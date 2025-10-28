@@ -23,6 +23,6 @@ services:
 
 databases:
   - name: must-lms-db
-    databaseName: LMS_MUST_DB_ORG
+    databaseName: lms_must_db_org 
     user: postgres
     plan: free
