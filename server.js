@@ -2780,6 +2780,33 @@ app.post('/api/assignments', async (req, res) => {
       max_points, lecturer_id, lecturer_name
     } = req.body;
 
+    console.log('=== CREATE ASSIGNMENT API DEBUG ===');
+    console.log('Request Body:', req.body);
+    console.log('Title:', title);
+    console.log('Program Name:', program_name);
+    console.log('Deadline:', deadline);
+    console.log('Submission Type:', submission_type);
+    console.log('Max Points:', max_points);
+    console.log('Lecturer ID:', lecturer_id);
+    console.log('Lecturer Name:', lecturer_name);
+
+    // Validate required fields
+    if (!title || !program_name || !deadline) {
+      console.error('Missing required fields');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: title, program_name, or deadline' 
+      });
+    }
+
+    if (!lecturer_id || !lecturer_name) {
+      console.error('Missing lecturer information');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing lecturer information' 
+      });
+    }
+
     const result = await pool.query(`
       INSERT INTO assignments (
         title, description, program_name, deadline, submission_type, 
@@ -2787,9 +2814,12 @@ app.post('/api/assignments', async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
     `, [title, description, program_name, deadline, submission_type, max_points, lecturer_id, lecturer_name, 'active']);
 
+    console.log('Assignment created successfully:', result.rows[0]);
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Error creating assignment:', error);
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ success: false, error: error.message });
   }
 });
