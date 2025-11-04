@@ -5149,6 +5149,98 @@ app.post('/api/admin/email', async (req, res) => {
   }
 });
 
+// ==================== PASSWORD CHANGE ENDPOINT ====================
+
+// Change password for logged-in users
+app.post('/api/change-password', async (req, res) => {
+  try {
+    const { userId, username, currentPassword, newPassword, userType } = req.body;
+    
+    console.log('=== CHANGE PASSWORD DEBUG ===');
+    console.log('User Type:', userType);
+    console.log('User ID:', userId);
+    console.log('Username:', username);
+    
+    // Validate inputs
+    if (!currentPassword || !newPassword || !userType) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields' 
+      });
+    }
+    
+    // Determine which table to query
+    const table = userType === 'student' ? 'students' : 'lecturers';
+    const idField = userType === 'student' ? 'registration_number' : 'employee_id';
+    
+    // Get user from database
+    const userQuery = `SELECT * FROM ${table} WHERE ${idField} = $1`;
+    const userResult = await pool.query(userQuery, [username]);
+    
+    if (userResult.rows.length === 0) {
+      console.log('User not found in database');
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+    
+    const user = userResult.rows[0];
+    console.log('User found:', user.name || user.username);
+    
+    // Verify current password
+    if (user.password !== currentPassword) {
+      console.log('Current password incorrect');
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Current password is incorrect' 
+      });
+    }
+    
+    // Update password
+    const updateQuery = `UPDATE ${table} SET password = $1 WHERE ${idField} = $2 RETURNING *`;
+    const updateResult = await pool.query(updateQuery, [newPassword, username]);
+    
+    if (updateResult.rows.length === 0) {
+      console.log('Failed to update password');
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to update password' 
+      });
+    }
+    
+    console.log('Password updated successfully for:', username);
+    
+    // Also update in password_records table if it exists
+    try {
+      await pool.query(`
+        UPDATE password_records 
+        SET password = $1, updated_at = CURRENT_TIMESTAMP 
+        WHERE user_type = $2 AND (user_id = $3 OR username = $4)
+      `, [newPassword, userType, userId, username]);
+      console.log('Password record also updated');
+    } catch (recordError) {
+      console.log('Password records table may not exist or update failed:', recordError.message);
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Password updated successfully',
+      data: {
+        username: user.name || user.username,
+        userType
+      }
+    });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error while changing password',
+      error: error.message 
+    });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 
 // Start server
