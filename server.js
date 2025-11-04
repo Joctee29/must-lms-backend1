@@ -4350,6 +4350,7 @@ const initializeVenuesTable = async () => {
 // Get all timetable entries
 app.get('/api/timetable', async (req, res) => {
   try {
+    console.log('=== TIMETABLE GET ALL DEBUG ===');
     const result = await pool.query(`
       SELECT * FROM timetable 
       ORDER BY 
@@ -4365,20 +4366,28 @@ app.get('/api/timetable', async (req, res) => {
         time_start
     `);
     
-    console.log('=== TIMETABLE API DEBUG ===');
-    console.log('Total timetable entries:', result.rows.length);
-    console.log('Timetable entries:', result.rows);
+    console.log('Total Timetable Entries:', result.rows.length);
+    console.log('Sample Entry:', result.rows[0]);
     
-    res.json({ success: true, data: result.rows });
+    res.json({ 
+      success: true, 
+      data: result.rows 
+    });
   } catch (error) {
     console.error('Error fetching timetable:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
   }
 });
 
 // Create new timetable entry
 app.post('/api/timetable', async (req, res) => {
   try {
+    console.log('=== TIMETABLE CREATE DEBUG ===');
+    console.log('Request Body:', req.body);
+    
     const {
       day,
       time_start,
@@ -4392,9 +4401,6 @@ app.post('/api/timetable', async (req, res) => {
       semester,
       academic_year
     } = req.body;
-
-    console.log('=== TIMETABLE CREATE DEBUG ===');
-    console.log('Received data:', req.body);
 
     // Validate required fields
     if (!day || !time_start || !time_end || !program_name || !lecturer_name || !venue) {
