@@ -12,14 +12,14 @@ const app = express();
 const activeSessions = new Map(); // userId -> { userType, username, loginTime }
 
 // Email configuration - will be updated from database
-let CURRENT_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'uj23hiueddhpna2y@ethereal.email';
+let CURRENT_ADMIN_EMAIL = 'uj23hiueddhpna2y@ethereal.email';
 const EMAIL_CONFIG = {
-  host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: process.env.SMTP_SECURE === 'true' || false,
+  host: 'smtp.ethereal.email',
+  port: 587,
+  secure: false,
   auth: {
-    user: process.env.SMTP_USER || 'uj23hiueddhpna2y@ethereal.email',
-    pass: process.env.SMTP_PASS || 'bUBwMXt6UWqgK4Tetd'
+    user: 'uj23hiueddhpna2y@ethereal.email', // Working test email
+    pass: 'bUBwMXt6UWqgK4Tetd' // Working test password
   }
 };
 
@@ -161,24 +161,70 @@ const upload = multer({
   }
 });
 
+// CORS Configuration for Production
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // List of allowed origins
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002',
+      // Add your Netlify domains here
+      /\.netlify\.app$/,  // Allows all Netlify subdomains
+      /\.onrender\.com$/  // Allows all Render domains
+    ];
+    
+    // Check if origin is allowed
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return origin === allowedOrigin;
+      }
+      if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(null, true); // Allow anyway for now - change to false in production
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Serve static files from uploads directory
 app.use('/content', express.static(uploadsDir));
 
-// PostgreSQL connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  // Fallback for local development
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'LMS_MUST_DB_ORG',
-  password: process.env.DB_PASSWORD || '@Jctnftr01',
-  port: parseInt(process.env.DB_PORT) || 5432,
-});
+// PostgreSQL connection - Use environment variables for production
+const poolConfig = process.env.DATABASE_URL 
+  ? {
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    }
+  : {
+      user: process.env.DB_USER || 'postgres',
+      host: process.env.DB_HOST || 'localhost',
+      database: process.env.DB_NAME || 'LMS_MUST_DB_ORG',
+      password: process.env.DB_PASSWORD || '@Jctnftr01',
+      port: process.env.DB_PORT || 5432,
+    };
+
+const pool = new Pool(poolConfig);
 
 // Test database connection
 pool.connect((err, client, release) => {
@@ -438,10 +484,155 @@ const initializeDatabase = async () => {
 
 // API Routes
 
+// Authentication endpoint for student and lecturer login
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password, userType } = req.body;
+    
+    console.log('=== LOGIN ATTEMPT ===');
+    console.log('Username:', username);
+    console.log('User Type:', userType);
+    
+    if (!username || !password || !userType) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Username, password, and user type are required' 
+      });
+    }
+    
+    let user = null;
+    let query = '';
+    let params = [];
+    
+    if (userType === 'student') {
+      // Try to find student by registration number, email, or name
+      query = `
+        SELECT * FROM students 
+        WHERE registration_number = $1 
+           OR email = $1 
+           OR LOWER(name) = LOWER($1)
+      `;
+      params = [username];
+      
+      const result = await pool.query(query, params);
+      
+      if (result.rows.length > 0) {
+        const student = result.rows[0];
+        
+        // Verify password
+        if (student.password === password) {
+          user = {
+            id: student.id,
+            name: student.name,
+            registration_number: student.registration_number,
+            email: student.email,
+            course_id: student.course_id,
+            academic_year: student.academic_year,
+            current_semester: student.current_semester,
+            type: 'student'
+          };
+          
+          console.log('Student login successful:', user.name);
+        } else {
+          console.log('Password mismatch for student:', username);
+        }
+      } else {
+        console.log('Student not found:', username);
+      }
+      
+    } else if (userType === 'lecturer') {
+      // Try to find lecturer by employee_id, email, or name
+      query = `
+        SELECT * FROM lecturers 
+        WHERE employee_id = $1 
+           OR email = $1 
+           OR LOWER(name) = LOWER($1)
+      `;
+      params = [username];
+      
+      const result = await pool.query(query, params);
+      
+      if (result.rows.length > 0) {
+        const lecturer = result.rows[0];
+        
+        // Verify password
+        if (lecturer.password === password) {
+          user = {
+            id: lecturer.id,
+            name: lecturer.name,
+            employee_id: lecturer.employee_id,
+            email: lecturer.email,
+            specialization: lecturer.specialization,
+            phone: lecturer.phone,
+            type: 'lecturer'
+          };
+          
+          console.log('Lecturer login successful:', user.name);
+        } else {
+          console.log('Password mismatch for lecturer:', username);
+        }
+      } else {
+        console.log('Lecturer not found:', username);
+      }
+    } else {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid user type. Must be "student" or "lecturer"' 
+      });
+    }
+    
+    if (user) {
+      res.json({ 
+        success: true, 
+        data: user,
+        message: `Welcome ${user.name}!`
+      });
+    } else {
+      res.status(401).json({ 
+        success: false, 
+        error: 'Invalid username or password' 
+      });
+    }
+    
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error during login. Please try again.' 
+    });
+  }
+});
+
 // Lecturer routes
 app.post('/api/lecturers', async (req, res) => {
   try {
     const { name, employeeId, specialization, email, phone, password } = req.body;
+    
+    // Check if email already exists
+    const existingEmail = await pool.query(
+      'SELECT id FROM lecturers WHERE email = $1',
+      [email]
+    );
+    
+    if (existingEmail.rows.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Email already exists. Please use a different email address.' 
+      });
+    }
+    
+    // Check if employee ID already exists
+    const existingEmployeeId = await pool.query(
+      'SELECT id FROM lecturers WHERE employee_id = $1',
+      [employeeId]
+    );
+    
+    if (existingEmployeeId.rows.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Employee ID already exists. Please use a different employee ID.' 
+      });
+    }
     
     const result = await pool.query(
       `INSERT INTO lecturers (name, employee_id, specialization, email, phone, password) 
@@ -459,6 +650,22 @@ app.post('/api/lecturers', async (req, res) => {
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Error creating lecturer:', error);
+    
+    // Handle specific database errors
+    if (error.code === '23505') {
+      if (error.constraint === 'lecturers_email_key') {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Email already exists. Please use a different email address.' 
+        });
+      } else if (error.constraint === 'lecturers_employee_id_key') {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Employee ID already exists. Please use a different employee ID.' 
+        });
+      }
+    }
+    
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -3115,6 +3322,22 @@ app.post('/api/live-classes/:id/auto-start', async (req, res) => {
 // Automatic scheduler - checks every 10 seconds for classes that should start
 const checkScheduledClasses = async () => {
   try {
+    // Check database connection first
+    const client = await pool.connect().catch(err => {
+      if (err.code === 'ECONNREFUSED') {
+        // Database not available - fail silently to avoid spam
+        return null;
+      }
+      throw err;
+    });
+    
+    if (!client) {
+      // Database not connected, skip this check silently
+      return;
+    }
+    
+    client.release();
+    
     console.log('=== CHECKING SCHEDULED CLASSES ===');
     console.log(`Scheduler running at: ${new Date().toLocaleString()}`);
     
@@ -3274,7 +3497,11 @@ const checkScheduledClasses = async () => {
       }
     }
   } catch (error) {
-    console.error('❌ Error in automatic scheduler:', error);
+    // Only log non-connection errors to avoid spam
+    if (error.code !== 'ECONNREFUSED') {
+      console.error('❌ Error in automatic scheduler:', error.message);
+    }
+    // Connection errors are silently ignored as database may not be available yet
   }
 };
 
