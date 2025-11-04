@@ -2781,18 +2781,18 @@ app.post('/api/assignments', async (req, res) => {
     } = req.body;
 
     console.log('=== CREATE ASSIGNMENT API DEBUG ===');
-    console.log('Request Body:', req.body);
-    console.log('Title:', title);
-    console.log('Program Name:', program_name);
-    console.log('Deadline:', deadline);
-    console.log('Submission Type:', submission_type);
-    console.log('Max Points:', max_points);
-    console.log('Lecturer ID:', lecturer_id);
-    console.log('Lecturer Name:', lecturer_name);
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+    console.log('Title:', title, '(type:', typeof title, ')');
+    console.log('Program Name:', program_name, '(type:', typeof program_name, ')');
+    console.log('Deadline:', deadline, '(type:', typeof deadline, ')');
+    console.log('Submission Type:', submission_type, '(type:', typeof submission_type, ')');
+    console.log('Max Points:', max_points, '(type:', typeof max_points, ')');
+    console.log('Lecturer ID:', lecturer_id, '(type:', typeof lecturer_id, ')');
+    console.log('Lecturer Name:', lecturer_name, '(type:', typeof lecturer_name, ')');
 
     // Validate required fields
     if (!title || !program_name || !deadline) {
-      console.error('Missing required fields');
+      console.error('❌ Missing required fields');
       return res.status(400).json({ 
         success: false, 
         error: 'Missing required fields: title, program_name, or deadline' 
@@ -2800,24 +2800,49 @@ app.post('/api/assignments', async (req, res) => {
     }
 
     if (!lecturer_id || !lecturer_name) {
-      console.error('Missing lecturer information');
+      console.error('❌ Missing lecturer information');
+      console.error('Lecturer ID provided:', lecturer_id);
+      console.error('Lecturer Name provided:', lecturer_name);
       return res.status(400).json({ 
         success: false, 
-        error: 'Missing lecturer information' 
+        error: 'Missing lecturer information. Please ensure you are logged in properly.' 
       });
     }
+
+    // Convert lecturer_id to integer if it's a string
+    const lecturerIdInt = parseInt(lecturer_id);
+    if (isNaN(lecturerIdInt)) {
+      console.error('❌ Invalid lecturer_id:', lecturer_id);
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid lecturer ID format' 
+      });
+    }
+
+    console.log('✅ All validations passed. Inserting into database...');
+    console.log('Converted Lecturer ID:', lecturerIdInt);
 
     const result = await pool.query(`
       INSERT INTO assignments (
         title, description, program_name, deadline, submission_type, 
         max_points, lecturer_id, lecturer_name, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
-    `, [title, description, program_name, deadline, submission_type, max_points, lecturer_id, lecturer_name, 'active']);
+    `, [
+      title, 
+      description || '', 
+      program_name, 
+      deadline, 
+      submission_type || 'text', 
+      max_points || 100, 
+      lecturerIdInt, 
+      lecturer_name, 
+      'active'
+    ]);
 
-    console.log('Assignment created successfully:', result.rows[0]);
+    console.log('✅ Assignment created successfully:', result.rows[0]);
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Error creating assignment:', error);
+    console.error('❌ Error creating assignment:', error);
     console.error('Error details:', error.message);
     console.error('Error stack:', error.stack);
     res.status(500).json({ success: false, error: error.message });
