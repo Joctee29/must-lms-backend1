@@ -5217,13 +5217,18 @@ app.post('/api/change-password', async (req, res) => {
     
     const user = userResult.rows[0];
     console.log('User found:', user.name || user.username);
+    console.log('Stored password (first 4 chars):', user.password?.substring(0, 4) + '...');
+    console.log('Provided password (first 4 chars):', currentPassword?.substring(0, 4) + '...');
+    console.log('Password match:', user.password === currentPassword);
     
     // Verify current password
     if (user.password !== currentPassword) {
       console.log('Current password incorrect');
+      console.log('Expected:', user.password);
+      console.log('Received:', currentPassword);
       return res.status(401).json({ 
         success: false, 
-        message: 'Current password is incorrect' 
+        message: 'Current password is incorrect. Please check and try again.' 
       });
     }
     
