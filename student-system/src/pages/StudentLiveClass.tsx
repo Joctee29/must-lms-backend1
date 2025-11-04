@@ -1,0 +1,235 @@
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Video, 
+  Clock,
+  Globe,
+  Award,
+  AlertCircle,
+  ExternalLink
+} from "lucide-react";
+
+interface LiveClassViewerProps {
+  classId?: string;
+  onLeaveClass?: () => void;
+}
+
+export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps) => {
+  const [liveClasses, setLiveClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isGoogleMeetAuthenticated, setIsGoogleMeetAuthenticated] = useState(true);
+
+  // Load live classes on component mount
+  useEffect(() => {
+    fetchLiveClasses();
+    
+    // Set up automatic refresh every 10 seconds to check for status updates
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing live classes...');
+      fetchLiveClasses();
+    }, 10000); // 10 seconds - more frequent to catch status changes quickly
+    
+    // Cleanup interval on component unmount
+    return () => clearInterval(interval);
+  }, []);
+
+  // No authentication required - Google Meet will handle its own auth when student clicks join
+
+  // Fetch live classes for student's program
+  const fetchLiveClasses = async () => {
+    try {
+      setLoading(true);
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      
+      // Get student info
+      const studentResponse = await fetch('https://must-lms-backend.onrender.com/api/students');
+      const studentsResult = await studentResponse.json();
+      
+      const currentStudent = studentsResult.data?.find(s => 
+        s.name === currentUser.username || 
+        s.email === currentUser.username ||
+        s.registration_number === currentUser.username
+      );
+      
+      if (!currentStudent) {
+        console.error('Student not found');
+        setLoading(false);
+        return;
+      }
+      
+      // Get live classes for student's program
+      const liveClassResponse = await fetch('https://must-lms-backend.onrender.com/api/live-classes');
+      const liveClassResult = await liveClassResponse.json();
+      
+      // Enhanced filtering for student's program with debugging
+      console.log('=== LIVE CLASS FILTERING DEBUG ===');
+      console.log('All Live Classes:', liveClassResult.data);
+      console.log('Current Student:', currentStudent);
+      console.log('Student Course Name:', currentStudent.course_name);
+      
+      const studentClasses = liveClassResult.data?.filter(liveClass => {
+        console.log('Checking Live Class:', liveClass.title, 'Program:', liveClass.program_name);
+        
+        const mappedCourse = liveClass.mapped_course || liveClass.program_name;
+        const studentCourse = currentStudent.course_name;
+        
+        // Multiple matching strategies
+        let matches = false;
+        
+        // Strategy 1: Direct course name matching
+        if (mappedCourse && studentCourse) {
+          matches = mappedCourse.toUpperCase().includes(studentCourse.toUpperCase()) ||
+                   studentCourse.toUpperCase().includes(mappedCourse.toUpperCase());
+        }
+        
+        // Strategy 2: Program name matching (for program-based classes)
+        if (!matches && liveClass.program_name && currentStudent.course_name) {
+          matches = liveClass.program_name.toLowerCase().includes('computer') && 
+                   currentStudent.course_name.toLowerCase().includes('computer') ||
+                   liveClass.program_name.toLowerCase().includes('information') && 
+                   currentStudent.course_name.toLowerCase().includes('information') ||
+                   liveClass.program_name.toLowerCase().includes('engineering') && 
+                   currentStudent.course_name.toLowerCase().includes('engineering');
+        }
+        
+        // Strategy 3: Show all active/live classes (temporary for debugging)
+        if (!matches && (liveClass.status === 'live' || liveClass.status === 'scheduled')) {
+          console.log('Showing all live/scheduled classes for debugging');
+          matches = true; // Show all live classes for now
+        }
+        
+        console.log('Match Result:', matches, 'for class:', liveClass.title);
+        return matches;
+      }) || [];
+      
+      console.log('Filtered Student Classes:', studentClasses);
+      
+      setLiveClasses(studentClasses);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching live classes:', error);
+      setLoading(false);
+    }
+  };
+
+  // Join Google Meet class - works with any Google account
+  const joinGoogleMeetClass = (meetingUrl) => {
+    console.log('Student joining Google Meet:', meetingUrl);
+    
+    // Open the actual meeting URL directly
+    // Google Meet will prompt for sign-in if needed
+    if (meetingUrl && meetingUrl.includes('meet.google.com')) {
+      alert('🎓 Joining Google Meet!\n\nYou will be taken to Google Meet where you can:\n• Sign in with your Google account (any email)\n• Turn on camera and microphone\n• Join the live class session\n• Participate in the lesson');
+      
+      window.open(meetingUrl, '_blank', 'width=1200,height=800');
+    } else {
+      alert('❌ Invalid meeting link. Please contact your lecturer.');
+    }
+  };
+
+  // Check if class time has arrived for scheduled classes
+  const isClassTimeReached = (classDate, classTime) => {
+    const classDateTime = new Date(`${classDate} ${classTime}`);
+    const now = new Date();
+    return now >= classDateTime;
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="p-6 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p>Loading live classes...</p>
+      </div>
+    );
+  }
+
+  // Main live classes interface
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Live Classes</h1>
+        <Badge variant="outline" className="text-sm">
+          Google Meet Integration
+        </Badge>
+      </div>
+
+      {liveClasses.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-12">
+            <Video className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Live Classes</h3>
+            <p className="text-gray-500">
+              There are no live classes available for your program at the moment.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {liveClasses.map((liveClass) => (
+            <Card key={liveClass.id}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`w-3 h-3 rounded-full ${
+                        liveClass.status === 'live' ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'
+                      }`}></div>
+                      <Badge variant={liveClass.status === 'live' ? 'destructive' : 'secondary'}>
+                        {liveClass.status === 'live' ? '🔴 LIVE NOW' : '⏰ SCHEDULED'}
+                      </Badge>
+                      {liveClass.status === 'scheduled' && (
+                        <span className="text-xs text-gray-500">
+                          Starts at {liveClass.time} on {liveClass.date}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <h3 className="text-xl font-semibold mb-1">{liveClass.title}</h3>
+                    <p className="text-gray-600 mb-2">{liveClass.description}</p>
+                    
+                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <Globe className="h-4 w-4" />
+                        <span>{liveClass.program_name}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        <span>
+                          {liveClass.date} at {liveClass.time}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="ml-6">
+                    {liveClass.status === 'live' || 
+                     (liveClass.status === 'scheduled' && isClassTimeReached(liveClass.date, liveClass.time)) ? (
+                      <Button 
+                        onClick={() => joinGoogleMeetClass(liveClass.meeting_url || 'https://meet.google.com/new')}
+                        className="bg-blue-600 hover:bg-blue-700"
+                        size="lg"
+                      >
+                        <Video className="h-4 w-4 mr-2" />
+                        Join Now
+                      </Button>
+                    ) : (
+                      <Button variant="outline" disabled>
+                        <Clock className="h-4 w-4 mr-2" />
+                        Scheduled
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default StudentLiveClass;

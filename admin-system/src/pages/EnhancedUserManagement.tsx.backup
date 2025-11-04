@@ -1,0 +1,580 @@
+import { useState, useEffect } from "react";
+import { lecturerOperations, studentOperations, courseOperations, initializeDatabase } from "@/lib/database";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UserPlus, Users, GraduationCap, BookOpen, Building, Search, Filter } from "lucide-react";
+
+interface Student {
+  id: string;
+  name: string;
+  registrationNumber: string;
+  academicYear: string;
+  courseId: string;
+  college: string;
+  department: string;
+  course: string;
+  programs: string[];
+  currentSemester: number;
+  email: string;
+  phone: string;
+  password: string;
+}
+
+interface Lecturer {
+  id: string;
+  name: string;
+  employeeId: string;
+  specialization: string;
+  email: string;
+  phone: string;
+  password: string;
+  courses: string[];
+}
+
+const mockAcademicYears = ["2025/2026", "2024/2025", "2023/2024"];
+
+export const EnhancedUserManagement = () => {
+  const [students, setStudents] = useState<Student[]>([]);
+  const [lecturers, setLecturers] = useState<Lecturer[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Student form state
+  const [studentForm, setStudentForm] = useState({
+    name: "",
+    registrationNumber: "",
+    academicYear: "",
+    courseId: "",
+    email: "",
+    phone: "",
+    password: "",
+    currentSemester: 1
+  });
+
+  // Lecturer form state
+  const [lecturerForm, setLecturerForm] = useState({
+    name: "",
+    employeeId: "",
+    specialization: "",
+    email: "",
+    phone: "",
+    password: "",
+    courses: [] as string[]
+  });
+
+  // Initialize database and load data
+  useEffect(() => {
+    const initializeAndLoadData = async () => {
+      try {
+        await initializeDatabase();
+        await loadLecturers();
+        await loadStudents();
+        await loadCourses();
+      } catch (error) {
+        console.error('Error initializing data:', error);
+      }
+    };
+
+    initializeAndLoadData();
+  }, []);
+
+  // Load lecturers from database
+  const loadLecturers = async () => {
+    try {
+      const dbLecturers = await lecturerOperations.getAll();
+      const formattedLecturers = dbLecturers.map((lecturer: any) => ({
+        id: lecturer.id.toString(),
+        name: lecturer.name,
+        employeeId: lecturer.employee_id,
+        specialization: lecturer.specialization,
+        email: lecturer.email,
+        phone: lecturer.phone,
+        password: lecturer.password,
+        courses: []
+      }));
+      setLecturers(formattedLecturers);
+    } catch (error) {
+      console.error('Error loading lecturers:', error);
+    }
+  };
+
+  // Load students from database
+  const loadStudents = async () => {
+    try {
+      const dbStudents = await studentOperations.getAll();
+      const formattedStudents = dbStudents.map((student: any) => ({
+        id: student.id.toString(),
+        name: student.name,
+        registrationNumber: student.registration_number,
+        academicYear: student.academic_year,
+        courseId: student.course_id?.toString() || "",
+        college: "MUST",
+        department: "Auto-assigned", 
+        course: student.course_name || "Unknown Course",
+        programs: [],
+        currentSemester: student.current_semester,
+        email: student.email,
+        phone: student.phone,
+        password: student.password
+      }));
+      setStudents(formattedStudents);
+    } catch (error) {
+      console.error('Error loading students:', error);
+    }
+  };
+
+  // Load courses from database
+  const loadCourses = async () => {
+    try {
+      const dbCourses = await courseOperations.getAllCourses();
+      setCourses(dbCourses);
+    } catch (error) {
+      console.error('Error loading courses:', error);
+    }
+  };
+
+  const handleAddStudent = async () => {
+    // Validation
+    if (!studentForm.name.trim()) {
+      toast.error("Please enter student name");
+      return;
+    }
+    if (!studentForm.registrationNumber.trim()) {
+      toast.error("Please enter registration number");
+      return;
+    }
+    if (!studentForm.email.trim() || !studentForm.email.includes('@')) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    if (!studentForm.password.trim() || studentForm.password.length < 6) {
+      toast.error("Password must be at least 6 characters long");
+      return;
+    }
+    if (studentForm.name && studentForm.registrationNumber && studentForm.courseId && studentForm.academicYear) {
+      setLoading(true);
+      try {
+        await studentOperations.create({
+          name: studentForm.name,
+          registrationNumber: studentForm.registrationNumber,
+          academicYear: studentForm.academicYear,
+          courseId: parseInt(studentForm.courseId),
+          currentSemester: studentForm.currentSemester,
+          email: studentForm.email,
+          phone: studentForm.phone,
+          password: studentForm.password
+        });
+        
+        await loadStudents();
+        setStudentForm({
+          name: "",
+          registrationNumber: "",
+          academicYear: "",
+          courseId: "",
+          email: "",
+          phone: "",
+          password: "",
+          currentSemester: 1
+        });
+        toast.success("Student registered successfully!");
+      } catch (error) {
+        console.error('Error adding student:', error);
+        toast.error("Failed to register student. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleAddLecturer = async () => {
+    // Validation
+    if (!lecturerForm.name.trim()) {
+      toast.error("Please enter lecturer name");
+      return;
+    }
+    if (!lecturerForm.employeeId.trim()) {
+      toast.error("Please enter check number");
+      return;
+    }
+    if (!lecturerForm.email.trim() || !lecturerForm.email.includes('@')) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    if (!lecturerForm.password.trim() || lecturerForm.password.length < 6) {
+      toast.error("Password must be at least 6 characters long");
+      return;
+    }
+    if (lecturerForm.name && lecturerForm.employeeId) {
+      setLoading(true);
+      try {
+        await lecturerOperations.create({
+          name: lecturerForm.name,
+          employeeId: lecturerForm.employeeId,
+          specialization: lecturerForm.specialization,
+          email: lecturerForm.email,
+          phone: lecturerForm.phone,
+          password: lecturerForm.password
+        });
+        
+        await loadLecturers();
+        setLecturerForm({
+          name: "",
+          employeeId: "",
+          specialization: "",
+          email: "",
+          phone: "",
+          password: "",
+          courses: []
+        });
+        toast.success("Lecturer registered successfully!");
+      } catch (error) {
+        console.error('Error adding lecturer:', error);
+        toast.error("Failed to register lecturer. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const getSelectedCourse = () => {
+    return courses.find(c => c.id.toString() === studentForm.courseId);
+  };
+
+  const filteredStudents = students.filter(student => 
+    student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.registrationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.course.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredLecturers = lecturers.filter(lecturer =>
+    lecturer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    lecturer.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    lecturer.specialization.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">User Management</h1>
+          <p className="text-muted-foreground">Manage students and lecturers with automatic course data</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-64"
+            />
+          </div>
+        </div>
+      </div>
+
+      <Tabs defaultValue="students" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="students">Students</TabsTrigger>
+          <TabsTrigger value="lecturers">Lecturers</TabsTrigger>
+        </TabsList>
+
+        {/* Students Tab */}
+        <TabsContent value="students" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserPlus className="h-5 w-5" />
+                Add New Student
+              </CardTitle>
+              <CardDescription>Register a new student with automatic course data fetching</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="studentName">Student Name</Label>
+                  <Input
+                    id="studentName"
+                    value={studentForm.name}
+                    onChange={(e) => setStudentForm({...studentForm, name: e.target.value})}
+                    placeholder="e.g., John Doe"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="regNumber">Registration Number</Label>
+                  <Input
+                    id="regNumber"
+                    value={studentForm.registrationNumber}
+                    onChange={(e) => setStudentForm({...studentForm, registrationNumber: e.target.value})}
+                    placeholder="e.g., ST2025001"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="academicYear">Academic Year</Label>
+                  <Select value={studentForm.academicYear} onValueChange={(value) => setStudentForm({...studentForm, academicYear: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select academic year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mockAcademicYears.map((year) => (
+                        <SelectItem key={year} value={year}>
+                          {year}
+                        </SelectItem>
+                      )))
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="course">Course</Label>
+                  <Select value={studentForm.courseId} onValueChange={(value) => setStudentForm({...studentForm, courseId: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select course" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {courses.map((course) => (
+                        <SelectItem key={course.id} value={course.id.toString()}>
+                          {course.code} - {course.name}
+                        </SelectItem>
+                      )))
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="semester">Current Semester</Label>
+                  <Select value={studentForm.currentSemester.toString()} onValueChange={(value) => setStudentForm({...studentForm, currentSemester: parseInt(value)})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select semester" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 2].map((sem) => (
+                        <SelectItem key={sem} value={sem.toString()}>
+                          Semester {sem}
+                        </SelectItem>
+                      )))
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={studentForm.email}
+                    onChange={(e) => setStudentForm({...studentForm, email: e.target.value})}
+                    placeholder="student@must.ac.tz"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={studentForm.phone}
+                    onChange={(e) => setStudentForm({...studentForm, phone: e.target.value})}
+                    placeholder="+255 xxx xxx xxx"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="studentPassword">Password</Label>
+                  <Input
+                    id="studentPassword"
+                    type="password"
+                    value={studentForm.password}
+                    onChange={(e) => setStudentForm({...studentForm, password: e.target.value})}
+                    placeholder="Enter secure password"
+                  />
+                </div>
+              </div>
+
+              {/* Auto-fetched Course Information */}
+              {getSelectedCourse() && (
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="font-semibold text-blue-900 mb-2">Auto-fetched Course Information:</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                    <p><span className="font-medium">Course Name:</span> {getSelectedCourse()?.name}</p>
+                    <p><span className="font-medium">Course Code:</span> {getSelectedCourse()?.code}</p>
+                    <p><span className="font-medium">Duration:</span> {getSelectedCourse()?.duration} years</p>
+                    <p><span className="font-medium">Description:</span> {getSelectedCourse()?.description}</p>
+                  </div>
+                </div>
+              )}
+
+              <Button onClick={handleAddStudent} className="w-full" disabled={loading}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                {loading ? 'Registering...' : 'Register Student'}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Registered Students ({filteredStudents.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {filteredStudents.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    <p>No students registered yet</p>
+                    <p className="text-sm mt-2">Register students using the form above. Data will be saved to PostgreSQL database.</p>
+                  </div>
+                ) : (
+                  filteredStudents.map((student) => (
+                  <Card key={student.id} className="border-l-4 border-l-blue-500">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{student.name}</h3>
+                            <Badge variant="secondary">{student.registrationNumber}</Badge>
+                            <Badge variant="outline">Semester {student.currentSemester}</Badge>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                            <p><span className="font-medium">Academic Year:</span> {student.academicYear}</p>
+                            <p><span className="font-medium">College:</span> {student.college}</p>
+                            <p><span className="font-medium">Department:</span> {student.department}</p>
+                            <p><span className="font-medium">Course:</span> {student.course}</p>
+                            <p><span className="font-medium">Email:</span> {student.email}</p>
+                            <p><span className="font-medium">Phone:</span> {student.phone}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium mb-1">Programs:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {student.programs.map((program, index) => (
+                                <Badge key={index} variant="outline" className="text-xs">
+                                  {program}
+                                </Badge>
+                              )))
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm">Edit</Button>
+                          <Button variant="outline" size="sm">View Details</Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )))
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Lecturers Tab */}
+        <TabsContent value="lecturers" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Add New Lecturer
+              </CardTitle>
+              <CardDescription>Register a new lecturer</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="lecturerName">Lecturer Name</Label>
+                  <Input
+                    id="lecturerName"
+                    value={lecturerForm.name}
+                    onChange={(e) => setLecturerForm({...lecturerForm, name: e.target.value})}
+                    placeholder="e.g., Dr. Jane Smith"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="employeeId">Check Number</Label>
+                  <Input
+                    id="employeeId"
+                    value={lecturerForm.employeeId}
+                    onChange={(e) => setLecturerForm({...lecturerForm, employeeId: e.target.value})}
+                    placeholder="e.g., CHK2025001"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="specialization">Specialization</Label>
+                  <Input
+                    id="specialization"
+                    value={lecturerForm.specialization}
+                    onChange={(e) => setLecturerForm({...lecturerForm, specialization: e.target.value})}
+                    placeholder="e.g., Structural Engineering"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lecturerEmail">Email</Label>
+                  <Input
+                    id="lecturerEmail"
+                    type="email"
+                    value={lecturerForm.email}
+                    onChange={(e) => setLecturerForm({...lecturerForm, email: e.target.value})}
+                    placeholder="lecturer@must.ac.tz"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lecturerPhone">Phone</Label>
+                  <Input
+                    id="lecturerPhone"
+                    value={lecturerForm.phone}
+                    onChange={(e) => setLecturerForm({...lecturerForm, phone: e.target.value})}
+                    placeholder="+255 xxx xxx xxx"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lecturerPassword">Password</Label>
+                  <Input
+                    id="lecturerPassword"
+                    type="password"
+                    value={lecturerForm.password}
+                    onChange={(e) => setLecturerForm({...lecturerForm, password: e.target.value})}
+                    placeholder="Enter secure password"
+                  />
+                </div>
+              </div>
+              <Button onClick={handleAddLecturer} className="w-full" disabled={loading}>
+                <Users className="h-4 w-4 mr-2" />
+                {loading ? 'Registering...' : 'Register Lecturer'}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Registered Lecturers ({filteredLecturers.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {filteredLecturers.map((lecturer) => (
+                  <Card key={lecturer.id} className="border-l-4 border-l-green-500">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{lecturer.name}</h3>
+                            <Badge variant="secondary">{lecturer.employeeId}</Badge>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                            <p><span className="font-medium">Specialization:</span> {lecturer.specialization}</p>
+                            <p><span className="font-medium">Email:</span> {lecturer.email}</p>
+                            <p><span className="font-medium">Phone:</span> {lecturer.phone}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm">Edit</Button>
+                          <Button variant="outline" size="sm">Assign Courses</Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )))
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
