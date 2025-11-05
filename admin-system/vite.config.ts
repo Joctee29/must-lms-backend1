@@ -8,7 +8,11 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 3002,
   },
-  plugins: [react()],
+  plugins: [react({
+    // Force JSX runtime to be included
+    jsxRuntime: 'automatic',
+    jsxImportSource: 'react',
+  })],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -17,6 +21,9 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],
         },
