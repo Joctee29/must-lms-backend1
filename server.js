@@ -2957,18 +2957,32 @@ app.get('/api/lecturer-programs', async (req, res) => {
   }
 });
 
-// Get assignments for lecturer
+// Get assignments for lecturer or all assignments
 app.get('/api/assignments', async (req, res) => {
   try {
     const { lecturer_id } = req.query;
     
-    const result = await pool.query(`
-      SELECT a.*, COUNT(s.id) as submission_count
-      FROM assignments a
-      LEFT JOIN assignment_submissions s ON a.id = s.assignment_id
-      WHERE a.lecturer_id = $1
-      GROUP BY a.id ORDER BY a.created_at DESC
-    `, [lecturer_id]);
+    let result;
+    
+    if (lecturer_id) {
+      // Get assignments for specific lecturer
+      result = await pool.query(`
+        SELECT a.*, COUNT(s.id) as submission_count
+        FROM assignments a
+        LEFT JOIN assignment_submissions s ON a.id = s.assignment_id
+        WHERE a.lecturer_id = $1
+        GROUP BY a.id ORDER BY a.created_at DESC
+      `, [lecturer_id]);
+    } else {
+      // Get all active assignments (for students)
+      result = await pool.query(`
+        SELECT a.*, COUNT(s.id) as submission_count
+        FROM assignments a
+        LEFT JOIN assignment_submissions s ON a.id = s.assignment_id
+        WHERE a.status = 'active' AND a.deadline > NOW()
+        GROUP BY a.id ORDER BY a.created_at DESC
+      `);
+    }
 
     res.json({ success: true, data: result.rows });
   } catch (error) {
