@@ -52,7 +52,7 @@ export const LiveClassroom = () => {
     setLoading(false);
   }, []);
 
-  // No authentication required - Google Meet will handle its own auth when user clicks join
+  // No authentication required - Jitsi Meet works without any login
 
   // Load lecturer's programs (regular + short-term)
   const loadLecturerPrograms = async () => {
@@ -124,28 +124,18 @@ export const LiveClassroom = () => {
     }
   };
 
-  // Generate Google Meet URL with proper format
-  const generateGoogleMeetUrl = () => {
-    // Generate proper Google Meet format: xxx-yyyy-zzz
-    const generateSegment = (length) => {
-      const chars = 'abcdefghijklmnopqrstuvwxyz';
-      let result = '';
-      for (let i = 0; i < length; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      return result;
-    };
+  // Generate a unique Jitsi Meet URL (free, no authentication required)
+  const generateJitsiMeetUrl = () => {
+    // Generate unique room name for Jitsi Meet
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 10);
+    const roomName = `MUST-LiveClass-${timestamp}-${randomStr}`;
     
-    // Google Meet format: 3 letters - 4 letters - 3 letters
-    const segment1 = generateSegment(3);  // xxx
-    const segment2 = generateSegment(4);  // yyyy  
-    const segment3 = generateSegment(3);  // zzz
+    // Jitsi Meet URL format - works without authentication
+    const meetingUrl = `https://meet.jit.si/${roomName}`;
     
-    const meetingCode = `${segment1}-${segment2}-${segment3}`;
-    const meetingUrl = `https://meet.google.com/${meetingCode}`;
-    
-    console.log('Generated Google Meet URL:', meetingUrl);
-    console.log('Meeting Code Format:', meetingCode);
+    console.log('Generated Jitsi Meet URL:', meetingUrl);
+    console.log('Room Name:', roomName);
     
     return meetingUrl;
   };
@@ -181,7 +171,7 @@ export const LiveClassroom = () => {
         return;
       }
       
-      const meetingUrl = generateGoogleMeetUrl();
+      const meetingUrl = generateJitsiMeetUrl();
       const roomId = `room_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       
       const classData = {
@@ -210,7 +200,7 @@ export const LiveClassroom = () => {
       console.log('API Response:', result);
       
       if (response.ok && result.success) {
-        alert(`✅ Class scheduled successfully!\n\nGoogle Meet Link: ${meetingUrl}\n\nStudents will see this class in their portal and can join when the time arrives.`);
+        alert(`✅ Class scheduled successfully!\n\nMeeting Link: ${meetingUrl}\n\nStudents will see this class in their portal and can join when the time arrives.\n\nNote: This uses Jitsi Meet - a free, secure video conferencing platform.`);
         setScheduledClass({ title: '', description: '', program: '', date: '', time: '', duration: '60' });
         setShowCreateClass(false);
         loadActiveLiveClasses();
@@ -245,7 +235,7 @@ export const LiveClassroom = () => {
         return;
       }
       
-      const meetingUrl = generateGoogleMeetUrl();
+      const meetingUrl = generateJitsiMeetUrl();
       
       // Create class data with proper formatting
       const roomId = `room_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
@@ -276,12 +266,11 @@ export const LiveClassroom = () => {
       console.log('API Response:', result);
       
       if (response.ok && result.success) {
-        alert(`✅ Live class started successfully!\n\nGoogle Meet will open automatically.\n\nStudents can now join this class from their portal.`);
+        alert(`✅ Live class started successfully!\n\nJitsi Meet will open automatically.\n\nStudents can now join this class from their portal.\n\nNote: Jitsi Meet is a free, secure video conferencing platform.`);
         
-        // Open Google Meet for lecturer - use "new meeting" for reliability
-        const newMeetingUrl = 'https://meet.google.com/new';
-        console.log('Opening Google Meet for lecturer:', newMeetingUrl);
-        window.open(newMeetingUrl, '_blank', 'width=1200,height=800');
+        // Open Jitsi Meet for lecturer
+        console.log('Opening Jitsi Meet for lecturer:', meetingUrl);
+        window.open(meetingUrl, '_blank', 'width=1200,height=800');
         
         // Reset form and close
         setInstantClass({ title: '', description: '', program: '', duration: '60' });
@@ -299,17 +288,14 @@ export const LiveClassroom = () => {
 
   // Join existing live class
   const joinLiveClass = (meetingUrl) => {
-    console.log('Joining Google Meet:', meetingUrl);
+    console.log('Joining live class:', meetingUrl);
     
-    // If custom generated URL, redirect to Google Meet new meeting
-    if (meetingUrl && meetingUrl.includes('meet.google.com')) {
-      // For generated URLs, use Google Meet's "new meeting" feature
-      const newMeetingUrl = 'https://meet.google.com/new';
-      console.log('Opening Google Meet new meeting:', newMeetingUrl);
-      window.open(newMeetingUrl, '_blank', 'width=1200,height=800');
+    // Open the meeting URL directly (works for both Jitsi Meet and Google Meet)
+    if (meetingUrl && (meetingUrl.includes('meet.jit.si') || meetingUrl.includes('meet.google.com'))) {
+      console.log('Opening meeting:', meetingUrl);
+      window.open(meetingUrl, '_blank', 'width=1200,height=800');
     } else {
-      // For real Google Meet URLs, open directly
-      window.open(meetingUrl || 'https://meet.google.com/new', '_blank', 'width=1200,height=800');
+      alert('❌ Invalid meeting URL');
     }
   };
 
@@ -350,7 +336,7 @@ export const LiveClassroom = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Live Classroom</h1>
         <Badge variant="outline" className="text-sm">
-          Google Meet Integration
+          Jitsi Meet Integration
         </Badge>
       </div>
 

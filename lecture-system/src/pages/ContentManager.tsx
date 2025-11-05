@@ -599,14 +599,31 @@ export const ContentManager = () => {
                   variant="outline" 
                   size="sm"
                   onClick={() => {
+                    console.log('=== VIEW CONTENT DEBUG (LECTURER) ===');
+                    console.log('Content Item:', item);
+                    console.log('File URL:', item.fileUrl);
+                    
+                    // Validate file URL
+                    if (!item.fileUrl) {
+                      alert('Error: File URL is missing. Please re-upload this content.');
+                      console.error('Missing fileUrl for content:', item);
+                      return;
+                    }
+                    
                     // Handle different file types for viewing
                     const fileExtension = item.fileUrl?.split('.').pop()?.toLowerCase();
+                    console.log('File Extension:', fileExtension);
+                    
                     const viewableTypes = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'txt', 'html'];
                     const videoTypes = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'];
                     
+                    const fullUrl = `https://must-lms-backend.onrender.com${item.fileUrl}`;
+                    console.log('Full URL:', fullUrl);
+                    
                     if (viewableTypes.includes(fileExtension)) {
                       // Open directly in browser for viewable files
-                      window.open(`https://must-lms-backend.onrender.com${item.fileUrl}`, '_blank');
+                      console.log('Opening viewable file:', fullUrl);
+                      window.open(fullUrl, '_blank');
                     } else if (videoTypes.includes(fileExtension)) {
                       // Create video player page for video files
                       const videoContent = `

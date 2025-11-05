@@ -289,14 +289,31 @@ const MaterialsComponent = () => {
                 className="flex-1" 
                 variant="outline"
                 onClick={() => {
+                  console.log('=== VIEW MATERIAL DEBUG ===');
+                  console.log('Material:', material);
+                  console.log('File URL:', material.file_url);
+                  
+                  // Validate file URL
+                  if (!material.file_url) {
+                    alert('Error: File URL is missing. Please contact your lecturer.');
+                    console.error('Missing file_url for material:', material);
+                    return;
+                  }
+                  
                   // Handle different file types for viewing
                   const fileExtension = material.file_url?.split('.').pop()?.toLowerCase();
+                  console.log('File Extension:', fileExtension);
+                  
                   const viewableTypes = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'txt', 'html'];
                   const videoTypes = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'];
                   
+                  const fullUrl = `https://must-lms-backend.onrender.com${material.file_url}`;
+                  console.log('Full URL:', fullUrl);
+                  
                   if (viewableTypes.includes(fileExtension)) {
                     // Open directly in browser for viewable files
-                    window.open(`https://must-lms-backend.onrender.com${material.file_url}`, '_blank');
+                    console.log('Opening viewable file:', fullUrl);
+                    window.open(fullUrl, '_blank');
                   } else if (videoTypes.includes(fileExtension)) {
                     // Create video player page for video files
                     const videoContent = `
@@ -329,7 +346,6 @@ const MaterialsComponent = () => {
                           
                           <div class="info">
                             <p><span class="label">Program:</span> ${material.program_name}</p>
-                            <p><span class="label">Lecturer:</span> ${material.lecturer_name || 'Unknown'}</p>
                             <p><span class="label">File Size:</span> ${material.file_size}</p>
                             <p><span class="label">Upload Date:</span> ${material.upload_date ? new Date(material.upload_date).toLocaleDateString() : 'N/A'}</p>
                             ${material.description ? `<p><span class="label">Description:</span> ${material.description}</p>` : ''}
@@ -369,7 +385,6 @@ const MaterialsComponent = () => {
                           
                           <div class="info">
                             <p><span class="label">Program:</span> ${material.program_name}</p>
-                            <p><span class="label">Lecturer:</span> ${material.lecturer_name || 'Unknown'}</p>
                             <p><span class="label">File Size:</span> ${material.file_size}</p>
                             <p><span class="label">Upload Date:</span> ${material.upload_date ? new Date(material.upload_date).toLocaleDateString() : 'N/A'}</p>
                             <p><span class="label">File Type:</span> ${fileExtension?.toUpperCase() || 'Unknown'}</p>
@@ -494,8 +509,6 @@ const Index = () => {
         return <CourseCatalog />;
       case "grades":
         return <Grades />;
-      case "schedule":
-        return <Timetable />;
       case "old-schedule":
         return (
           <div className="p-6">
@@ -572,6 +585,17 @@ const Index = () => {
                 const newPassword = formData.get('newPassword') as string;
                 const confirmPassword = formData.get('confirmPassword') as string;
                 
+                // Validation
+                if (!currentPassword || !newPassword || !confirmPassword) {
+                  alert('Please fill in all password fields');
+                  return;
+                }
+                
+                if (newPassword.length < 4) {
+                  alert('New password must be at least 4 characters long');
+                  return;
+                }
+                
                 if (newPassword !== confirmPassword) {
                   alert('New passwords do not match!');
                   return;
@@ -579,6 +603,10 @@ const Index = () => {
                 
                 try {
                   const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+                  
+                  console.log('=== PASSWORD RESET DEBUG (STUDENT) ===');
+                  console.log('Current User:', currentUser);
+                  
                   const response = await fetch('https://must-lms-backend.onrender.com/api/change-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -591,15 +619,20 @@ const Index = () => {
                     })
                   });
                   
+                  console.log('Response Status:', response.status);
+                  
                   const result = await response.json();
+                  console.log('Response Data:', result);
+                  
                   if (result.success) {
-                    alert('Password updated successfully!');
+                    alert('Password updated successfully! Please use your new password next time you login.');
                     (e.target as HTMLFormElement).reset();
                   } else {
-                    alert(result.message || 'Failed to update password');
+                    alert(result.message || 'Failed to update password. Please check your current password.');
                   }
                 } catch (error) {
-                  alert('Error updating password. Please try again.');
+                  console.error('Password reset error:', error);
+                  alert('Error updating password. Please check your internet connection and try again.');
                 }
               }} className="space-y-4">
                 <div>

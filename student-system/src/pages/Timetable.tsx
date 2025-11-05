@@ -64,12 +64,14 @@ const Timetable = () => {
       setLoading(true);
       console.log('=== STUDENT TIMETABLE DEBUG ===');
       console.log('Current User:', currentUser);
+      console.log('Username:', currentUser.username);
 
       // 1. Get student information
       const studentsResponse = await fetch(`${API_BASE_URL}/students`);
       if (studentsResponse.ok) {
         const studentsResult = await studentsResponse.json();
         console.log('Students API Response:', studentsResult);
+        console.log('Total Students:', studentsResult.data?.length);
 
         // Find current student
         const student = studentsResult.data?.find((s: any) => 
@@ -79,6 +81,8 @@ const Timetable = () => {
         );
 
         console.log('Found Student:', student);
+        console.log('Student Course ID:', student?.course_id);
+        console.log('Student Course Name:', student?.course_name);
 
         if (student) {
           setStudentData(student);
@@ -95,19 +99,26 @@ const Timetable = () => {
             ) || [];
 
             console.log('Student Programs:', studentPrograms);
+            console.log('Student Programs Count:', studentPrograms.length);
+            console.log('Program Names:', studentPrograms.map((p: any) => p.name));
 
             // 3. Get timetable entries for student's programs
             const timetableResponse = await fetch(`${API_BASE_URL}/timetable`);
             if (timetableResponse.ok) {
               const timetableResult = await timetableResponse.json();
               console.log('Timetable API Response:', timetableResult);
+              console.log('Total Timetable Entries:', timetableResult.data?.length);
+              console.log('All Program Names in Timetable:', timetableResult.data?.map((e: any) => e.program_name));
 
               // Filter timetable entries for student's programs
-              const studentTimetable = timetableResult.data?.filter((entry: any) => 
-                studentPrograms.some((program: any) => program.name === entry.program_name)
-              ) || [];
+              const studentTimetable = timetableResult.data?.filter((entry: any) => {
+                const match = studentPrograms.some((program: any) => program.name === entry.program_name);
+                console.log(`Checking entry "${entry.program_name}": ${match ? 'MATCH' : 'NO MATCH'}`);
+                return match;
+              }) || [];
 
               console.log('Student Timetable Entries:', studentTimetable);
+              console.log('Filtered Timetable Count:', studentTimetable.length);
               setTimetableEntries(studentTimetable);
             }
           }

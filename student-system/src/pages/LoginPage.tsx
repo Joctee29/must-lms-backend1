@@ -233,7 +233,7 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
             <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md">
               <CardHeader className="text-center pb-6">
                 {/* MUST Logo */}
-                <div className="flex justify-center mb-6">
+                <div className="flex justify-center mb-4 md:mb-6">
                   <img 
                     src="/must-logo.png" 
                     alt="MUST" 
@@ -241,13 +241,13 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
                   />
                 </div>
                 
-                <CardTitle className="text-3xl font-bold text-gray-900 mb-2">
+                <CardTitle className="text-xl md:text-3xl font-bold text-gray-900 mb-2">
                   Reset Password
                 </CardTitle>
-                <CardDescription className="text-lg">
+                <CardDescription className="text-sm md:text-lg">
                   Student Portal - MUST LMS
                 </CardDescription>
-                <CardDescription className="text-sm text-gray-600 mt-2">
+                <CardDescription className="text-xs md:text-sm text-gray-600 mt-2">
                   Enter your details to reset your password
                 </CardDescription>
               </CardHeader>
@@ -255,9 +255,9 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
               <CardContent>
                 {/* Step 1: Enter Email */}
                 {resetStep === 'email' && (
-                  <form onSubmit={handleSendResetCode} className="space-y-6">
+                  <form onSubmit={handleSendResetCode} className="space-y-4 md:space-y-6">
                     <div className="space-y-2">
-                      <Label htmlFor="reset-email" className="text-base font-medium">
+                      <Label htmlFor="reset-email" className="text-sm md:text-base font-medium">
                         Email Address
                       </Label>
                       <Input
@@ -266,7 +266,7 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
                         placeholder="your.email@student.must.ac.tz"
                         value={forgotPasswordData.email}
                         onChange={(e) => setForgotPasswordData({...forgotPasswordData, email: e.target.value})}
-                        className="h-12 text-base border-2 focus:border-blue-500"
+                        className="h-10 md:h-12 text-sm md:text-base border-2 focus:border-blue-500"
                         required
                       />
                     </div>
@@ -286,10 +286,10 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
                     <Button 
                       type="submit" 
                       disabled={resetStatus === 'sending'}
-                      className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
+                      className="w-full h-10 md:h-12 text-base md:text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
                     >
                       {resetStatus === 'sending' ? 'Sending...' : 'Send Reset Code'}
-                      <ArrowRight className="ml-2 h-5 w-5" />
+                      <ArrowRight className="ml-2 h-4 w-4 md:h-5 md:w-5" />
                     </Button>
                   </form>
                 )}
@@ -457,7 +457,7 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
           <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md">
             <CardHeader className="text-center pb-6">
               {/* MUST Logo */}
-              <div className="flex justify-center mb-6">
+              <div className="flex justify-center mb-4 md:mb-6">
                 <img 
                   src="/must-logo.png" 
                   alt="MUST" 
@@ -465,21 +465,21 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
                 />
               </div>
               
-              <CardTitle className="text-3xl font-bold text-gray-900 mb-2">
+              <CardTitle className="text-xl md:text-3xl font-bold text-gray-900 mb-2">
                 MUST LMS
               </CardTitle>
-              <CardDescription className="text-lg">
+              <CardDescription className="text-sm md:text-lg">
                 Mbeya University of Science and Technology
               </CardDescription>
-              <CardDescription className="text-sm text-gray-600 mt-2">
+              <CardDescription className="text-xs md:text-sm text-gray-600 mt-2">
                 Enter your credentials to access the Learning Management System
               </CardDescription>
             </CardHeader>
             
             <CardContent>
-              <form onSubmit={handleLogin} className="space-y-6">
+              <form onSubmit={handleLogin} className="space-y-4 md:space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="registration" className="text-base font-medium flex items-center">
+                  <Label htmlFor="registration" className="text-sm md:text-base font-medium flex items-center">
                     <User className="h-4 w-4 mr-2" />
                     Registration Number
                   </Label>
@@ -489,13 +489,13 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
                     placeholder="e.g., MUST/2024/001234"
                     value={loginData.registrationNumber}
                     onChange={(e) => setLoginData({...loginData, registrationNumber: e.target.value})}
-                    className="h-12 text-base border-2 focus:border-blue-500"
+                    className="h-10 md:h-12 text-sm md:text-base border-2 focus:border-blue-500"
                     required
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-base font-medium flex items-center">
+                  <Label htmlFor="password" className="text-sm md:text-base font-medium flex items-center">
                     <Lock className="h-4 w-4 mr-2" />
                     Password
                   </Label>
@@ -505,17 +505,17 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
                     placeholder="Enter your password"
                     value={loginData.password}
                     onChange={(e) => setLoginData({...loginData, password: e.target.value})}
-                    className="h-12 text-base border-2 focus:border-blue-500"
+                    className="h-10 md:h-12 text-sm md:text-base border-2 focus:border-blue-500"
                     required
                   />
                 </div>
                 
                 <Button 
                   type="submit" 
-                  className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
+                  className="w-full h-10 md:h-12 text-base md:text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
                 >
                   Login to LMS
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                  <ArrowRight className="ml-2 h-4 w-4 md:h-5 md:w-5" />
                 </Button>
               </form>
               

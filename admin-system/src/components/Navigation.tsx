@@ -36,7 +36,6 @@ export const Navigation = ({ activeSection, onSectionChange }: NavigationProps) 
     { id: "reports", label: "Reports & Analytics", icon: BarChart3 },
     { id: "content", label: "Content Management", icon: FileText },
     { id: "communications", label: "Communications", icon: MessageSquare },
-    { id: "schedule", label: "Academic Calendar", icon: Calendar },
     { id: "system", label: "Academic Settings", icon: Settings },
   ];
 

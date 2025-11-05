@@ -15,6 +15,8 @@ import {
   ClipboardList,
   TrendingUp,
   Megaphone,
+  Menu,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -25,6 +27,8 @@ interface NavigationProps {
 }
 
 export const Navigation = ({ activeSection, onSectionChange }: NavigationProps) => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const navigationItems = [
     { id: "dashboard", label: "Dashboard", icon: Home },
     { id: "courses", label: "My Programs", icon: BookOpen },
@@ -35,32 +39,62 @@ export const Navigation = ({ activeSection, onSectionChange }: NavigationProps) 
     { id: "assignments", label: "Assignments", icon: Search },
     { id: "students", label: "Students", icon: Users },
     { id: "discussions", label: "Discussions", icon: MessageSquare },
-    { id: "schedule", label: "Schedule", icon: Calendar },
     { id: "announcements", label: "Announcements", icon: Megaphone },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
+  const handleNavClick = (sectionId: string) => {
+    onSectionChange(sectionId);
+    setIsMobileMenuOpen(false); // Close menu after selection on mobile
+  };
+
   return (
-    <nav className="w-full md:w-64 border-r bg-card p-2 md:p-4 overflow-x-auto md:overflow-visible">
-      <div className="flex md:flex-col space-x-1 md:space-x-0 md:space-y-2">
-        {navigationItems.map((item) => {
-          const IconComponent = item.icon;
-          return (
-            <Button
-              key={item.id}
-              variant="ghost"
-              className={cn(
-                "flex-shrink-0 md:w-full justify-start whitespace-nowrap px-3 md:px-4",
-                activeSection === item.id && "bg-primary/10 text-primary hover:bg-primary/15"
-              )}
-              onClick={() => onSectionChange(item.id)}
-            >
-              <IconComponent className="mr-2 md:mr-3 h-4 w-4" />
-              <span className="text-xs md:text-sm">{item.label}</span>
-            </Button>
-          );
-        })}
-      </div>
-    </nav>
+    <>
+      {/* Mobile Menu Button - Only visible on mobile */}
+      <button
+        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        className="md:hidden fixed top-24 left-4 z-50 text-gray-700 hover:text-gray-900 transition-colors"
+        aria-label="Toggle menu"
+      >
+        {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+      </button>
+
+      {/* Overlay - Only on mobile when menu is open */}
+      {isMobileMenuOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Navigation */}
+      <nav
+        className={cn(
+          "fixed md:relative top-0 left-0 h-full w-64 border-r bg-card p-4 z-40 transition-transform duration-300 ease-in-out",
+          // Mobile: slide in/out from left
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}
+      >
+        <div className="flex flex-col space-y-2 mt-16 md:mt-0">
+          {navigationItems.map((item) => {
+            const IconComponent = item.icon;
+            return (
+              <Button
+                key={item.id}
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start px-4",
+                  activeSection === item.id && "bg-primary/10 text-primary hover:bg-primary/15"
+                )}
+                onClick={() => handleNavClick(item.id)}
+              >
+                <IconComponent className="h-5 w-5 mr-3" />
+                <span className="text-sm">{item.label}</span>
+              </Button>
+            );
+          })}
+        </div>
+      </nav>
+    </>
   );
 };

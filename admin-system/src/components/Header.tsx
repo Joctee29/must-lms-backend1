@@ -17,6 +17,81 @@ const mustLogo = "/must-logo.png";
 
 export const Header = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  // Fetch notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        // Fetch system-wide data
+        const [studentsRes, lecturersRes, coursesRes] = await Promise.all([
+          fetch('https://must-lms-backend.onrender.com/api/students'),
+          fetch('https://must-lms-backend.onrender.com/api/lecturers'),
+          fetch('https://must-lms-backend.onrender.com/api/courses')
+        ]);
+        
+        const students = await studentsRes.json();
+        const lecturers = await lecturersRes.json();
+        const courses = await coursesRes.json();
+        
+        const newNotifications: any[] = [];
+        
+        // Add recent students
+        if (students.success && students.data) {
+          const recentStudents = students.data.filter((s: any) => {
+            if (!s.created_at) return false;
+            const createdDate = new Date(s.created_at);
+            const daysSinceCreated = (Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
+            return daysSinceCreated <= 7; // Last 7 days
+          });
+          
+          if (recentStudents.length > 0) {
+            newNotifications.push({
+              title: '🎓 New Students',
+              message: `${recentStudents.length} new student(s) registered`,
+              time: 'Last 7 days'
+            });
+          }
+        }
+        
+        // Add recent lecturers
+        if (lecturers.success && lecturers.data) {
+          const recentLecturers = lecturers.data.filter((l: any) => {
+            if (!l.created_at) return false;
+            const createdDate = new Date(l.created_at);
+            const daysSinceCreated = (Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
+            return daysSinceCreated <= 7; // Last 7 days
+          });
+          
+          if (recentLecturers.length > 0) {
+            newNotifications.push({
+              title: '👨‍🏫 New Lecturers',
+              message: `${recentLecturers.length} new lecturer(s) added`,
+              time: 'Last 7 days'
+            });
+          }
+        }
+        
+        // System stats
+        if (students.success && lecturers.success && courses.success) {
+          newNotifications.push({
+            title: '📊 System Overview',
+            message: `${students.data?.length || 0} students, ${lecturers.data?.length || 0} lecturers, ${courses.data?.length || 0} courses`,
+            time: 'Current'
+          });
+        }
+        
+        setNotifications(newNotifications);
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+      }
+    };
+    
+    fetchNotifications();
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchNotifications, 300000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,17 +157,35 @@ export const Header = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="relative">
                 <Bell className="h-5 w-5" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs">
-                  0
-                </Badge>
+                {notifications.length > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs bg-red-500">
+                    {notifications.length}
+                  </Badge>
+                )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuContent align="end" className="w-80 max-h-96 overflow-y-auto">
               <DropdownMenuLabel>System Notifications</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <div className="p-4 text-center text-muted-foreground">
-                <p>No new notifications</p>
-              </div>
+              {notifications.length === 0 ? (
+                <div className="p-4 text-center text-muted-foreground">
+                  <p>No new notifications</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {notifications.map((notif, index) => (
+                    <div key={index} className="p-3 hover:bg-muted/50 cursor-pointer border-b last:border-b-0">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{notif.title}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{notif.message}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{notif.time}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 

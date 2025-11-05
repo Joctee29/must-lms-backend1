@@ -184,30 +184,32 @@ const LandingPage = ({ onShowLogin }: LandingPageProps) => {
       <div className="relative z-10">
         {/* Header */}
         <header className="bg-white/60 backdrop-blur-md border-b sticky top-0 z-50">
-          <div className="container mx-auto px-4 py-4">
+          <div className="container mx-auto px-2 md:px-4 py-2 md:py-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-7">
-                <img src="/must-logo.png" alt="MUST" className="h-28 w-28 object-contain" />
+              <div className="flex items-center space-x-2 md:space-x-7">
+                <img src="/must-logo.png" alt="MUST" className="h-20 w-20 md:h-28 md:w-28 object-contain" />
                 <div>
-                  <h1 className="text-5xl font-bold text-gray-900 drop-shadow-sm">MUST</h1>
-                  <p className="text-xl text-gray-800 font-semibold drop-shadow-sm">Mbeya University of Science and Technology</p>
+                  <h1 className="text-xl md:text-5xl font-bold text-gray-900 drop-shadow-sm">MUST</h1>
+                  <p className="hidden md:block text-xl text-gray-800 font-semibold drop-shadow-sm">Mbeya University of Science and Technology</p>
+                  <p className="md:hidden text-[10px] leading-tight text-gray-800 font-semibold drop-shadow-sm">Mbeya University of Science and Technology</p>
                 </div>
               </div>
-              <Badge variant="outline" className="text-sm px-3 py-1 bg-blue-100 text-blue-700">
-                Learning Management System (LMS)
+              <Badge variant="outline" className="text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 bg-blue-100 text-blue-700">
+                <span className="hidden md:inline">Learning Management System (LMS)</span>
+                <span className="md:hidden">LMS</span>
               </Badge>
             </div>
           </div>
         </header>
 
         {/* Hero Section */}
-        <section className="py-20 px-4">
+        <section className="py-10 md:py-20 px-2 md:px-4">
           <div className="container mx-auto text-center">
             <div className="max-w-4xl mx-auto">
-              <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+              <h1 className="text-2xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 md:mb-6">
                 Welcome to <span className="text-blue-600">MUST</span> LMS
               </h1>
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+              <p className="text-sm md:text-xl text-gray-600 mb-6 md:mb-8 leading-relaxed px-2">
                 Empowering excellence in science and technology education through innovative digital learning solutions. 
                 Join thousands of learners in their journey towards academic and professional success.
               </p>
@@ -219,19 +221,19 @@ const LandingPage = ({ onShowLogin }: LandingPageProps) => {
                   onShowLogin();
                 }}
                 size="lg"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 text-lg font-semibold shadow-lg"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-8 py-3 md:py-4 text-sm md:text-lg font-semibold shadow-lg"
               >
-                <LogIn className="mr-2 h-5 w-5" />
+                <LogIn className="mr-2 h-4 w-4 md:h-5 md:w-5" />
                 Access LMS Portal
               </Button>
             
               {/* Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-16">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mt-8 md:mt-16">
                 {stats.map((stat, index) => (
-                  <div key={index} className="bg-white rounded-lg p-6 shadow-lg">
-                    <stat.icon className={`h-8 w-8 ${stat.color} mx-auto mb-2`} />
-                    <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
-                    <div className="text-sm text-gray-600">{stat.label}</div>
+                  <div key={index} className="bg-white rounded-lg p-3 md:p-6 shadow-lg">
+                    <stat.icon className={`h-5 w-5 md:h-8 md:w-8 ${stat.color} mx-auto mb-1 md:mb-2`} />
+                    <div className="text-lg md:text-2xl font-bold text-gray-900">{stat.value}</div>
+                    <div className="text-xs md:text-sm text-gray-600">{stat.label}</div>
                   </div>
                 ))}
               </div>
@@ -240,11 +242,11 @@ const LandingPage = ({ onShowLogin }: LandingPageProps) => {
         </section>
 
       {/* Colleges & Departments */}
-      <section className="py-20 px-4">
+      <section className="py-10 md:py-20 px-2 md:px-4">
         <div className="container mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Academic Excellence</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <div className="text-center mb-8 md:mb-16">
+            <h2 className="text-2xl md:text-4xl font-bold text-gray-900 mb-2 md:mb-4">Academic Excellence</h2>
+            <p className="text-sm md:text-xl text-gray-600 max-w-3xl mx-auto px-2">
               Discover our comprehensive range of colleges, departments, and programs designed to shape the future leaders in science and technology.
             </p>
           </div>
@@ -299,23 +301,23 @@ const LandingPage = ({ onShowLogin }: LandingPageProps) => {
       </section>
 
       {/* Features */}
-      <section className="py-20 px-4 bg-gray-50">
+      <section className="py-10 md:py-20 px-2 md:px-4 bg-gray-50">
         <div className="container mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose MUST Student Portal?</h2>
-            <p className="text-xl text-gray-600">
+          <div className="text-center mb-8 md:mb-16">
+            <h2 className="text-2xl md:text-4xl font-bold text-gray-900 mb-2 md:mb-4">Why Choose MUST Student Portal?</h2>
+            <p className="text-sm md:text-xl text-gray-600 px-2">
               Experience cutting-edge educational technology designed for your success
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
             {features.map((feature, index) => (
-              <div key={index} className="text-center">
-                <div className="bg-white rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                  <feature.icon className="h-8 w-8 text-blue-600" />
+              <div key={index} className="text-center px-2">
+                <div className="bg-white rounded-full w-12 h-12 md:w-16 md:h-16 flex items-center justify-center mx-auto mb-2 md:mb-4 shadow-lg">
+                  <feature.icon className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                <p className="text-gray-600">{feature.description}</p>
+                <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-1 md:mb-2">{feature.title}</h3>
+                <p className="text-xs md:text-base text-gray-600">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -323,54 +325,54 @@ const LandingPage = ({ onShowLogin }: LandingPageProps) => {
       </section>
 
       {/* Contact & Info */}
-      <section className="py-16 px-4 bg-gray-900 text-white">
+      <section className="py-8 md:py-16 px-2 md:px-4 bg-gray-900 text-white">
         <div className="container mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
             <div>
-              <h3 className="text-xl font-bold mb-4">Contact Information</h3>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <MapPin className="h-5 w-5 text-blue-400" />
-                  <span>P.O.Box 131, Mbeya - Tanzania</span>
+              <h3 className="text-base md:text-xl font-bold mb-2 md:mb-4">Contact Information</h3>
+              <div className="space-y-2 md:space-y-3">
+                <div className="flex items-center space-x-2 md:space-x-3">
+                  <MapPin className="h-4 w-4 md:h-5 md:w-5 text-blue-400" />
+                  <span className="text-xs md:text-base">P.O.Box 131, Mbeya - Tanzania</span>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <Phone className="h-5 w-5 text-blue-400" />
-                  <span>+255 25 295 7544</span>
+                <div className="flex items-center space-x-2 md:space-x-3">
+                  <Phone className="h-4 w-4 md:h-5 md:w-5 text-blue-400" />
+                  <span className="text-xs md:text-base">+255 25 295 7544</span>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <Mail className="h-5 w-5 text-blue-400" />
-                  <span>must@must.ac.tz</span>
+                <div className="flex items-center space-x-2 md:space-x-3">
+                  <Mail className="h-4 w-4 md:h-5 md:w-5 text-blue-400" />
+                  <span className="text-xs md:text-base">must@must.ac.tz</span>
                 </div>
               </div>
             </div>
             
             <div>
-              <h3 className="text-xl font-bold mb-4">LMS Services</h3>
-              <div className="space-y-2">
-                <a href="#" className="block hover:text-blue-400 transition-colors">Academic Calendar</a>
-                <a href="#" className="block hover:text-blue-400 transition-colors">Course Registration</a>
-                <a href="#" className="block hover:text-blue-400 transition-colors">Learning Support</a>
-                <a href="#" className="block hover:text-blue-400 transition-colors">Library Services</a>
+              <h3 className="text-base md:text-xl font-bold mb-2 md:mb-4">LMS Services</h3>
+              <div className="space-y-1 md:space-y-2">
+                <a href="#" className="block hover:text-blue-400 transition-colors text-xs md:text-base">Academic Calendar</a>
+                <a href="#" className="block hover:text-blue-400 transition-colors text-xs md:text-base">Course Registration</a>
+                <a href="#" className="block hover:text-blue-400 transition-colors text-xs md:text-base">Learning Support</a>
+                <a href="#" className="block hover:text-blue-400 transition-colors text-xs md:text-base">Library Services</a>
               </div>
             </div>
             
             <div>
-              <h3 className="text-xl font-bold mb-4">Academic Year 2025/2026</h3>
-              <p className="text-gray-300 mb-4">
+              <h3 className="text-base md:text-xl font-bold mb-2 md:mb-4">Academic Year 2025/2026</h3>
+              <p className="text-gray-300 mb-2 md:mb-4 text-xs md:text-base">
                 Join us in our mission to advance science and technology education in Tanzania and beyond.
               </p>
               <div className="flex items-center space-x-2">
-                <Star className="h-5 w-5 text-yellow-400" />
-                <span className="text-sm">Accredited & Chartered University</span>
+                <Star className="h-4 w-4 md:h-5 md:w-5 text-yellow-400" />
+                <span className="text-xs md:text-sm">Accredited & Chartered University</span>
               </div>
             </div>
           </div>
           
-          <div className="border-t border-gray-700 mt-12 pt-8 text-center">
-            <div className="mb-4">
-              <span className="font-semibold text-lg text-white">MUST LMS</span>
+          <div className="border-t border-gray-700 mt-6 md:mt-12 pt-4 md:pt-8 text-center">
+            <div className="mb-2 md:mb-4">
+              <span className="font-semibold text-base md:text-lg text-white">MUST LMS</span>
             </div>
-            <p className="text-gray-400 text-sm mb-2">
+            <p className="text-gray-400 text-xs md:text-sm mb-1 md:mb-2 px-2">
               © 2026 Mbeya University of Science and Technology. All rights reserved.
             </p>
             <p className="text-xs text-gray-500">

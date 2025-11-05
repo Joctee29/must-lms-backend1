@@ -53,7 +53,7 @@ const MySchedule = () => {
     '08:00', '09:00', '10:00', '11:00', '12:00', 
     '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'
   ];
-  const API_BASE_URL = 'https://must-lms-backend.onrender.com/api';
+  const API_BASE_URL = 'http://localhost:5000/api';
 
   // Get current user
   const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
@@ -88,19 +88,31 @@ const MySchedule = () => {
 
           // 2. Get timetable entries for this lecturer
           const timetableResponse = await fetch(`${API_BASE_URL}/timetable/lecturer/${encodeURIComponent(lecturer.name)}`);
+          console.log('Timetable URL:', `${API_BASE_URL}/timetable/lecturer/${encodeURIComponent(lecturer.name)}`);
+          console.log('Timetable Response Status:', timetableResponse.status);
+          
           if (timetableResponse.ok) {
             const timetableResult = await timetableResponse.json();
             console.log('Lecturer Timetable Response:', timetableResult);
+            console.log('Timetable Entries Count:', timetableResult.data?.length);
             setTimetableEntries(timetableResult.data || []);
           } else {
+            console.log('Lecturer-specific endpoint failed, using fallback...');
             // Fallback: get all timetable and filter by lecturer name
             const allTimetableResponse = await fetch(`${API_BASE_URL}/timetable`);
             if (allTimetableResponse.ok) {
               const allTimetableResult = await allTimetableResponse.json();
-              const lecturerTimetable = allTimetableResult.data?.filter((entry: any) => 
-                entry.lecturer_name === lecturer.name
-              ) || [];
+              console.log('All Timetable Entries:', allTimetableResult.data?.length);
+              console.log('All Lecturer Names:', allTimetableResult.data?.map((e: any) => e.lecturer_name));
+              
+              const lecturerTimetable = allTimetableResult.data?.filter((entry: any) => {
+                const match = entry.lecturer_name === lecturer.name;
+                console.log(`Checking "${entry.lecturer_name}" === "${lecturer.name}": ${match ? 'MATCH' : 'NO MATCH'}`);
+                return match;
+              }) || [];
+              
               console.log('Filtered Lecturer Timetable:', lecturerTimetable);
+              console.log('Filtered Count:', lecturerTimetable.length);
               setTimetableEntries(lecturerTimetable);
             }
           }

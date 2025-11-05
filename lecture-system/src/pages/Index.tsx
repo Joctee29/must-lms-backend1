@@ -102,8 +102,6 @@ const Index = () => {
             <Assignments />
           </div>
         );
-      case "schedule":
-        return <MySchedule />;
       case "catalog":
         return <CourseCatalog />;
       case "content":
@@ -179,6 +177,17 @@ const Index = () => {
                   const newPassword = formData.get('newPassword') as string;
                   const confirmPassword = formData.get('confirmPassword') as string;
                   
+                  // Validation
+                  if (!currentPassword || !newPassword || !confirmPassword) {
+                    alert('Please fill in all password fields');
+                    return;
+                  }
+                  
+                  if (newPassword.length < 4) {
+                    alert('New password must be at least 4 characters long');
+                    return;
+                  }
+                  
                   if (newPassword !== confirmPassword) {
                     alert('New passwords do not match!');
                     return;
@@ -186,6 +195,10 @@ const Index = () => {
                   
                   try {
                     const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+                    
+                    console.log('=== PASSWORD RESET DEBUG (LECTURER) ===');
+                    console.log('Current User:', currentUser);
+                    
                     const response = await fetch('https://must-lms-backend.onrender.com/api/change-password', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -198,15 +211,20 @@ const Index = () => {
                       })
                     });
                     
+                    console.log('Response Status:', response.status);
+                    
                     const result = await response.json();
+                    console.log('Response Data:', result);
+                    
                     if (result.success) {
-                      alert('Password updated successfully!');
+                      alert('Password updated successfully! Please use your new password next time you login.');
                       (e.target as HTMLFormElement).reset();
                     } else {
-                      alert(result.message || 'Failed to update password');
+                      alert(result.message || 'Failed to update password. Please check your current password.');
                     }
                   } catch (error) {
-                    alert('Error updating password. Please try again.');
+                    console.error('Password reset error:', error);
+                    alert('Error updating password. Please check your internet connection and try again.');
                   }
                 }} className="space-y-4">
                   <div>

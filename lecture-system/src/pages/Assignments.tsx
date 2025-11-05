@@ -29,6 +29,7 @@ export const Assignments = () => {
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [lecturerPrograms, setLecturerPrograms] = useState([]);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   
   const [newAssignment, setNewAssignment] = useState({
     title: "",
@@ -45,21 +46,40 @@ export const Assignments = () => {
       try {
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         
+        console.log('=== FETCHING LECTURER DATA ===');
+        console.log('Current User from localStorage:', currentUser);
+        console.log('User ID:', currentUser.id);
+        console.log('Username:', currentUser.username);
+        
+        if (!currentUser.id) {
+          console.error('❌ No lecturer ID found in currentUser');
+          alert('Session error: Please log out and log in again.');
+          return;
+        }
+        
         // Fetch lecturer programs
+        console.log('Fetching programs for lecturer ID:', currentUser.id);
         const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/lecturer-programs?lecturer_id=${currentUser.id}`);
         if (programsResponse.ok) {
           const programsResult = await programsResponse.json();
+          console.log('Programs fetched:', programsResult.data);
           setLecturerPrograms(programsResult.data || []);
+        } else {
+          console.error('Failed to fetch programs:', programsResponse.status);
         }
         
         // Fetch assignments
+        console.log('Fetching assignments for lecturer ID:', currentUser.id);
         const assignmentsResponse = await fetch(`https://must-lms-backend.onrender.com/api/assignments?lecturer_id=${currentUser.id}`);
         if (assignmentsResponse.ok) {
           const assignmentsResult = await assignmentsResponse.json();
+          console.log('Assignments fetched:', assignmentsResult.data);
           setAssignments(assignmentsResult.data || []);
+        } else {
+          console.error('Failed to fetch assignments:', assignmentsResponse.status);
         }
       } catch (error) {
-        console.error('Error fetching lecturer data:', error);
+        console.error('❌ Error fetching lecturer data:', error);
         // Fallback programs
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         setLecturerPrograms([
@@ -76,19 +96,50 @@ export const Assignments = () => {
   // Create new assignment
   const handleCreateAssignment = async () => {
     try {
+      // Validation
+      if (!newAssignment.title || !newAssignment.program || !newAssignment.deadline) {
+        alert('Please fill in all required fields (Title, Program, Deadline)');
+        return;
+      }
+
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      
+      console.log('=== CREATING ASSIGNMENT DEBUG ===');
+      console.log('Current User:', JSON.stringify(currentUser, null, 2));
+      console.log('Current User ID:', currentUser.id, '(type:', typeof currentUser.id, ')');
+      console.log('Current User Username:', currentUser.username, '(type:', typeof currentUser.username, ')');
+      console.log('Current User Name:', currentUser.name);
+      console.log('New Assignment Data:', JSON.stringify(newAssignment, null, 2));
+      
+      // Validate lecturer information
+      if (!currentUser.id) {
+        console.error('❌ Missing lecturer ID');
+        alert('Error: Lecturer ID not found. Please log out and log in again.');
+        return;
+      }
+      
+      if (!currentUser.username && !currentUser.name) {
+        console.error('❌ Missing lecturer username/name');
+        alert('Error: Lecturer information not found. Please log out and log in again.');
+        return;
+      }
       
       const assignmentData = {
         title: newAssignment.title,
-        description: newAssignment.description,
+        description: newAssignment.description || '',
         program_name: newAssignment.program,
         deadline: newAssignment.deadline,
-        submission_type: newAssignment.submissionType,
-        max_points: newAssignment.maxPoints,
-        lecturer_id: currentUser.id,
-        lecturer_name: currentUser.username,
+        submission_type: newAssignment.submissionType || 'text',
+        max_points: parseInt(newAssignment.maxPoints) || 100,
+        lecturer_id: parseInt(currentUser.id),
+        lecturer_name: currentUser.username || currentUser.name,
         status: 'active'
       };
+
+      console.log('✅ Assignment Data to Send:', JSON.stringify(assignmentData, null, 2));
+      console.log('Lecturer ID:', assignmentData.lecturer_id, '(type:', typeof assignmentData.lecturer_id, ')');
+      console.log('Lecturer Name:', assignmentData.lecturer_name, '(type:', typeof assignmentData.lecturer_name, ')');
+      console.log('Max Points:', assignmentData.max_points, '(type:', typeof assignmentData.max_points, ')');
 
       const response = await fetch('https://must-lms-backend.onrender.com/api/assignments', {
         method: 'POST',
@@ -96,25 +147,49 @@ export const Assignments = () => {
         body: JSON.stringify(assignmentData)
       });
 
+      console.log('Response Status:', response.status);
+      console.log('Response OK:', response.ok);
+
+      const responseText = await response.text();
+      console.log('Raw Response:', responseText);
+      
       if (response.ok) {
-        const result = await response.json();
-        setAssignments(prev => [...prev, result.data]);
-        setNewAssignment({
-          title: "",
-          description: "",
-          program: "",
-          deadline: "",
-          submissionType: "text",
-          maxPoints: 100
-        });
-        setViewMode('list');
-        alert('Assignment created successfully!');
+        const result = JSON.parse(responseText);
+        console.log('Assignment Created Successfully:', result);
+        
+        if (result.success && result.data) {
+          setAssignments(prev => [...prev, result.data]);
+          setNewAssignment({
+            title: "",
+            description: "",
+            program: "",
+            deadline: "",
+            submissionType: "text",
+            maxPoints: 100
+          });
+          setShowCreateForm(false);
+          alert('Assignment created and sent to students successfully!');
+        } else {
+          console.error('Backend returned success=false:', result);
+          alert(`Failed to create assignment: ${result.error || result.message || 'Unknown error'}`);
+        }
       } else {
-        alert('Failed to create assignment. Please try again.');
+        console.error('HTTP Error:', response.status, response.statusText);
+        console.error('Response Body:', responseText);
+        
+        let errorMessage = 'Server error';
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch (e) {
+          errorMessage = responseText || errorMessage;
+        }
+        
+        alert(`Failed to create assignment (${response.status}): ${errorMessage}`);
       }
     } catch (error) {
       console.error('Error creating assignment:', error);
-      alert('Error creating assignment. Please try again.');
+      alert(`Error creating assignment: ${error.message || 'Please check your connection and try again'}`);
     }
   };
 
@@ -186,37 +261,51 @@ export const Assignments = () => {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Course</label>
+                <label className="text-sm font-medium">Program</label>
                 <select
-                  value={newAssignment.course}
-                  onChange={(e) => setNewAssignment({...newAssignment, course: e.target.value})}
+                  value={newAssignment.program}
+                  onChange={(e) => setNewAssignment({...newAssignment, program: e.target.value})}
                   className="w-full border rounded px-3 py-2"
                 >
-                  <option value="">Select Course</option>
-                  <option value="Advanced Mathematics">Advanced Mathematics</option>
-                  <option value="Physics Laboratory">Physics Laboratory</option>
-                  <option value="Computer Science">Computer Science</option>
-                  <option value="Chemistry 101">Chemistry 101</option>
+                  <option value="">Select Program</option>
+                  {lecturerPrograms.map((program) => (
+                    <option key={program.id} value={program.name}>
+                      {program.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Due Date</label>
+                <label className="text-sm font-medium">Deadline</label>
                 <Input
-                  type="date"
-                  value={newAssignment.dueDate}
-                  onChange={(e) => setNewAssignment({...newAssignment, dueDate: e.target.value})}
+                  type="datetime-local"
+                  value={newAssignment.deadline}
+                  onChange={(e) => setNewAssignment({...newAssignment, deadline: e.target.value})}
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Points</label>
+                <label className="text-sm font-medium">Max Points</label>
                 <Input
                   type="number"
                   placeholder="100"
-                  value={newAssignment.points}
-                  onChange={(e) => setNewAssignment({...newAssignment, points: parseInt(e.target.value)})}
+                  value={newAssignment.maxPoints}
+                  onChange={(e) => setNewAssignment({...newAssignment, maxPoints: parseInt(e.target.value)})}
                 />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Submission Type</label>
+                <select
+                  value={newAssignment.submissionType}
+                  onChange={(e) => setNewAssignment({...newAssignment, submissionType: e.target.value})}
+                  className="w-full border rounded px-3 py-2"
+                >
+                  <option value="text">Text (Type in portal)</option>
+                  <option value="pdf">PDF Upload</option>
+                </select>
               </div>
             </div>
             <div>
@@ -229,8 +318,9 @@ export const Assignments = () => {
               />
             </div>
             <div className="flex space-x-2">
-              <Button onClick={handleCreateAssignment} disabled={!newAssignment.title || !newAssignment.course}>
-                Create Assignment
+              <Button onClick={handleCreateAssignment} disabled={!newAssignment.title || !newAssignment.program}>
+                <Send className="mr-2 h-4 w-4" />
+                Send Assignment to Students
               </Button>
               <Button variant="outline" onClick={() => setShowCreateForm(false)}>
                 Cancel

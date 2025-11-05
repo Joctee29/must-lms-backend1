@@ -25,6 +25,7 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [studentData, setStudentData] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     const user = localStorage.getItem('currentUser');
@@ -32,6 +33,86 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
       setCurrentUser(JSON.parse(user));
     }
   }, []);
+
+  // Fetch notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!currentUser?.username) return;
+      
+      try {
+        // Fetch assignments, live classes, and announcements
+        const [assignmentsRes, liveClassesRes, announcementsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/assignments`),
+          fetch(`${API_BASE_URL}/live-classes`),
+          fetch(`${API_BASE_URL}/announcements`)
+        ]);
+        
+        const assignments = await assignmentsRes.json();
+        const liveClasses = await liveClassesRes.json();
+        const announcements = await announcementsRes.json();
+        
+        const newNotifications: any[] = [];
+        
+        // Add new assignments
+        if (assignments.success && assignments.data) {
+          const recentAssignments = assignments.data.filter((a: any) => {
+            const createdDate = new Date(a.created_at);
+            const daysSinceCreated = (Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
+            return daysSinceCreated <= 3; // Last 3 days
+          });
+          
+          recentAssignments.forEach((a: any) => {
+            newNotifications.push({
+              title: '📝 New Assignment',
+              message: `${a.title} - Due: ${new Date(a.deadline).toLocaleDateString()}`,
+              time: new Date(a.created_at).toLocaleString()
+            });
+          });
+        }
+        
+        // Add live classes
+        if (liveClasses.success && liveClasses.data) {
+          const activeClasses = liveClasses.data.filter((c: any) => 
+            c.status === 'live' || c.status === 'scheduled'
+          );
+          
+          activeClasses.forEach((c: any) => {
+            newNotifications.push({
+              title: c.status === 'live' ? '🔴 Live Class Now!' : '⏰ Upcoming Class',
+              message: `${c.title} - ${c.program_name}`,
+              time: `${c.date} at ${c.time}`
+            });
+          });
+        }
+        
+        // Add announcements
+        if (announcements.success && announcements.data) {
+          const recentAnnouncements = announcements.data.filter((a: any) => {
+            const createdDate = new Date(a.created_at);
+            const daysSinceCreated = (Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
+            return daysSinceCreated <= 7; // Last 7 days
+          });
+          
+          recentAnnouncements.slice(0, 5).forEach((a: any) => {
+            newNotifications.push({
+              title: '📢 Announcement',
+              message: a.title,
+              time: new Date(a.created_at).toLocaleString()
+            });
+          });
+        }
+        
+        setNotifications(newNotifications);
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+      }
+    };
+    
+    fetchNotifications();
+    // Refresh every 2 minutes
+    const interval = setInterval(fetchNotifications, 120000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   // Fetch student data
   useEffect(() => {
@@ -115,10 +196,10 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
   };
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-20 md:h-32 items-center px-2 md:px-4">
+      <div className="container flex h-20 md:h-32 items-center justify-between px-2 md:px-4">
         {/* Logo and Branding */}
         <div className="flex items-center space-x-2 md:space-x-8">
-          <img src="/must-logo.png" alt="MUST" className="h-12 w-12 md:h-28 md:w-28 object-contain" />
+          <img src="/must-logo.png" alt="MUST" className="h-20 w-20 md:h-28 md:w-28 object-contain" />
           <div className="flex flex-col">
             <span className="text-xl md:text-5xl font-bold text-foreground">MUST</span>
             <span className="hidden md:block text-lg font-semibold text-primary">Learning Management System</span>
@@ -127,8 +208,8 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="hidden sm:flex flex-1 items-center justify-center px-2 md:px-6">
+        {/* Search - Hidden on mobile */}
+        <div className="hidden md:flex flex-1 items-center justify-center px-2 md:px-6">
           <div className="w-full max-w-sm lg:max-w-md">
             <form onSubmit={handleSearch} className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -144,23 +225,41 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 md:space-x-4">
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="relative">
                 <Bell className="h-5 w-5" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs">
-                  0
-                </Badge>
+                {notifications.length > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs bg-red-500">
+                    {notifications.length}
+                  </Badge>
+                )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuContent align="end" className="w-80 max-h-96 overflow-y-auto">
               <DropdownMenuLabel>Notifications</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <div className="p-4 text-center text-muted-foreground">
-                <p>No new notifications</p>
-              </div>
+              {notifications.length === 0 ? (
+                <div className="p-4 text-center text-muted-foreground">
+                  <p>No new notifications</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {notifications.map((notif, index) => (
+                    <div key={index} className="p-3 hover:bg-muted/50 cursor-pointer border-b last:border-b-0">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{notif.title}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{notif.message}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{notif.time}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 

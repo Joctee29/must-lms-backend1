@@ -114,14 +114,14 @@ export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps
     }
   };
 
-  // Join Google Meet class - works with any Google account
-  const joinGoogleMeetClass = (meetingUrl) => {
-    console.log('Student joining Google Meet:', meetingUrl);
+  // Join live class meeting - supports Jitsi Meet
+  const joinLiveClassMeeting = (meetingUrl) => {
+    console.log('Student joining live class:', meetingUrl);
     
-    // Open the actual meeting URL directly
-    // Google Meet will prompt for sign-in if needed
-    if (meetingUrl && meetingUrl.includes('meet.google.com')) {
-      alert('🎓 Joining Google Meet!\n\nYou will be taken to Google Meet where you can:\n• Sign in with your Google account (any email)\n• Turn on camera and microphone\n• Join the live class session\n• Participate in the lesson');
+    // Open the meeting URL directly
+    // Jitsi Meet works without authentication
+    if (meetingUrl && (meetingUrl.includes('meet.jit.si') || meetingUrl.includes('meet.google.com'))) {
+      alert('🎓 Joining Live Class!\n\nYou will be taken to the video conference where you can:\n• Enter your name\n• Turn on camera and microphone\n• Join the live class session\n• Participate in the lesson\n\nNote: No account required for Jitsi Meet!');
       
       window.open(meetingUrl, '_blank', 'width=1200,height=800');
     } else {
@@ -152,7 +152,7 @@ export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Live Classes</h1>
         <Badge variant="outline" className="text-sm">
-          Google Meet Integration
+          Jitsi Meet Integration
         </Badge>
       </div>
 
@@ -170,14 +170,14 @@ export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps
         <div className="grid gap-4">
           {liveClasses.map((liveClass) => (
             <Card key={liveClass.id}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`w-3 h-3 rounded-full ${
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
                         liveClass.status === 'live' ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'
                       }`}></div>
-                      <Badge variant={liveClass.status === 'live' ? 'destructive' : 'secondary'}>
+                      <Badge variant={liveClass.status === 'live' ? 'destructive' : 'secondary'} className="text-xs">
                         {liveClass.status === 'live' ? '🔴 LIVE NOW' : '⏰ SCHEDULED'}
                       </Badge>
                       {liveClass.status === 'scheduled' && (
@@ -187,16 +187,16 @@ export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps
                       )}
                     </div>
                     
-                    <h3 className="text-xl font-semibold mb-1">{liveClass.title}</h3>
-                    <p className="text-gray-600 mb-2">{liveClass.description}</p>
+                    <h3 className="text-lg md:text-xl font-semibold mb-2">{liveClass.title}</h3>
+                    <p className="text-sm md:text-base text-gray-600 mb-3">{liveClass.description}</p>
                     
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-500">
                       <div className="flex items-center gap-1">
-                        <Globe className="h-4 w-4" />
-                        <span>{liveClass.program_name}</span>
+                        <Globe className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">{liveClass.program_name}</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
+                        <Clock className="h-4 w-4 flex-shrink-0" />
                         <span>
                           {liveClass.date} at {liveClass.time}
                         </span>
@@ -204,19 +204,19 @@ export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps
                     </div>
                   </div>
                   
-                  <div className="ml-6">
+                  <div className="w-full md:w-auto md:ml-6">
                     {liveClass.status === 'live' || 
                      (liveClass.status === 'scheduled' && isClassTimeReached(liveClass.date, liveClass.time)) ? (
                       <Button 
-                        onClick={() => joinGoogleMeetClass(liveClass.meeting_url || 'https://meet.google.com/new')}
-                        className="bg-blue-600 hover:bg-blue-700"
+                        onClick={() => joinLiveClassMeeting(liveClass.meeting_url)}
+                        className="w-full md:w-auto bg-blue-600 hover:bg-blue-700"
                         size="lg"
                       >
                         <Video className="h-4 w-4 mr-2" />
                         Join Now
                       </Button>
                     ) : (
-                      <Button variant="outline" disabled>
+                      <Button variant="outline" disabled className="w-full md:w-auto">
                         <Clock className="h-4 w-4 mr-2" />
                         Scheduled
                       </Button>

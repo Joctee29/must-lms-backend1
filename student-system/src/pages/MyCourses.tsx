@@ -227,7 +227,7 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
               <p className="text-lg font-semibold">{studentInfo.currentSemester}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">College</p>
+              <p className="text-sm font-medium text-muted-foreground">Institution</p>
               <p className="text-lg font-semibold">{studentInfo.college}</p>
             </div>
             <div>
