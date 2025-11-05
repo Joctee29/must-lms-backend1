@@ -3036,17 +3036,41 @@ app.post('/api/assignment-submissions', async (req, res) => {
 // Get assignment submissions for lecturer
 app.get('/api/assignment-submissions', async (req, res) => {
   try {
-    const { assignment_id } = req.query;
+    const { assignment_id, lecturer_id } = req.query;
     
     console.log('=== ASSIGNMENT SUBMISSIONS API DEBUG ===');
     console.log('Assignment ID requested:', assignment_id);
+    console.log('Lecturer ID requested:', lecturer_id);
     
-    const result = await pool.query(`
-      SELECT * FROM assignment_submissions 
-      WHERE assignment_id = $1 ORDER BY submitted_at DESC
-    `, [assignment_id]);
+    let result;
+    
+    if (assignment_id) {
+      // Get submissions for specific assignment
+      result = await pool.query(`
+        SELECT * FROM assignment_submissions 
+        WHERE assignment_id = $1 ORDER BY submitted_at DESC
+      `, [assignment_id]);
+    } else if (lecturer_id) {
+      // Get all submissions for lecturer's assignments
+      result = await pool.query(`
+        SELECT s.*, a.title as assignment_title, a.program_name
+        FROM assignment_submissions s
+        JOIN assignments a ON s.assignment_id = a.id
+        WHERE a.lecturer_id = $1
+        ORDER BY s.submitted_at DESC
+      `, [lecturer_id]);
+    } else {
+      // Get all submissions (for admin or general view)
+      result = await pool.query(`
+        SELECT s.*, a.title as assignment_title, a.program_name, a.lecturer_name
+        FROM assignment_submissions s
+        JOIN assignments a ON s.assignment_id = a.id
+        ORDER BY s.submitted_at DESC
+        LIMIT 100
+      `);
+    }
 
-    console.log('Submissions found:', result.rows);
+    console.log('Submissions found:', result.rows.length);
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching assignment submissions:', error);
