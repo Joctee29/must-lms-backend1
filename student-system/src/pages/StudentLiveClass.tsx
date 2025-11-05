@@ -108,17 +108,62 @@ export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps
   };
 
   // Join live class meeting - supports Jitsi Meet
-  const joinLiveClassMeeting = (meetingUrl) => {
-    console.log('Student joining live class:', meetingUrl);
-    
-    // Open the meeting URL directly
-    // Jitsi Meet works without authentication
-    if (meetingUrl && (meetingUrl.includes('meet.jit.si') || meetingUrl.includes('meet.google.com'))) {
+  const joinLiveClassMeeting = async (liveClass) => {
+    try {
+      const meetingUrl = liveClass.meeting_url;
+      console.log('Student joining live class:', meetingUrl);
+      
+      // Validate meeting URL
+      if (!meetingUrl || (!meetingUrl.includes('meet.jit.si') && !meetingUrl.includes('meet.google.com'))) {
+        alert('❌ Invalid meeting link. Please contact your lecturer.');
+        return;
+      }
+      
+      // Get current student info
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const studentResponse = await fetch('https://must-lms-backend.onrender.com/api/students');
+      const studentsResult = await studentResponse.json();
+      
+      const currentStudent = studentsResult.data?.find(s => 
+        s.name === currentUser.username || 
+        s.email === currentUser.username ||
+        s.registration_number === currentUser.username
+      );
+      
+      if (!currentStudent) {
+        alert('❌ Student information not found. Please log in again.');
+        return;
+      }
+      
+      // Record student joining the class
+      console.log('Recording student join...');
+      const joinResponse = await fetch('https://must-lms-backend.onrender.com/api/live-classes/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          class_id: liveClass.id,
+          student_id: currentStudent.id,
+          student_name: currentStudent.name,
+          join_time: new Date().toISOString()
+        })
+      });
+      
+      const joinResult = await joinResponse.json();
+      console.log('Join recorded:', joinResult);
+      
+      // Show success message
       alert('🎓 Joining Live Class!\n\nYou will be taken to the video conference where you can:\n• Enter your name\n• Turn on camera and microphone\n• Join the live class session\n• Participate in the lesson\n\nNote: No account required for Jitsi Meet!');
       
+      // Open meeting in new window
       window.open(meetingUrl, '_blank', 'width=1200,height=800');
-    } else {
-      alert('❌ Invalid meeting link. Please contact your lecturer.');
+      
+    } catch (error) {
+      console.error('Error joining live class:', error);
+      alert('⚠️ Opening meeting link...\n\nNote: Your attendance may not be recorded due to a connection issue.');
+      // Still open the meeting even if tracking fails
+      if (liveClass.meeting_url) {
+        window.open(liveClass.meeting_url, '_blank', 'width=1200,height=800');
+      }
     }
   };
 
@@ -201,7 +246,7 @@ export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps
                     {liveClass.status === 'live' || 
                      (liveClass.status === 'scheduled' && isClassTimeReached(liveClass.date, liveClass.time)) ? (
                       <Button 
-                        onClick={() => joinLiveClassMeeting(liveClass.meeting_url)}
+                        onClick={() => joinLiveClassMeeting(liveClass)}
                         className="w-full md:w-auto bg-blue-600 hover:bg-blue-700"
                         size="lg"
                       >
