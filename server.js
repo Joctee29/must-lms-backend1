@@ -11,23 +11,39 @@ const app = express();
 // Track active sessions
 const activeSessions = new Map(); // userId -> { userType, username, loginTime }
 
-// Email configuration - will be updated from database
-let CURRENT_ADMIN_EMAIL = 'uj23hiueddhpna2y@ethereal.email';
+// Email configuration - Gmail SMTP for real email delivery
+// IMPORTANT: Set these environment variables or update directly:
+// - GMAIL_USER: Your Gmail address (e.g., mustlms@gmail.com)
+// - GMAIL_APP_PASSWORD: Your 16-character Gmail App Password
+// 
+// TO SETUP GMAIL APP PASSWORD:
+// 1. Enable 2-factor authentication: https://myaccount.google.com/security
+// 2. Generate app password: https://myaccount.google.com/apppasswords
+// 3. Select "Mail" and "Other (MUST LMS)"
+// 4. Copy the 16-character password (format: xxxx xxxx xxxx xxxx)
+// 5. Set environment variables or update EMAIL_CONFIG below
+
+let CURRENT_ADMIN_EMAIL = process.env.GMAIL_USER || 'your-gmail@gmail.com';
 const EMAIL_CONFIG = {
+  host: 'smtp.gmail.com',  // Gmail SMTP server
+  port: 587,
+  secure: false,  // Use STARTTLS
+  auth: {
+    user: process.env.GMAIL_USER || 'your-gmail@gmail.com',  // Replace with your Gmail
+    pass: process.env.GMAIL_APP_PASSWORD || 'your-16-char-app-password'  // Replace with your App Password
+  }
+};
+
+// FALLBACK: If Gmail credentials not set, use Ethereal for testing
+const FALLBACK_EMAIL_CONFIG = {
   host: 'smtp.ethereal.email',
   port: 587,
   secure: false,
   auth: {
-    user: 'uj23hiueddhpna2y@ethereal.email', // Working test email
-    pass: 'bUBwMXt6UWqgK4Tetd' // Working test password
+    user: 'uj23hiueddhpna2y@ethereal.email',
+    pass: 'bUBwMXt6UWqgK4Tetd'
   }
 };
-
-// For testing purposes, you can use these settings:
-// 1. Enable 2-factor authentication on Gmail
-// 2. Generate app password: https://myaccount.google.com/apppasswords
-// 3. Replace 'your-app-password' with the generated 16-character password
-// 4. Make sure the admin email matches your Gmail address
 
 // Function to get admin email from database
 const getAdminEmail = async () => {
@@ -48,12 +64,29 @@ const getAdminEmail = async () => {
   }
 };
 
-// Create email transporter
+// Create email transporter with Gmail or fallback to Ethereal
 let emailTransporter = null;
+let usingGmail = false;
+
 try {
-  emailTransporter = nodemailer.createTransport(EMAIL_CONFIG);
-  console.log('✅ Email transporter configured for:', EMAIL_CONFIG.auth.user);
-  console.log('✅ Real Gmail SMTP enabled - emails will be sent to users');
+  // Check if Gmail credentials are properly configured
+  const hasGmailCredentials = 
+    EMAIL_CONFIG.auth.user !== 'your-gmail@gmail.com' && 
+    EMAIL_CONFIG.auth.pass !== 'your-16-char-app-password';
+  
+  if (hasGmailCredentials) {
+    // Try Gmail configuration
+    emailTransporter = nodemailer.createTransport(EMAIL_CONFIG);
+    usingGmail = true;
+    console.log('✅ Gmail SMTP configured for:', EMAIL_CONFIG.auth.user);
+    console.log('✅ Real emails will be sent to users\' Gmail accounts');
+  } else {
+    // Use Ethereal fallback for testing
+    emailTransporter = nodemailer.createTransport(FALLBACK_EMAIL_CONFIG);
+    console.log('⚠️  Using Ethereal test email (emails won\'t reach real Gmail)');
+    console.log('📧 Test email account:', FALLBACK_EMAIL_CONFIG.auth.user);
+    console.log('💡 To send real emails, configure Gmail credentials in server.js');
+  }
 } catch (error) {
   console.warn('⚠️ Email configuration error:', error.message);
   console.warn('Emails will be simulated.');
