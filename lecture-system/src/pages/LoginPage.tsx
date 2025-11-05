@@ -85,13 +85,27 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
     setResetMessage("");
     
     try {
+      // Fetch admin email from backend first
+      let adminEmail = 'admin@must.ac.tz'; // Default fallback
+      try {
+        const emailResponse = await fetch('https://must-lms-backend.onrender.com/api/admin/email');
+        if (emailResponse.ok) {
+          const emailResult = await emailResponse.json();
+          if (emailResult.success && emailResult.data.adminEmail) {
+            adminEmail = emailResult.data.adminEmail;
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch admin email, using default');
+      }
+      
       const response = await fetch('https://must-lms-backend.onrender.com/api/password-reset/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           email: forgotPasswordData.email,
           userType: 'lecturer',
-          adminEmail: 'uj23hiueddhpna2y@ethereal.email'
+          adminEmail: adminEmail  // Use dynamic admin email from backend
         })
       });
       
