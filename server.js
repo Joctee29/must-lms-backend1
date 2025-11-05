@@ -474,6 +474,43 @@ const initializeDatabase = async () => {
       )
     `);
 
+    // Create assignments table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS assignments (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        program_name VARCHAR(255) NOT NULL,
+        deadline TIMESTAMP NOT NULL,
+        submission_type VARCHAR(20) DEFAULT 'text',
+        max_points INTEGER DEFAULT 100,
+        lecturer_id INTEGER,
+        lecturer_name VARCHAR(255),
+        status VARCHAR(20) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create assignment_submissions table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS assignment_submissions (
+        id SERIAL PRIMARY KEY,
+        assignment_id INTEGER REFERENCES assignments(id) ON DELETE CASCADE,
+        student_id INTEGER,
+        student_name VARCHAR(255),
+        student_registration VARCHAR(100),
+        student_program VARCHAR(255),
+        submission_type VARCHAR(20),
+        text_content TEXT,
+        file_path VARCHAR(500),
+        file_name VARCHAR(255),
+        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        points_awarded INTEGER DEFAULT 0,
+        feedback TEXT,
+        graded_at TIMESTAMP
+      )
+    `);
+
     console.log('Database tables initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
