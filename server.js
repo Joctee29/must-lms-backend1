@@ -2995,6 +2995,9 @@ app.get('/api/assignments', async (req, res) => {
   try {
     const { lecturer_id } = req.query;
     
+    console.log('=== ASSIGNMENTS API DEBUG ===');
+    console.log('Lecturer ID:', lecturer_id);
+    
     let result;
     
     if (lecturer_id) {
@@ -3006,15 +3009,24 @@ app.get('/api/assignments', async (req, res) => {
         WHERE a.lecturer_id = $1
         GROUP BY a.id ORDER BY a.created_at DESC
       `, [lecturer_id]);
+      console.log('Lecturer assignments found:', result.rows.length);
     } else {
-      // Get all active assignments (for students)
+      // Get all active assignments (for students) - IMPROVED QUERY
       result = await pool.query(`
         SELECT a.*, COUNT(s.id) as submission_count
         FROM assignments a
         LEFT JOIN assignment_submissions s ON a.id = s.assignment_id
         WHERE a.status = 'active' AND a.deadline > NOW()
-        GROUP BY a.id ORDER BY a.created_at DESC
+        GROUP BY a.id ORDER BY a.deadline ASC
       `);
+      console.log('Active assignments for students found:', result.rows.length);
+      console.log('Assignments:', result.rows.map(a => ({
+        id: a.id,
+        title: a.title,
+        program: a.program_name,
+        deadline: a.deadline,
+        status: a.status
+      })));
     }
 
     res.json({ success: true, data: result.rows });
