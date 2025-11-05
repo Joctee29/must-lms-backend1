@@ -63,48 +63,41 @@ export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps
       const liveClassResponse = await fetch('https://must-lms-backend.onrender.com/api/live-classes');
       const liveClassResult = await liveClassResponse.json();
       
-      // Enhanced filtering for student's program with debugging
+      // Get student's programs (both regular and short-term)
+      const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
+      const programsResult = await programsResponse.json();
+      
+      // Find student's programs based on course_id
+      const studentPrograms = programsResult.data?.filter(p => 
+        p.course_id === currentStudent.course_id
+      ) || [];
+      
       console.log('=== LIVE CLASS FILTERING DEBUG ===');
       console.log('All Live Classes:', liveClassResult.data);
       console.log('Current Student:', currentStudent);
-      console.log('Student Course Name:', currentStudent.course_name);
+      console.log('Student Course:', currentStudent.course_name);
+      console.log('Student Programs:', studentPrograms.map(p => p.name));
       
+      // Filter live classes to show only those for student's programs
       const studentClasses = liveClassResult.data?.filter(liveClass => {
-        console.log('Checking Live Class:', liveClass.title, 'Program:', liveClass.program_name);
+        console.log(`\n--- Checking Live Class: ${liveClass.title} ---`);
+        console.log('Class Program:', liveClass.program_name);
         
-        const mappedCourse = liveClass.mapped_course || liveClass.program_name;
-        const studentCourse = currentStudent.course_name;
+        // Check if live class program matches any of student's programs
+        const matches = studentPrograms.some(studentProgram => {
+          const programMatch = studentProgram.name.toLowerCase() === liveClass.program_name.toLowerCase();
+          console.log(`Comparing: "${studentProgram.name}" === "${liveClass.program_name}" => ${programMatch}`);
+          return programMatch;
+        });
         
-        // Multiple matching strategies
-        let matches = false;
-        
-        // Strategy 1: Direct course name matching
-        if (mappedCourse && studentCourse) {
-          matches = mappedCourse.toUpperCase().includes(studentCourse.toUpperCase()) ||
-                   studentCourse.toUpperCase().includes(mappedCourse.toUpperCase());
-        }
-        
-        // Strategy 2: Program name matching (for program-based classes)
-        if (!matches && liveClass.program_name && currentStudent.course_name) {
-          matches = liveClass.program_name.toLowerCase().includes('computer') && 
-                   currentStudent.course_name.toLowerCase().includes('computer') ||
-                   liveClass.program_name.toLowerCase().includes('information') && 
-                   currentStudent.course_name.toLowerCase().includes('information') ||
-                   liveClass.program_name.toLowerCase().includes('engineering') && 
-                   currentStudent.course_name.toLowerCase().includes('engineering');
-        }
-        
-        // Strategy 3: Show all active/live classes (temporary for debugging)
-        if (!matches && (liveClass.status === 'live' || liveClass.status === 'scheduled')) {
-          console.log('Showing all live/scheduled classes for debugging');
-          matches = true; // Show all live classes for now
-        }
-        
-        console.log('Match Result:', matches, 'for class:', liveClass.title);
+        console.log(`✅ Match Result: ${matches ? 'SHOW' : 'HIDE'}`);
         return matches;
       }) || [];
       
-      console.log('Filtered Student Classes:', studentClasses);
+      console.log('\n=== FINAL FILTERED CLASSES ===');
+      console.log('Total Classes:', liveClassResult.data?.length || 0);
+      console.log('Student Classes:', studentClasses.length);
+      console.log('Classes:', studentClasses.map(c => c.title));
       
       setLiveClasses(studentClasses);
       setLoading(false);
