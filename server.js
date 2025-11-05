@@ -3231,32 +3231,8 @@ app.get('/api/live-classes', async (req, res) => {
     
     const result = await pool.query(query, params);
     
-    // Enhanced program mapping for students
-    const enhancedClasses = result.rows.map(liveClass => {
-      // Map program names to course names for better matching
-      let mappedProgram = liveClass.program_name;
-      
-      // Program to Course mapping
-      if (liveClass.program_name?.toLowerCase().includes('programming') || 
-          liveClass.program_name?.toLowerCase().includes('computer')) {
-        mappedProgram = 'BACHELOR OF COMPUTER SCIENCE';
-      } else if (liveClass.program_name?.toLowerCase().includes('civil') || 
-                 liveClass.program_name?.toLowerCase().includes('engineering')) {
-        mappedProgram = 'BACHELOR OF CIVIL';
-      } else if (liveClass.program_name?.toLowerCase().includes('architecture')) {
-        mappedProgram = 'DIPLOMA IN ARCHITECTURE';
-      }
-      
-      return {
-        ...liveClass,
-        mapped_course: mappedProgram,
-        original_program: liveClass.program_name
-      };
-    });
-    
     console.log('Live classes found:', result.rows.length);
-    console.log('Enhanced with course mapping');
-    res.json({ success: true, data: enhancedClasses });
+    res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching live classes:', error);
     res.status(500).json({ success: false, error: error.message });
