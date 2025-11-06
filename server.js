@@ -742,10 +742,43 @@ app.post('/api/lecturers', async (req, res) => {
 
 app.get('/api/lecturers', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM lecturers ORDER BY created_at DESC');
+    // SECURITY: Exclude password from response
+    const result = await pool.query(
+      'SELECT id, name, employee_id, specialization, email, phone, created_at, updated_at FROM lecturers ORDER BY created_at DESC'
+    );
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching lecturers:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get current lecturer by username (EFFICIENT - no need to fetch all lecturers)
+app.get('/api/lecturers/me', async (req, res) => {
+  try {
+    const { username } = req.query;
+    
+    console.log('=== GET CURRENT LECTURER ===');
+    console.log('Username:', username);
+    
+    if (!username) {
+      return res.status(400).json({ success: false, error: 'Username is required' });
+    }
+    
+    // SECURITY: Exclude password from response
+    const result = await pool.query(
+      'SELECT id, name, employee_id, specialization, email, phone, created_at, updated_at FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
+      [username]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Lecturer not found' });
+    }
+    
+    console.log('Lecturer found:', result.rows[0].name);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error fetching current lecturer:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -805,8 +838,11 @@ app.post('/api/students', async (req, res) => {
 
 app.get('/api/students', async (req, res) => {
   try {
+    // SECURITY: Exclude password from response
     const result = await pool.query(`
-      SELECT s.*, c.name as course_name 
+      SELECT s.id, s.name, s.registration_number, s.academic_year, s.course_id, 
+             s.current_semester, s.email, s.phone, s.created_at, s.updated_at,
+             c.name as course_name 
       FROM students s 
       LEFT JOIN courses c ON s.course_id = c.id 
       ORDER BY s.created_at DESC
@@ -838,6 +874,42 @@ app.post('/api/students/by-registration', async (req, res) => {
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching students by registration:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get current student by username (EFFICIENT - no need to fetch all students)
+app.get('/api/students/me', async (req, res) => {
+  try {
+    const { username } = req.query;
+    
+    console.log('=== GET CURRENT STUDENT ===');
+    console.log('Username:', username);
+    
+    if (!username) {
+      return res.status(400).json({ success: false, error: 'Username is required' });
+    }
+    
+    // SECURITY: Exclude password from response
+    const result = await pool.query(`
+      SELECT s.id, s.name, s.registration_number, s.academic_year, s.course_id, 
+             s.current_semester, s.email, s.phone, s.created_at, s.updated_at,
+             c.name as course_name, d.name as department_name, col.name as college_name
+      FROM students s 
+      LEFT JOIN courses c ON s.course_id = c.id
+      LEFT JOIN departments d ON c.department_id = d.id
+      LEFT JOIN colleges col ON d.college_id = col.id
+      WHERE s.registration_number = $1 OR s.email = $1 OR s.name = $1
+    `, [username]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+    
+    console.log('Student found:', result.rows[0].name);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error fetching current student:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -1423,14 +1495,112 @@ app.post('/api/content/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// Get all content
+// Get all content with student-specific program filtering
 app.get('/api/content', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM content ORDER BY upload_date DESC');
-    console.log('=== CONTENT API DEBUG ===');
-    console.log('Total content in database:', result.rows.length);
-    console.log('Content rows:', result.rows);
-    res.json({ success: true, data: result.rows });
+    const { student_id, student_username } = req.query;
+    
+    console.log('=== FETCHING CONTENT ===');
+    console.log('Student ID:', student_id);
+    console.log('Student Username:', student_username);
+    
+    // If no student info provided, return all content (for admin/lecturer view)
+    if (!student_id && !student_username) {
+      const result = await pool.query('SELECT * FROM content ORDER BY upload_date DESC');
+      console.log('Content found (no filter):', result.rows.length);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // Get student information
+    let studentInfo = null;
+    if (student_id) {
+      const studentResult = await pool.query(`
+        SELECT s.*, c.name as course_name
+        FROM students s
+        LEFT JOIN courses c ON s.course_id = c.id
+        WHERE s.id = $1
+      `, [student_id]);
+      
+      if (studentResult.rows.length > 0) {
+        studentInfo = studentResult.rows[0];
+      }
+    } else if (student_username) {
+      const studentResult = await pool.query(`
+        SELECT s.*, c.name as course_name
+        FROM students s
+        LEFT JOIN courses c ON s.course_id = c.id
+        WHERE s.registration_number = $1 OR s.email = $1 OR s.name = $1
+      `, [student_username]);
+      
+      if (studentResult.rows.length > 0) {
+        studentInfo = studentResult.rows[0];
+      }
+    }
+    
+    if (!studentInfo) {
+      console.log('Student not found, returning empty array');
+      return res.json({ success: true, data: [] });
+    }
+    
+    console.log('Student Info:', studentInfo);
+    
+    // Get student's programs
+    const programsResult = await pool.query(
+      'SELECT name FROM programs WHERE course_id = $1',
+      [studentInfo.course_id]
+    );
+    const studentPrograms = programsResult.rows.map(p => p.name);
+    
+    console.log('Student Programs:', studentPrograms);
+    
+    // Fetch all content
+    const contentResult = await pool.query('SELECT * FROM content ORDER BY upload_date DESC');
+    
+    // Filter content based on student's programs
+    const filteredContent = contentResult.rows.filter(content => {
+      // Check if content program matches any of student's programs
+      const programMatch = studentPrograms.some(program => {
+        if (!program || !content.program_name) return false;
+        
+        const programLower = program.toLowerCase().trim();
+        const contentProgramLower = content.program_name.toLowerCase().trim();
+        
+        // Exact match
+        if (programLower === contentProgramLower) {
+          console.log(`✅ Content "${content.title}" - Exact program match: ${content.program_name}`);
+          return true;
+        }
+        
+        // Contains match
+        if (programLower.includes(contentProgramLower) || contentProgramLower.includes(programLower)) {
+          console.log(`✅ Content "${content.title}" - Partial program match: ${content.program_name}`);
+          return true;
+        }
+        
+        // Word-based matching
+        const programWords = programLower.split(/\s+/);
+        const contentWords = contentProgramLower.split(/\s+/);
+        const commonWords = programWords.filter(word => 
+          word.length > 3 && contentWords.includes(word)
+        );
+        
+        if (commonWords.length >= 2) {
+          console.log(`✅ Content "${content.title}" - Word match: ${content.program_name}`);
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (!programMatch) {
+        console.log(`❌ Content "${content.title}" - No program match: ${content.program_name}`);
+      }
+      
+      return programMatch;
+    });
+    
+    console.log(`Filtered ${filteredContent.length} content items for student`);
+    res.json({ success: true, data: filteredContent });
   } catch (error) {
     console.error('Error fetching content:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -1571,11 +1741,112 @@ app.post('/api/assignments/init', async (req, res) => {
   }
 });
 
-// Get all assignments
+// Get all assignments with student-specific program filtering
 app.get('/api/assignments', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM assignments ORDER BY created_at DESC');
-    res.json({ success: true, data: result.rows });
+    const { student_id, student_username } = req.query;
+    
+    console.log('=== FETCHING ASSIGNMENTS ===');
+    console.log('Student ID:', student_id);
+    console.log('Student Username:', student_username);
+    
+    // If no student info provided, return all assignments (for admin/lecturer view)
+    if (!student_id && !student_username) {
+      const result = await pool.query('SELECT * FROM assignments ORDER BY created_at DESC');
+      console.log('Assignments found (no filter):', result.rows.length);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // Get student information
+    let studentInfo = null;
+    if (student_id) {
+      const studentResult = await pool.query(`
+        SELECT s.*, c.name as course_name
+        FROM students s
+        LEFT JOIN courses c ON s.course_id = c.id
+        WHERE s.id = $1
+      `, [student_id]);
+      
+      if (studentResult.rows.length > 0) {
+        studentInfo = studentResult.rows[0];
+      }
+    } else if (student_username) {
+      const studentResult = await pool.query(`
+        SELECT s.*, c.name as course_name
+        FROM students s
+        LEFT JOIN courses c ON s.course_id = c.id
+        WHERE s.registration_number = $1 OR s.email = $1 OR s.name = $1
+      `, [student_username]);
+      
+      if (studentResult.rows.length > 0) {
+        studentInfo = studentResult.rows[0];
+      }
+    }
+    
+    if (!studentInfo) {
+      console.log('Student not found, returning empty array');
+      return res.json({ success: true, data: [] });
+    }
+    
+    console.log('Student Info:', studentInfo);
+    
+    // Get student's programs
+    const programsResult = await pool.query(
+      'SELECT name FROM programs WHERE course_id = $1',
+      [studentInfo.course_id]
+    );
+    const studentPrograms = programsResult.rows.map(p => p.name);
+    
+    console.log('Student Programs:', studentPrograms);
+    
+    // Fetch all assignments
+    const assignmentsResult = await pool.query('SELECT * FROM assignments ORDER BY created_at DESC');
+    
+    // Filter assignments based on student's programs
+    const filteredAssignments = assignmentsResult.rows.filter(assignment => {
+      // Check if assignment program matches any of student's programs
+      const programMatch = studentPrograms.some(program => {
+        if (!program || !assignment.program_name) return false;
+        
+        const programLower = program.toLowerCase().trim();
+        const assignmentProgramLower = assignment.program_name.toLowerCase().trim();
+        
+        // Exact match
+        if (programLower === assignmentProgramLower) {
+          console.log(`✅ Assignment "${assignment.title}" - Exact program match: ${assignment.program_name}`);
+          return true;
+        }
+        
+        // Contains match
+        if (programLower.includes(assignmentProgramLower) || assignmentProgramLower.includes(programLower)) {
+          console.log(`✅ Assignment "${assignment.title}" - Partial program match: ${assignment.program_name}`);
+          return true;
+        }
+        
+        // Word-based matching
+        const programWords = programLower.split(/\s+/);
+        const assignmentWords = assignmentProgramLower.split(/\s+/);
+        const commonWords = programWords.filter(word => 
+          word.length > 3 && assignmentWords.includes(word)
+        );
+        
+        if (commonWords.length >= 2) {
+          console.log(`✅ Assignment "${assignment.title}" - Word match: ${assignment.program_name}`);
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (!programMatch) {
+        console.log(`❌ Assignment "${assignment.title}" - No program match: ${assignment.program_name}`);
+      }
+      
+      return programMatch;
+    });
+    
+    console.log(`Filtered ${filteredAssignments.length} assignments for student`);
+    res.json({ success: true, data: filteredAssignments });
   } catch (error) {
     console.error('Error fetching assignments:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -1752,10 +2023,16 @@ app.post('/api/assessments', async (req, res) => {
   }
 });
 
-// Get all assessments
+// Get all assessments with student-specific program filtering
 app.get('/api/assessments', async (req, res) => {
   try {
-    const { lecturer_id, lecturer_name, program_name, status } = req.query;
+    const { lecturer_id, lecturer_name, program_name, status, student_id, student_username } = req.query;
+    
+    console.log('=== FETCHING ASSESSMENTS ===');
+    console.log('Student ID:', student_id);
+    console.log('Student Username:', student_username);
+    console.log('Lecturer ID:', lecturer_id);
+    console.log('Status:', status);
     
     let query = 'SELECT * FROM assessments';
     let params = [];
@@ -1789,16 +2066,104 @@ app.get('/api/assessments', async (req, res) => {
 
     const result = await pool.query(query, params);
     
-    console.log('=== ASSESSMENTS FETCH DEBUG ===');
     console.log('Query:', query);
     console.log('Params:', params);
     console.log('Found assessments:', result.rows.length);
+    
+    // If student info provided, filter by student's programs
+    let filteredAssessments = result.rows;
+    
+    if (student_id || student_username) {
+      // Get student information
+      let studentInfo = null;
+      if (student_id) {
+        const studentResult = await pool.query(`
+          SELECT s.*, c.name as course_name
+          FROM students s
+          LEFT JOIN courses c ON s.course_id = c.id
+          WHERE s.id = $1
+        `, [student_id]);
+        
+        if (studentResult.rows.length > 0) {
+          studentInfo = studentResult.rows[0];
+        }
+      } else if (student_username) {
+        const studentResult = await pool.query(`
+          SELECT s.*, c.name as course_name
+          FROM students s
+          LEFT JOIN courses c ON s.course_id = c.id
+          WHERE s.registration_number = $1 OR s.email = $1 OR s.name = $1
+        `, [student_username]);
+        
+        if (studentResult.rows.length > 0) {
+          studentInfo = studentResult.rows[0];
+        }
+      }
+      
+      if (studentInfo) {
+        console.log('Student Info:', studentInfo);
+        
+        // Get student's programs
+        const programsResult = await pool.query(
+          'SELECT name FROM programs WHERE course_id = $1',
+          [studentInfo.course_id]
+        );
+        const studentPrograms = programsResult.rows.map(p => p.name);
+        
+        console.log('Student Programs:', studentPrograms);
+        
+        // Filter assessments based on student's programs
+        filteredAssessments = result.rows.filter(assessment => {
+          // Check if assessment program matches any of student's programs
+          const programMatch = studentPrograms.some(program => {
+            if (!program || !assessment.program_name) return false;
+            
+            const programLower = program.toLowerCase().trim();
+            const assessmentProgramLower = assessment.program_name.toLowerCase().trim();
+            
+            // Exact match
+            if (programLower === assessmentProgramLower) {
+              console.log(`✅ Assessment "${assessment.title}" - Exact program match: ${assessment.program_name}`);
+              return true;
+            }
+            
+            // Contains match
+            if (programLower.includes(assessmentProgramLower) || assessmentProgramLower.includes(programLower)) {
+              console.log(`✅ Assessment "${assessment.title}" - Partial program match: ${assessment.program_name}`);
+              return true;
+            }
+            
+            // Word-based matching
+            const programWords = programLower.split(/\s+/);
+            const assessmentWords = assessmentProgramLower.split(/\s+/);
+            const commonWords = programWords.filter(word => 
+              word.length > 3 && assessmentWords.includes(word)
+            );
+            
+            if (commonWords.length >= 2) {
+              console.log(`✅ Assessment "${assessment.title}" - Word match: ${assessment.program_name}`);
+              return true;
+            }
+            
+            return false;
+          });
+          
+          if (!programMatch) {
+            console.log(`❌ Assessment "${assessment.title}" - No program match: ${assessment.program_name}`);
+          }
+          
+          return programMatch;
+        });
+        
+        console.log(`Filtered ${filteredAssessments.length} assessments for student`);
+      }
+    }
 
     // AUTO-EXPIRE ASSESSMENTS BASED ON REAL TIME
     const now = new Date();
     const updatedAssessments = [];
     
-    for (const assessment of result.rows) {
+    for (const assessment of filteredAssessments) {
       let updatedAssessment = { ...assessment };
       
       // Check if scheduled assessment has expired
@@ -2012,92 +2377,8 @@ app.post('/api/assessments/:id/submit', async (req, res) => {
   }
 });
 
-// Get assessment with submissions (for lecturer results view)
-app.get('/api/assessments/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    console.log('=== ASSESSMENT WITH SUBMISSIONS DEBUG ===');
-    console.log('Assessment ID:', id);
-
-    // Get assessment details
-    const assessmentResult = await pool.query('SELECT * FROM assessments WHERE id = $1', [id]);
-    
-    if (assessmentResult.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Assessment not found' });
-    }
-
-    const assessment = assessmentResult.rows[0];
-
-    // Get submissions for this assessment
-    const submissionsResult = await pool.query(
-      'SELECT * FROM assessment_submissions WHERE assessment_id = $1 ORDER BY submitted_at DESC',
-      [id]
-    );
-
-    const submissions = submissionsResult.rows.map(submission => ({
-      id: submission.id,
-      student_name: submission.student_name,
-      student_registration: submission.student_registration,
-      student_program: submission.student_program,
-      score: submission.score || 0,
-      percentage: submission.percentage || 0,
-      status: submission.status,
-      submitted_at: submission.submitted_at,
-      answers: submission.answers,
-      auto_graded_score: submission.auto_graded_score,
-      manual_graded_score: submission.manual_graded_score
-    }));
-
-    console.log('Assessment with submissions:', { assessment: assessment.title, submissions: submissions.length });
-
-    res.json({ 
-      success: true, 
-      data: {
-        ...assessment,
-        submissions: submissions
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching assessment with submissions:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Update assessment (for status changes, etc.)
-app.put('/api/assessments/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-
-    console.log('=== UPDATE ASSESSMENT ===');
-    console.log('Assessment ID:', id);
-    console.log('Update Data:', updateData);
-
-    // Build dynamic update query
-    const fields = Object.keys(updateData);
-    const values = Object.values(updateData);
-    const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ');
-    
-    const query = `UPDATE assessments SET ${setClause} WHERE id = $1 RETURNING *`;
-    const params = [id, ...values];
-
-    console.log('Query:', query);
-    console.log('Params:', params);
-
-    const result = await pool.query(query, params);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Assessment not found' });
-    }
-
-    console.log('Assessment updated:', result.rows[0]);
-    res.json({ success: true, data: result.rows[0] });
-  } catch (error) {
-    console.error('Error updating assessment:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// REMOVED: Duplicate GET endpoint - already exists at line 2153
+// REMOVED: Duplicate PUT endpoint - already exists at line 2180
 
 // Get student assessments (available assessments for student to take)
 app.get('/api/student-assessments', async (req, res) => {
@@ -2439,24 +2720,37 @@ app.post('/api/submit-results-to-students', async (req, res) => {
 // Get assessment submissions for lecturer
 app.get('/api/assessment-submissions', async (req, res) => {
   try {
-    const { assessment_id } = req.query;
+    const { assessment_id, student_id } = req.query;
     
     console.log('=== GET ASSESSMENT SUBMISSIONS DEBUG ===');
     console.log('Assessment ID filter:', assessment_id);
+    console.log('Student ID filter:', student_id);
     
-    let query = 'SELECT * FROM assessment_submissions ORDER BY submitted_at DESC';
-    let params = [];
-    
-    if (assessment_id) {
-      query = 'SELECT * FROM assessment_submissions WHERE assessment_id = $1 ORDER BY submitted_at DESC';
-      params = [assessment_id];
+    // SECURITY: If student_id provided, only return that student's submissions
+    if (student_id) {
+      let query = 'SELECT * FROM assessment_submissions WHERE student_id = $1 ORDER BY submitted_at DESC';
+      let params = [student_id];
+      
+      if (assessment_id) {
+        query = 'SELECT * FROM assessment_submissions WHERE assessment_id = $1 AND student_id = $2 ORDER BY submitted_at DESC';
+        params = [assessment_id, student_id];
+      }
+      
+      const result = await pool.query(query, params);
+      console.log('Found submissions for student:', result.rows.length);
+      return res.json({ success: true, data: result.rows });
     }
     
-    const result = await pool.query(query, params);
+    // For lecturer/admin view: require assessment_id to prevent returning all submissions
+    if (!assessment_id) {
+      console.log('No assessment_id or student_id provided, returning empty array');
+      return res.json({ success: true, data: [] });
+    }
+    
+    const query = 'SELECT * FROM assessment_submissions WHERE assessment_id = $1 ORDER BY submitted_at DESC';
+    const result = await pool.query(query, [assessment_id]);
     
     console.log('Found submissions:', result.rows.length);
-    console.log('Submissions data:', result.rows);
-    
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching assessment submissions:', error);
@@ -2990,51 +3284,7 @@ app.get('/api/lecturer-programs', async (req, res) => {
   }
 });
 
-// Get assignments for lecturer or all assignments
-app.get('/api/assignments', async (req, res) => {
-  try {
-    const { lecturer_id } = req.query;
-    
-    console.log('=== ASSIGNMENTS API DEBUG ===');
-    console.log('Lecturer ID:', lecturer_id);
-    
-    let result;
-    
-    if (lecturer_id) {
-      // Get assignments for specific lecturer
-      result = await pool.query(`
-        SELECT a.*, COUNT(s.id) as submission_count
-        FROM assignments a
-        LEFT JOIN assignment_submissions s ON a.id = s.assignment_id
-        WHERE a.lecturer_id = $1
-        GROUP BY a.id ORDER BY a.created_at DESC
-      `, [lecturer_id]);
-      console.log('Lecturer assignments found:', result.rows.length);
-    } else {
-      // Get all active assignments (for students) - IMPROVED QUERY
-      result = await pool.query(`
-        SELECT a.*, COUNT(s.id) as submission_count
-        FROM assignments a
-        LEFT JOIN assignment_submissions s ON a.id = s.assignment_id
-        WHERE a.status = 'active' AND a.deadline > NOW()
-        GROUP BY a.id ORDER BY a.deadline ASC
-      `);
-      console.log('Active assignments for students found:', result.rows.length);
-      console.log('Assignments:', result.rows.map(a => ({
-        id: a.id,
-        title: a.title,
-        program: a.program_name,
-        deadline: a.deadline,
-        status: a.status
-      })));
-    }
-
-    res.json({ success: true, data: result.rows });
-  } catch (error) {
-    console.error('Error fetching assignments:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// REMOVED: Duplicate GET /api/assignments endpoint - already exists at line 1680 with better student filtering
 
 // Get assignments for students
 app.get('/api/student-assignments', async (req, res) => {
@@ -3132,16 +3382,32 @@ app.post('/api/assignment-submissions', async (req, res) => {
 // Get assignment submissions for lecturer
 app.get('/api/assignment-submissions', async (req, res) => {
   try {
-    const { assignment_id, lecturer_id } = req.query;
+    const { assignment_id, lecturer_id, student_id } = req.query;
     
     console.log('=== ASSIGNMENT SUBMISSIONS API DEBUG ===');
     console.log('Assignment ID requested:', assignment_id);
     console.log('Lecturer ID requested:', lecturer_id);
+    console.log('Student ID requested:', student_id);
     
     let result;
     
+    // SECURITY: If student_id provided, only return that student's submissions
+    if (student_id) {
+      let query = 'SELECT * FROM assignment_submissions WHERE student_id = $1 ORDER BY submitted_at DESC';
+      let params = [student_id];
+      
+      if (assignment_id) {
+        query = 'SELECT * FROM assignment_submissions WHERE assignment_id = $1 AND student_id = $2 ORDER BY submitted_at DESC';
+        params = [assignment_id, student_id];
+      }
+      
+      result = await pool.query(query, params);
+      console.log('Found submissions for student:', result.rows.length);
+      return res.json({ success: true, data: result.rows });
+    }
+    
     if (assignment_id) {
-      // Get submissions for specific assignment
+      // Get submissions for specific assignment (lecturer view)
       result = await pool.query(`
         SELECT * FROM assignment_submissions 
         WHERE assignment_id = $1 ORDER BY submitted_at DESC
@@ -3156,14 +3422,9 @@ app.get('/api/assignment-submissions', async (req, res) => {
         ORDER BY s.submitted_at DESC
       `, [lecturer_id]);
     } else {
-      // Get all submissions (for admin or general view)
-      result = await pool.query(`
-        SELECT s.*, a.title as assignment_title, a.program_name, a.lecturer_name
-        FROM assignment_submissions s
-        JOIN assignments a ON s.assignment_id = a.id
-        ORDER BY s.submitted_at DESC
-        LIMIT 100
-      `);
+      // SECURITY: Require at least one filter parameter
+      console.log('No filter provided, returning empty array');
+      return res.json({ success: true, data: [] });
     }
 
     console.log('Submissions found:', result.rows.length);
@@ -3306,29 +3567,124 @@ app.post('/api/live-classes', async (req, res) => {
   }
 });
 
-// Get live classes with enhanced program mapping
+// Get live classes with student-specific program filtering
 app.get('/api/live-classes', async (req, res) => {
   try {
-    const { lecturer_name, student_course } = req.query;
+    const { lecturer_name, student_course, student_id, student_username } = req.query;
     
     console.log('=== GET LIVE CLASSES DEBUG ===');
     console.log('Lecturer Name:', lecturer_name);
     console.log('Student Course:', student_course);
+    console.log('Student ID:', student_id);
+    console.log('Student Username:', student_username);
     
-    let query = 'SELECT * FROM live_classes';
-    let params = [];
-    
-    if (lecturer_name) {
-      query += ' WHERE lecturer_name = $1';
-      params = [lecturer_name];
+    // If lecturer_name provided, return only that lecturer's classes (for lecturer view)
+    if (lecturer_name && !student_id && !student_username) {
+      const result = await pool.query(
+        'SELECT * FROM live_classes WHERE lecturer_name = $1 ORDER BY date ASC, time ASC',
+        [lecturer_name]
+      );
+      console.log('Live classes found for lecturer:', result.rows.length);
+      return res.json({ success: true, data: result.rows });
     }
     
-    query += ' ORDER BY date ASC, time ASC';
+    // If no student info provided, return all classes (for admin view)
+    if (!student_id && !student_username) {
+      const result = await pool.query('SELECT * FROM live_classes ORDER BY date ASC, time ASC');
+      console.log('Live classes found (no filter):', result.rows.length);
+      return res.json({ success: true, data: result.rows });
+    }
     
-    const result = await pool.query(query, params);
+    // Get student information
+    let studentInfo = null;
+    if (student_id) {
+      const studentResult = await pool.query(`
+        SELECT s.*, c.name as course_name
+        FROM students s
+        LEFT JOIN courses c ON s.course_id = c.id
+        WHERE s.id = $1
+      `, [student_id]);
+      
+      if (studentResult.rows.length > 0) {
+        studentInfo = studentResult.rows[0];
+      }
+    } else if (student_username) {
+      const studentResult = await pool.query(`
+        SELECT s.*, c.name as course_name
+        FROM students s
+        LEFT JOIN courses c ON s.course_id = c.id
+        WHERE s.registration_number = $1 OR s.email = $1 OR s.name = $1
+      `, [student_username]);
+      
+      if (studentResult.rows.length > 0) {
+        studentInfo = studentResult.rows[0];
+      }
+    }
     
-    console.log('Live classes found:', result.rows.length);
-    res.json({ success: true, data: result.rows });
+    if (!studentInfo) {
+      console.log('Student not found, returning empty array');
+      return res.json({ success: true, data: [] });
+    }
+    
+    console.log('Student Info:', studentInfo);
+    
+    // Get student's programs
+    const programsResult = await pool.query(
+      'SELECT name FROM programs WHERE course_id = $1',
+      [studentInfo.course_id]
+    );
+    const studentPrograms = programsResult.rows.map(p => p.name);
+    
+    console.log('Student Programs:', studentPrograms);
+    
+    // Fetch all live classes
+    const liveClassesResult = await pool.query('SELECT * FROM live_classes ORDER BY date ASC, time ASC');
+    
+    // Filter live classes based on student's programs
+    const filteredLiveClasses = liveClassesResult.rows.filter(liveClass => {
+      // Check if live class program matches any of student's programs
+      const programMatch = studentPrograms.some(program => {
+        if (!program || !liveClass.program_name) return false;
+        
+        const programLower = program.toLowerCase().trim();
+        const liveClassProgramLower = liveClass.program_name.toLowerCase().trim();
+        
+        // Exact match
+        if (programLower === liveClassProgramLower) {
+          console.log(`✅ Live Class "${liveClass.title}" - Exact program match: ${liveClass.program_name}`);
+          return true;
+        }
+        
+        // Contains match
+        if (programLower.includes(liveClassProgramLower) || liveClassProgramLower.includes(programLower)) {
+          console.log(`✅ Live Class "${liveClass.title}" - Partial program match: ${liveClass.program_name}`);
+          return true;
+        }
+        
+        // Word-based matching
+        const programWords = programLower.split(/\s+/);
+        const liveClassWords = liveClassProgramLower.split(/\s+/);
+        const commonWords = programWords.filter(word => 
+          word.length > 3 && liveClassWords.includes(word)
+        );
+        
+        if (commonWords.length >= 2) {
+          console.log(`✅ Live Class "${liveClass.title}" - Word match: ${liveClass.program_name}`);
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (!programMatch) {
+        console.log(`❌ Live Class "${liveClass.title}" - No program match: ${liveClass.program_name}`);
+      }
+      
+      return programMatch;
+    });
+    
+    console.log(`Filtered ${filteredLiveClasses.length} live classes for student`);
+    res.json({ success: true, data: filteredLiveClasses });
   } catch (error) {
     console.error('Error fetching live classes:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -3797,20 +4153,122 @@ app.post('/api/live-classes/test-scheduler', async (req, res) => {
 
 // ===== DISCUSSION SYSTEM API ENDPOINTS =====
 
-// Get all discussions
+// Get all discussions with student-specific program filtering
 app.get('/api/discussions', async (req, res) => {
   try {
-    console.log('=== FETCHING DISCUSSIONS ===');
+    const { student_id, student_username } = req.query;
     
-    const result = await pool.query(`
+    console.log('=== FETCHING DISCUSSIONS ===');
+    console.log('Student ID:', student_id);
+    console.log('Student Username:', student_username);
+    
+    // If no student info provided, return all discussions (for admin/lecturer view)
+    if (!student_id && !student_username) {
+      const result = await pool.query(`
+        SELECT d.*, 
+               (SELECT COUNT(*) FROM discussion_replies WHERE discussion_id = d.id) as reply_count
+        FROM discussions d 
+        ORDER BY d.created_at DESC
+      `);
+      console.log('Discussions found (no filter):', result.rows.length);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // Get student information
+    let studentInfo = null;
+    if (student_id) {
+      const studentResult = await pool.query(`
+        SELECT s.*, c.name as course_name
+        FROM students s
+        LEFT JOIN courses c ON s.course_id = c.id
+        WHERE s.id = $1
+      `, [student_id]);
+      
+      if (studentResult.rows.length > 0) {
+        studentInfo = studentResult.rows[0];
+      }
+    } else if (student_username) {
+      const studentResult = await pool.query(`
+        SELECT s.*, c.name as course_name
+        FROM students s
+        LEFT JOIN courses c ON s.course_id = c.id
+        WHERE s.registration_number = $1 OR s.email = $1 OR s.name = $1
+      `, [student_username]);
+      
+      if (studentResult.rows.length > 0) {
+        studentInfo = studentResult.rows[0];
+      }
+    }
+    
+    if (!studentInfo) {
+      console.log('Student not found, returning empty array');
+      return res.json({ success: true, data: [] });
+    }
+    
+    console.log('Student Info:', studentInfo);
+    
+    // Get student's programs
+    const programsResult = await pool.query(
+      'SELECT name FROM programs WHERE course_id = $1',
+      [studentInfo.course_id]
+    );
+    const studentPrograms = programsResult.rows.map(p => p.name);
+    
+    console.log('Student Programs:', studentPrograms);
+    
+    // Fetch all discussions
+    const discussionsResult = await pool.query(`
       SELECT d.*, 
              (SELECT COUNT(*) FROM discussion_replies WHERE discussion_id = d.id) as reply_count
       FROM discussions d 
       ORDER BY d.created_at DESC
     `);
     
-    console.log('Discussions found:', result.rows.length);
-    res.json({ success: true, data: result.rows });
+    // Filter discussions based on student's programs
+    const filteredDiscussions = discussionsResult.rows.filter(discussion => {
+      // Check if discussion program matches any of student's programs
+      const programMatch = studentPrograms.some(program => {
+        if (!program || !discussion.program) return false;
+        
+        const programLower = program.toLowerCase().trim();
+        const discussionProgramLower = discussion.program.toLowerCase().trim();
+        
+        // Exact match
+        if (programLower === discussionProgramLower) {
+          console.log(`✅ Discussion "${discussion.title}" - Exact program match: ${discussion.program}`);
+          return true;
+        }
+        
+        // Contains match
+        if (programLower.includes(discussionProgramLower) || discussionProgramLower.includes(programLower)) {
+          console.log(`✅ Discussion "${discussion.title}" - Partial program match: ${discussion.program}`);
+          return true;
+        }
+        
+        // Word-based matching
+        const programWords = programLower.split(/\s+/);
+        const discussionWords = discussionProgramLower.split(/\s+/);
+        const commonWords = programWords.filter(word => 
+          word.length > 3 && discussionWords.includes(word)
+        );
+        
+        if (commonWords.length >= 2) {
+          console.log(`✅ Discussion "${discussion.title}" - Word match: ${discussion.program}`);
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (!programMatch) {
+        console.log(`❌ Discussion "${discussion.title}" - No program match: ${discussion.program}`);
+      }
+      
+      return programMatch;
+    });
+    
+    console.log(`Filtered ${filteredDiscussions.length} discussions for student`);
+    res.json({ success: true, data: filteredDiscussions });
   } catch (error) {
     console.error('Error fetching discussions:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -4260,14 +4718,154 @@ const initializeShortTermProgramsTable = async () => {
   }
 };
 
-// Get all announcements
+// Get all announcements with student-specific filtering
 app.get('/api/announcements', async (req, res) => {
   try {
-    const result = await pool.query(
+    const { student_id, student_username } = req.query;
+    
+    console.log('=== FETCHING ANNOUNCEMENTS ===');
+    console.log('Student ID:', student_id);
+    console.log('Student Username:', student_username);
+    
+    // If no student info provided, return all announcements (for admin/lecturer view)
+    if (!student_id && !student_username) {
+      const result = await pool.query(
+        'SELECT * FROM announcements ORDER BY created_at DESC'
+      );
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // Get student information with college, department, and course details
+    let studentInfo = null;
+    if (student_id) {
+      const studentResult = await pool.query(`
+        SELECT s.*, 
+               c.name as course_name,
+               d.name as department_name,
+               col.name as college_name
+        FROM students s
+        LEFT JOIN courses c ON s.course_id = c.id
+        LEFT JOIN departments d ON c.department_id = d.id
+        LEFT JOIN colleges col ON d.college_id = col.id
+        WHERE s.id = $1
+      `, [student_id]);
+      
+      if (studentResult.rows.length > 0) {
+        studentInfo = studentResult.rows[0];
+      }
+    } else if (student_username) {
+      const studentResult = await pool.query(`
+        SELECT s.*, 
+               c.name as course_name,
+               d.name as department_name,
+               col.name as college_name
+        FROM students s
+        LEFT JOIN courses c ON s.course_id = c.id
+        LEFT JOIN departments d ON c.department_id = d.id
+        LEFT JOIN colleges col ON d.college_id = col.id
+        WHERE s.registration_number = $1 OR s.email = $1 OR s.name = $1
+      `, [student_username]);
+      
+      if (studentResult.rows.length > 0) {
+        studentInfo = studentResult.rows[0];
+      }
+    }
+    
+    if (!studentInfo) {
+      console.log('Student not found, returning empty array');
+      return res.json({ success: true, data: [] });
+    }
+    
+    console.log('Student Info:', studentInfo);
+    
+    // Get student's programs (regular + short-term)
+    const programsResult = await pool.query(
+      'SELECT name FROM programs WHERE course_id = $1',
+      [studentInfo.course_id]
+    );
+    let studentPrograms = programsResult.rows.map(p => p.name);
+    
+    // Add short-term programs that student is eligible for
+    try {
+      const shortTermResult = await pool.query(
+        'SELECT * FROM short_term_programs WHERE end_date > NOW()'
+      );
+      
+      const eligibleShortTermPrograms = shortTermResult.rows.filter(program => {
+        // Check targeting for short-term programs
+        if (program.target_type === 'all') return true;
+        if (program.target_type === 'college' && program.target_value === studentInfo.college_name) return true;
+        if (program.target_type === 'department' && program.target_value === studentInfo.department_name) return true;
+        if (program.target_type === 'course' && program.target_value === studentInfo.course_name) return true;
+        if (program.target_type === 'program') {
+          return studentPrograms.some(p => p === program.target_value);
+        }
+        return false;
+      });
+      
+      // Add short-term program titles to student programs list
+      const shortTermProgramNames = eligibleShortTermPrograms.map(p => p.title);
+      studentPrograms = [...studentPrograms, ...shortTermProgramNames];
+      console.log('Added short-term programs:', shortTermProgramNames);
+    } catch (error) {
+      console.log('No short-term programs table or error:', error.message);
+    }
+    
+    console.log('Student Programs (Regular + Short-Term):', studentPrograms);
+    
+    // Fetch all announcements
+    const announcementsResult = await pool.query(
       'SELECT * FROM announcements ORDER BY created_at DESC'
     );
     
-    res.json({ success: true, data: result.rows });
+    // Filter announcements based on targeting
+    const filteredAnnouncements = announcementsResult.rows.filter(announcement => {
+      // Show all announcements targeted to "All Students"
+      if (announcement.target_type === 'all') {
+        console.log(`✅ Announcement "${announcement.title}" - All Students`);
+        return true;
+      }
+      
+      // Show announcements targeted to student's college
+      if (announcement.target_type === 'college' && 
+          announcement.target_value === studentInfo.college_name) {
+        console.log(`✅ Announcement "${announcement.title}" - College match: ${announcement.target_value}`);
+        return true;
+      }
+      
+      // Show announcements targeted to student's department
+      if (announcement.target_type === 'department' && 
+          announcement.target_value === studentInfo.department_name) {
+        console.log(`✅ Announcement "${announcement.title}" - Department match: ${announcement.target_value}`);
+        return true;
+      }
+      
+      // Show announcements targeted to student's course
+      if (announcement.target_type === 'course' && 
+          announcement.target_value === studentInfo.course_name) {
+        console.log(`✅ Announcement "${announcement.title}" - Course match: ${announcement.target_value}`);
+        return true;
+      }
+      
+      // Show announcements targeted to student's programs
+      if (announcement.target_type === 'program') {
+        const programMatch = studentPrograms.some(program => 
+          program === announcement.target_value ||
+          program?.toLowerCase().includes(announcement.target_value?.toLowerCase()) ||
+          announcement.target_value?.toLowerCase().includes(program?.toLowerCase())
+        );
+        if (programMatch) {
+          console.log(`✅ Announcement "${announcement.title}" - Program match: ${announcement.target_value}`);
+          return true;
+        }
+      }
+      
+      console.log(`❌ Announcement "${announcement.title}" - No match`);
+      return false;
+    });
+    
+    console.log(`Filtered ${filteredAnnouncements.length} announcements for student`);
+    res.json({ success: true, data: filteredAnnouncements });
   } catch (error) {
     console.error('Error fetching announcements:', error);
     res.status(500).json({ success: false, error: error.message });
