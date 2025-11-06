@@ -60,6 +60,11 @@ export const AnnouncementsNews = () => {
         const filteredAnnouncements = result.data || [];
         
         console.log(`✅ Received ${filteredAnnouncements.length} filtered announcements from backend`);
+        console.log('📢 Announcements details:', filteredAnnouncements.map(a => ({
+          title: a.title,
+          target: `${a.target_type}: ${a.target_value}`,
+          created_by: `${a.created_by} (${a.created_by_type})`
+        })));
         
         // Backend already filtered - just set the data!
         setAnnouncements(filteredAnnouncements);

@@ -141,6 +141,12 @@ export const Discussions = () => {
         
         const filteredDiscussions = discussionsResult.data || [];
         console.log(`✅ Received ${filteredDiscussions.length} filtered discussions from backend`);
+        console.log('💬 Discussions details:', filteredDiscussions.map(d => ({
+          title: d.title,
+          program: d.program,
+          category: d.category,
+          author: d.author
+        })));
         
         // Backend already filtered - just set the data!
         setDiscussions(filteredDiscussions);
