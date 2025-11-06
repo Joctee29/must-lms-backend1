@@ -1303,22 +1303,8 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       );
       
       if (lecturerResult.rows.length === 0) {
-        console.log('❌ LECTURER NOT FOUND BY USERNAME');
-        console.log('Searched for:', lecturer_username);
-        
-        // Check if any lecturers exist
-        const totalLecturers = await pool.query('SELECT COUNT(*) FROM lecturers');
-        console.log('Total lecturers in database:', totalLecturers.rows[0].count);
-        
-        // Show sample lecturer employee_ids
-        const sampleLecturers = await pool.query('SELECT employee_id, name FROM lecturers LIMIT 5');
-        console.log('Sample lecturer employee_ids:', sampleLecturers.rows);
-        
-        return res.json({ 
-          success: true, 
-          data: [],
-          message: 'Lecturer not found. Please verify your employee ID is registered in the system.'
-        });
+        console.log('Lecturer not found by username');
+        return res.json({ success: true, data: [] });
       }
       
       const lecturer = lecturerResult.rows[0];
@@ -1331,25 +1317,6 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
         [lecturer.id, lecturer.employee_id, lecturer.name]
       );
       console.log(`Found ${result.rows.length} programs for lecturer username: ${lecturer_username}`);
-      
-      // DEBUGGING: If no programs found, check why
-      if (result.rows.length === 0) {
-        console.log('⚠️ NO PROGRAMS FOUND - DEBUGGING:');
-        console.log('Lecturer ID:', lecturer.id);
-        console.log('Lecturer Employee ID:', lecturer.employee_id);
-        console.log('Lecturer Name:', lecturer.name);
-        
-        // Check total programs in database
-        const totalPrograms = await pool.query('SELECT COUNT(*) FROM programs');
-        console.log('Total programs in database:', totalPrograms.rows[0].count);
-        
-        // Check programs with lecturer_name set
-        const programsWithLecturer = await pool.query(
-          'SELECT id, name, lecturer_id, lecturer_name FROM programs WHERE lecturer_name IS NOT NULL OR lecturer_id IS NOT NULL LIMIT 5'
-        );
-        console.log('Sample programs with lecturer assigned:', programsWithLecturer.rows);
-      }
-      
       return res.json({ success: true, data: result.rows });
     }
     
