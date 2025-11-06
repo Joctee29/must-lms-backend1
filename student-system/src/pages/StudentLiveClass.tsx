@@ -44,14 +44,10 @@ export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       
       // Get student info
-      const studentResponse = await fetch('https://must-lms-backend.onrender.com/api/students');
+      const studentResponse = await fetch(`https://must-lms-backend.onrender.com/api/students/me?username=${encodeURIComponent(currentUser.username)}`);
       const studentsResult = await studentResponse.json();
       
-      const currentStudent = studentsResult.data?.find(s => 
-        s.name === currentUser.username || 
-        s.email === currentUser.username ||
-        s.registration_number === currentUser.username
-      );
+      const currentStudent = studentsResult.data;
       
       if (!currentStudent) {
         console.error('Student not found');
@@ -121,14 +117,10 @@ export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps
       
       // Get current student info
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      const studentResponse = await fetch('https://must-lms-backend.onrender.com/api/students');
+      const studentResponse = await fetch(`https://must-lms-backend.onrender.com/api/students/me?username=${encodeURIComponent(currentUser.username)}`);
       const studentsResult = await studentResponse.json();
       
-      const currentStudent = studentsResult.data?.find(s => 
-        s.name === currentUser.username || 
-        s.email === currentUser.username ||
-        s.registration_number === currentUser.username
-      );
+      const currentStudent = studentsResult.data;
       
       if (!currentStudent) {
         alert('❌ Student information not found. Please log in again.');

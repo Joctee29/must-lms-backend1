@@ -39,17 +39,12 @@ const MaterialsComponent = () => {
         const user = JSON.parse(currentUser);
         
         // Get current student information
-        const studentsResponse = await fetch('https://must-lms-backend.onrender.com/api/students');
+        const studentsResponse = await fetch(`https://must-lms-backend.onrender.com/api/students/me?username=${encodeURIComponent(user.username)}`);
         let currentStudent = null;
         
         if (studentsResponse.ok) {
           const studentsResult = await studentsResponse.json();
-          currentStudent = studentsResult.data?.find(s => 
-            s.name === user.username || 
-            s.email === user.username ||
-            s.registration_number === user.username ||
-            s.name?.toLowerCase() === user.username?.toLowerCase()
-          );
+          currentStudent = studentsResult.data;
         }
         
         if (!currentStudent) {

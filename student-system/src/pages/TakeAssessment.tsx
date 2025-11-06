@@ -58,14 +58,10 @@ export const TakeAssessment = () => {
         console.log('Current User:', currentUser);
 
         // Get student information first
-        const studentsResponse = await fetch('https://must-lms-backend.onrender.com/api/students');
+        const studentsResponse = await fetch(`https://must-lms-backend.onrender.com/api/students/me?username=${encodeURIComponent(currentUser.username)}`);
         if (studentsResponse.ok) {
           const studentsResult = await studentsResponse.json();
-          const currentStudent = studentsResult.data?.find(s => 
-            s.name === currentUser.username || 
-            s.email === currentUser.username ||
-            s.registration_number === currentUser.username
-          );
+          const currentStudent = studentsResult.data;
 
           console.log('Found Student:', currentStudent);
 

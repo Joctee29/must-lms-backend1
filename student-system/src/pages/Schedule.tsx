@@ -25,14 +25,10 @@ export const Schedule = ({ onNavigate }: { onNavigate?: (section: string) => voi
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         
         // Get current student
-        const studentsResponse = await fetch('https://must-lms-backend.onrender.com/api/students');
+        const studentsResponse = await fetch(`https://must-lms-backend.onrender.com/api/students/me?username=${encodeURIComponent(currentUser.username)}`);
         if (studentsResponse.ok) {
           const studentsResult = await studentsResponse.json();
-          const currentStudent = studentsResult.data?.find(s => 
-            s.name === currentUser.username || 
-            s.email === currentUser.username ||
-            s.registration_number === currentUser.username
-          );
+          const currentStudent = studentsResult.data;
           
           console.log('Current student found:', currentStudent);
           

@@ -52,20 +52,14 @@ export const Dashboard = () => {
         console.log('=== STUDENT DASHBOARD DATA FETCH ===');
         console.log('Current User:', currentUser);
         
-        // Try to fetch real data from students table
-        const response = await fetch(`${API_BASE_URL}/students`);
+        // Use the dedicated /api/students/me endpoint for students
+        const response = await fetch(`${API_BASE_URL}/students/me?username=${encodeURIComponent(currentUser.username)}`);
         if (response.ok) {
           const result = await response.json();
-          console.log('Students API Response:', result);
+          console.log('Student API Response:', result);
           
           if (result.success && result.data) {
-            // Multiple matching strategies for finding student
-            const student = result.data.find((s: any) => 
-              s.registration_number === currentUser.username ||
-              s.name === currentUser.username ||
-              s.email === currentUser.username ||
-              s.username === currentUser.username
-            );
+            const student = result.data;
             
             console.log('Found Student:', student);
             
