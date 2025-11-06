@@ -833,11 +833,30 @@ app.get('/api/lecturers', optionalAuth, async (req, res) => {
       console.log('=== SEARCHING FOR LECTURER ===');
       console.log('Username/Employee ID:', username);
       
-      const result = await pool.query(
+      // First try direct field match
+      let result = await pool.query(
         'SELECT id, name, employee_id, specialization, email, phone, created_at FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
         [username]
       );
-      console.log(`Found ${result.rows.length} lecturer(s) by username: ${username}`);
+      console.log(`Found ${result.rows.length} lecturer(s) by direct match: ${username}`);
+      
+      // If not found, try password_records lookup
+      if (result.rows.length === 0) {
+        console.log('Lecturer not found by direct match, checking password_records...');
+        const passwordResult = await pool.query(
+          'SELECT user_id FROM password_records WHERE username = $1 AND user_type = $2',
+          [username, 'lecturer']
+        );
+        
+        if (passwordResult.rows.length > 0) {
+          console.log('Found lecturer via password_records, user_id:', passwordResult.rows[0].user_id);
+          result = await pool.query(
+            'SELECT id, name, employee_id, specialization, email, phone, created_at FROM lecturers WHERE id = $1',
+            [passwordResult.rows[0].user_id]
+          );
+          console.log(`Found ${result.rows.length} lecturer(s) via password_records`);
+        }
+      }
       
       if (result.rows.length > 0) {
         console.log('Lecturer found:', result.rows[0]);
@@ -1315,13 +1334,31 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
     
     // For lecturers by username - find programs by lecturer username/employee_id
     if (lecturer_username) {
-      const lecturerResult = await pool.query(
+      // First, try to find lecturer by direct field matches
+      let lecturerResult = await pool.query(
         'SELECT id, employee_id, name FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
         [lecturer_username]
       );
       
+      // If not found, try to find via password_records table using username
       if (lecturerResult.rows.length === 0) {
-        console.log('Lecturer not found by username');
+        console.log('Lecturer not found by direct match, checking password_records...');
+        const passwordResult = await pool.query(
+          'SELECT user_id FROM password_records WHERE username = $1 AND user_type = $2',
+          [lecturer_username, 'lecturer']
+        );
+        
+        if (passwordResult.rows.length > 0) {
+          console.log('Found lecturer via password_records, user_id:', passwordResult.rows[0].user_id);
+          lecturerResult = await pool.query(
+            'SELECT id, employee_id, name FROM lecturers WHERE id = $1',
+            [passwordResult.rows[0].user_id]
+          );
+        }
+      }
+      
+      if (lecturerResult.rows.length === 0) {
+        console.log('Lecturer not found by username:', lecturer_username);
         return res.json({ success: true, data: [] });
       }
       
@@ -1331,13 +1368,16 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       console.log('Lecturer Employee ID:', lecturer.employee_id);
       console.log('Lecturer Name:', lecturer.name);
       
+      // More flexible query using ILIKE for partial matching
       const result = await pool.query(
         `SELECT * FROM programs 
          WHERE lecturer_id = $1 
             OR lecturer_name = $2 
             OR lecturer_name = $3
+            OR lecturer_name ILIKE $4
+            OR lecturer_name ILIKE $5
          ORDER BY created_at DESC`,
-        [lecturer.id, lecturer.employee_id, lecturer.name]
+        [lecturer.id, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`]
       );
       console.log(`Found ${result.rows.length} programs for lecturer username: ${lecturer_username}`);
       
@@ -1383,13 +1423,16 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       }
       
       const lecturer = lecturerResult.rows[0];
+      // More flexible query using ILIKE for partial matching
       const result = await pool.query(
         `SELECT * FROM programs 
          WHERE lecturer_id = $1 
             OR lecturer_name = $2 
             OR lecturer_name = $3
+            OR lecturer_name ILIKE $4
+            OR lecturer_name ILIKE $5
          ORDER BY created_at DESC`,
-        [effectiveUserId, lecturer.employee_id, lecturer.name]
+        [effectiveUserId, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`]
       );
       console.log(`Found ${result.rows.length} programs for lecturer`);
       return res.json({ success: true, data: result.rows });
@@ -5521,14 +5564,31 @@ app.get('/api/short-term-programs', async (req, res) => {
       console.log('=== FETCHING SHORT-TERM PROGRAMS FOR LECTURER ===');
       console.log('Lecturer Username:', lecturer_username);
       
-      // Find lecturer first
-      const lecturerResult = await pool.query(
+      // Find lecturer first - try direct field matches
+      let lecturerResult = await pool.query(
         'SELECT id, employee_id, name FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
         [lecturer_username]
       );
       
+      // If not found, try to find via password_records table using username
       if (lecturerResult.rows.length === 0) {
-        console.log('Lecturer not found');
+        console.log('Lecturer not found by direct match, checking password_records...');
+        const passwordResult = await pool.query(
+          'SELECT user_id FROM password_records WHERE username = $1 AND user_type = $2',
+          [lecturer_username, 'lecturer']
+        );
+        
+        if (passwordResult.rows.length > 0) {
+          console.log('Found lecturer via password_records, user_id:', passwordResult.rows[0].user_id);
+          lecturerResult = await pool.query(
+            'SELECT id, employee_id, name FROM lecturers WHERE id = $1',
+            [passwordResult.rows[0].user_id]
+          );
+        }
+      }
+      
+      if (lecturerResult.rows.length === 0) {
+        console.log('Lecturer not found:', lecturer_username);
         return res.json({ success: true, data: [] });
       }
       
@@ -5538,13 +5598,16 @@ app.get('/api/short-term-programs', async (req, res) => {
       console.log('Lecturer Employee ID:', lecturer.employee_id);
       console.log('Lecturer Name:', lecturer.name);
       
+      // More flexible query using ILIKE for partial matching
       const result = await pool.query(
         `SELECT * FROM short_term_programs 
          WHERE lecturer_id = $1 
             OR lecturer_name = $2 
             OR lecturer_name = $3
+            OR lecturer_name ILIKE $4
+            OR lecturer_name ILIKE $5
          ORDER BY created_at DESC`,
-        [lecturer.id, lecturer.employee_id, lecturer.name]
+        [lecturer.id, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`]
       );
       
       console.log(`Found ${result.rows.length} short-term programs for lecturer`);
@@ -5590,10 +5653,29 @@ app.get('/api/short-term-programs/lecturer/:lecturer_id', async (req, res) => {
     console.log('=== FETCHING LECTURER SHORT-TERM PROGRAMS ===');
     console.log('Lecturer ID:', lecturer_id);
     
-    // Get programs assigned to this lecturer
-    const result = await pool.query(
-      'SELECT * FROM short_term_programs WHERE lecturer_id = $1 ORDER BY created_at DESC',
+    // Get lecturer info for flexible matching
+    const lecturerResult = await pool.query(
+      'SELECT employee_id, name FROM lecturers WHERE id = $1',
       [lecturer_id]
+    );
+    
+    if (lecturerResult.rows.length === 0) {
+      console.log('Lecturer not found');
+      return res.json({ success: true, data: [] });
+    }
+    
+    const lecturer = lecturerResult.rows[0];
+    
+    // Get programs assigned to this lecturer with flexible matching
+    const result = await pool.query(
+      `SELECT * FROM short_term_programs 
+       WHERE lecturer_id = $1 
+          OR lecturer_name = $2 
+          OR lecturer_name = $3
+          OR lecturer_name ILIKE $4
+          OR lecturer_name ILIKE $5
+       ORDER BY created_at DESC`,
+      [lecturer_id, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`]
     );
     
     console.log(`Found ${result.rows.length} programs for lecturer ${lecturer_id}`);
