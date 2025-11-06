@@ -5622,7 +5622,7 @@ app.get('/api/short-term-programs', async (req, res) => {
         
         // Check short-term programs with lecturer assignments
         const shortTermWithLecturer = await pool.query(`
-          SELECT id, name, lecturer_id, lecturer_name 
+          SELECT id, title, lecturer_id, lecturer_name 
           FROM short_term_programs 
           WHERE lecturer_id IS NOT NULL OR lecturer_name IS NOT NULL 
           LIMIT 5
