@@ -847,18 +847,13 @@ app.get('/api/lecturers', optionalAuth, async (req, res) => {
       return res.json({ success: true, data: result.rows });
     }
     
-    // For students - can see basic lecturer info (names only for program display)
-    if (effectiveUserType === 'student') {
-      const result = await pool.query(
-        'SELECT id, name, employee_id, specialization FROM lecturers ORDER BY name ASC'
-      );
-      console.log(`Found ${result.rows.length} lecturers (student view - basic info only)`);
-      return res.json({ success: true, data: result.rows });
-    }
-    
-    // No authorization - return empty
-    console.log('Unauthorized - returning empty');
-    res.status(403).json({ success: false, error: 'Unauthorized to view lecturers list' });
+    // For students or unauthenticated - can see basic lecturer info (names only for program display)
+    // This is safe as it only exposes public information needed for course catalogs
+    const result = await pool.query(
+      'SELECT id, name, employee_id, specialization FROM lecturers ORDER BY name ASC'
+    );
+    console.log(`Found ${result.rows.length} lecturers (public view - basic info only)`);
+    return res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching lecturers:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -994,9 +989,10 @@ app.get('/api/students', optionalAuth, async (req, res) => {
       return res.json({ success: true, data: result.rows });
     }
     
-    // For students or no authorization - return empty for security
-    console.log('Unauthorized or student trying to access students list - returning empty');
-    res.status(403).json({ success: false, error: 'Unauthorized to view students list' });
+    // For students or no authorization - return empty array (not 403)
+    // This prevents errors in frontend when checking short-term program eligibility
+    console.log('Unauthorized or student trying to access students list - returning empty array');
+    res.json({ success: true, data: [] });
   } catch (error) {
     console.error('Error fetching students:', error);
     res.status(500).json({ success: false, error: error.message });
