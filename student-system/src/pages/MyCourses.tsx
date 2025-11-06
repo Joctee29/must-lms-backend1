@@ -79,26 +79,65 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
           setCourses(coursesResult.data);
         }
 
-        // Fetch short-term programs using student-specific endpoint (backend handles filtering)
-        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs/student?student_username=${encodeURIComponent(currentUser.username)}`);
+        // Fetch short-term programs that student is eligible for
+        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs`);
         const shortTermResult = await shortTermResponse.json();
         
-        if (shortTermResult.success) {
+        if (shortTermResult.success && student) {
           console.log('=== SHORT-TERM PROGRAMS DEBUG ===');
-          console.log('Filtered Short-Term Programs from Backend:', shortTermResult.data);
+          console.log('All Short-Term Programs:', shortTermResult.data);
+          console.log('Current Student:', student);
+          console.log('Student College:', student.college_name);
+          console.log('Student Department:', student.department_name);
+          console.log('Student Course:', student.course_name);
+          console.log('Enrolled Programs:', enrolledPrograms);
           
-          // Programs are already filtered by backend based on student's targeting
-          // Backend already checked: college, department, course, program matching
-          // We just need to verify they're still active
           const eligibleShortTermPrograms = shortTermResult.data.filter((program: any) => {
+            console.log(`\n--- Checking Program: ${program.title} ---`);
+            console.log('Program Target Type:', program.target_type);
+            console.log('Program Target Value:', program.target_value);
+            console.log('Program End Date:', program.end_date);
+            
+            // Check if program is active (not expired)
             const now = new Date();
             const endDate = new Date(program.end_date);
             if (now > endDate) {
-              console.log(`❌ Program "${program.title}" expired`);
+              console.log('❌ Program expired');
               return false;
             }
-            console.log(`✅ Program "${program.title}" is active and eligible`);
-            return true;
+            
+            // Check targeting
+            if (program.target_type === 'all') {
+              console.log('✅ Matches: All students');
+              return true;
+            }
+            if (program.target_type === 'college' && program.target_value === student.college_name) {
+              console.log('✅ Matches: College targeting');
+              return true;
+            }
+            if (program.target_type === 'department' && program.target_value === student.department_name) {
+              console.log('✅ Matches: Department targeting');
+              return true;
+            }
+            if (program.target_type === 'course' && program.target_value === student.course_name) {
+              console.log('✅ Matches: Course targeting');
+              return true;
+            }
+            
+            // For program targeting, check if student's programs match
+            if (program.target_type === 'program') {
+              const programMatch = enrolledPrograms.some(p => p.name === program.target_value);
+              if (programMatch) {
+                console.log('✅ Matches: Program targeting');
+                return true;
+              } else {
+                console.log('❌ No program match');
+                return false;
+              }
+            }
+            
+            console.log('❌ No match found');
+            return false;
           });
           
           console.log('Eligible Short-Term Programs:', eligibleShortTermPrograms);

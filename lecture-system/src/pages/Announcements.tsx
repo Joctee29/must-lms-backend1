@@ -62,11 +62,17 @@ export const Announcements = () => {
           allPrograms = [...lecturerRegularPrograms];
         }
         
-        // Fetch lecturer's short-term programs using lecturer-specific endpoint
-        const shortTermResponse = await fetch(`https://must-lms-backend.onrender.com/api/short-term-programs/lecturer/${currentUser.id}`);
+        // Fetch lecturer's short-term programs
+        const shortTermResponse = await fetch('https://must-lms-backend.onrender.com/api/short-term-programs');
         if (shortTermResponse.ok) {
           const shortTermResult = await shortTermResponse.json();
-          const lecturerShortTermPrograms = shortTermResult.data || [];
+          const shortTermPrograms = shortTermResult.data || [];
+          
+          // Filter short-term programs for current lecturer
+          const lecturerShortTermPrograms = shortTermPrograms.filter(program => 
+            program.lecturer_name === currentUser.username || 
+            program.lecturer_id === currentUser.id
+          );
           
           // Convert short-term programs to same format as regular programs
           const formattedShortTermPrograms = lecturerShortTermPrograms.map(program => ({

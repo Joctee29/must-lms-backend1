@@ -159,16 +159,20 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
           }
         }
         
-        // 3. Get short-term programs using lecturer-specific endpoint
-        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs/lecturer/${currentLecturer.id}`);
+        // 3. Get short-term programs assigned to this lecturer
+        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs`);
         if (shortTermResponse.ok) {
           const shortTermResult = await shortTermResponse.json();
           console.log('Short-Term Programs API Response:', shortTermResult);
           
           if (shortTermResult.success) {
-            // Programs are already filtered by backend
-            const shortTermPrograms = shortTermResult.data || [];
-            console.log('Lecturer Short-Term Programs:', shortTermPrograms);
+            console.log('All Short-Term Programs:', shortTermResult.data);
+            const shortTermPrograms = shortTermResult.data.filter((p: any) => 
+              p.lecturer_name === currentLecturer.name ||
+              p.lecturer_name === currentLecturer.employee_id ||
+              p.lecturer_id === currentLecturer.id
+            );
+            console.log('Filtered Short-Term Lecturer Programs:', shortTermPrograms);
             
             // Convert short-term programs to same format as regular programs
             const formattedShortTermPrograms = shortTermPrograms.map((program: any) => ({
