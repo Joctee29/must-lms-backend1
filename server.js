@@ -4681,9 +4681,15 @@ app.get('/api/discussions', async (req, res) => {
     
     // Filter discussions based on student's programs
     const filteredDiscussions = discussionsResult.rows.filter(discussion => {
+      // If no program specified, show to all (for general discussions)
+      if (!discussion.program || discussion.program.trim() === '') {
+        console.log(`✅ Discussion "${discussion.title}" - No program restriction (general)`);
+        return true;
+      }
+      
       // Check if discussion program matches any of student's programs
       const programMatch = studentPrograms.some(program => {
-        if (!program || !discussion.program) return false;
+        if (!program) return false;
         
         const programLower = program.toLowerCase().trim();
         const discussionProgramLower = discussion.program.toLowerCase().trim();
@@ -4694,21 +4700,25 @@ app.get('/api/discussions', async (req, res) => {
           return true;
         }
         
-        // Contains match
+        // Contains match (either direction)
         if (programLower.includes(discussionProgramLower) || discussionProgramLower.includes(programLower)) {
           console.log(`✅ Discussion "${discussion.title}" - Partial program match: ${discussion.program}`);
           return true;
         }
         
-        // Word-based matching
-        const programWords = programLower.split(/\s+/);
-        const discussionWords = discussionProgramLower.split(/\s+/);
-        const commonWords = programWords.filter(word => 
-          word.length > 3 && discussionWords.includes(word)
-        );
+        // Word-based matching (at least 2 common significant words)
+        const programWords = programLower.split(/\s+/).filter(w => w.length > 3);
+        const discussionWords = discussionProgramLower.split(/\s+/).filter(w => w.length > 3);
+        const commonWords = programWords.filter(word => discussionWords.includes(word));
         
         if (commonWords.length >= 2) {
-          console.log(`✅ Discussion "${discussion.title}" - Word match: ${discussion.program}`);
+          console.log(`✅ Discussion "${discussion.title}" - Word match (${commonWords.join(', ')}): ${discussion.program}`);
+          return true;
+        }
+        
+        // Single significant word match for short program names
+        if (programWords.length === 1 && discussionWords.length === 1 && programWords[0] === discussionWords[0]) {
+          console.log(`✅ Discussion "${discussion.title}" - Single word match: ${discussion.program}`);
           return true;
         }
         
@@ -4716,7 +4726,7 @@ app.get('/api/discussions', async (req, res) => {
       });
       
       if (!programMatch) {
-        console.log(`❌ Discussion "${discussion.title}" - No program match: ${discussion.program}`);
+        console.log(`❌ Discussion "${discussion.title}" - No program match: ${discussion.program} (Student programs: ${studentPrograms.join(', ')})`);
       }
       
       return programMatch;
@@ -5326,14 +5336,36 @@ app.get('/api/announcements', async (req, res) => {
       if (announcement.created_by_type === 'lecturer') {
         // Lecturer announcements are ALWAYS program-specific
         if (announcement.target_type === 'program') {
-          const programMatch = studentPrograms.some(program => 
-            program === announcement.target_value ||
-            program?.toLowerCase().includes(announcement.target_value?.toLowerCase()) ||
-            announcement.target_value?.toLowerCase().includes(program?.toLowerCase())
-          );
+          const programMatch = studentPrograms.some(program => {
+            if (!program || !announcement.target_value) return false;
+            
+            const programLower = program.toLowerCase().trim();
+            const targetLower = announcement.target_value.toLowerCase().trim();
+            
+            // Exact match
+            if (programLower === targetLower) return true;
+            
+            // Contains match (either direction)
+            if (programLower.includes(targetLower) || targetLower.includes(programLower)) return true;
+            
+            // Word-based matching (at least 2 common significant words)
+            const programWords = programLower.split(/\s+/).filter(w => w.length > 3);
+            const targetWords = targetLower.split(/\s+/).filter(w => w.length > 3);
+            const commonWords = programWords.filter(word => targetWords.includes(word));
+            
+            if (commonWords.length >= 2) return true;
+            
+            // Single significant word match for short program names
+            if (programWords.length === 1 && targetWords.length === 1 && programWords[0] === targetWords[0]) return true;
+            
+            return false;
+          });
+          
           if (programMatch) {
             console.log(`✅ Lecturer Announcement - Program match: ${announcement.target_value}`);
             return true;
+          } else {
+            console.log(`❌ Lecturer Announcement - No match: ${announcement.target_value} (Student programs: ${studentPrograms.join(', ')})`);
           }
         }
       }
