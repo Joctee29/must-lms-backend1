@@ -57,36 +57,127 @@ export const StudentAssignments = () => {
     try {
       console.log('=== FETCHING ASSIGNMENTS ===');
       
-      // Simple: Get ALL assignments first
-      const response = await fetch('https://must-lms-backend.onrender.com/api/assignments');
+      // Get current user and their student data
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      console.log('Current User:', currentUser);
       
-      if (response.ok) {
-        const result = await response.json();
-        console.log('All assignments:', result.data);
-        
-        // Filter active assignments with proper deadline check
-        const now = new Date();
-        const activeAssignments = result.data?.filter(assignment => {
-          const deadline = new Date(assignment.deadline);
-          const isActive = assignment.status === 'active';
-          const isNotExpired = deadline > now;
-          
-          console.log(`Assignment "${assignment.title}": Status=${assignment.status}, Deadline=${assignment.deadline}, Expired=${deadline <= now}`);
-          
-          return isActive && isNotExpired;
-        }) || [];
-        
-        console.log('Active assignments:', activeAssignments);
-        setAssignments(activeAssignments);
-        
-      } else {
-        console.error('Failed to fetch assignments');
+      if (!currentUser.username) {
+        console.log('No user logged in');
         setAssignments([]);
+        setLoading(false);
+        return;
+      }
+
+      // Backend handles all filtering - no need to fetch student programs here
+      console.log('Fetching assignments for student:', currentUser.username);
+      
+      let allAssignments: any[] = [];
+      
+      // 1. Fetch published assessments (new system) with student filtering
+      // Backend handles ALL filtering - no need for frontend filtering!
+      try {
+        const assessmentsResponse = await fetch(
+          `https://must-lms-backend.onrender.com/api/assessments?status=published&student_username=${encodeURIComponent(currentUser.username)}`
+        );
+        
+        if (!assessmentsResponse.ok) {
+          throw new Error(`HTTP error! status: ${assessmentsResponse.status}`);
+        }
+        
+        const assessmentsResult = await assessmentsResponse.json();
+        
+        if (!assessmentsResult.success) {
+          console.warn('Failed to fetch assessments:', assessmentsResult.error);
+        } else {
+          const studentAssessments = assessmentsResult.data || [];
+          console.log(`✅ Received ${studentAssessments.length} filtered assessments from backend`);
+          
+          // Convert assessments to assignment format
+          const formattedAssessments = studentAssessments.map(assessment => ({
+            id: `assessment_${assessment.id}`,
+            original_id: assessment.id,
+            type: 'assessment',
+            title: assessment.title,
+            description: assessment.description || '',
+            program_name: assessment.program_name,
+            deadline: assessment.end_date || assessment.scheduled_date || new Date().toISOString(),
+            submission_type: 'text' as const,
+            max_points: assessment.total_points || 100,
+            lecturer_name: assessment.lecturer_name || 'Lecturer',
+            status: assessment.status === 'active' || assessment.status === 'published' ? 'active' as const : 'expired' as const,
+            created_at: assessment.created_at
+          }));
+          
+          allAssignments = [...allAssignments, ...formattedAssessments];
+        }
+      } catch (error) {
+        console.error('❌ Error fetching assessments:', error);
       }
       
+      // 2. Fetch traditional assignments (old system) with student filtering
+      // Backend handles ALL filtering - no need for frontend filtering!
+      try {
+        const assignmentsResponse = await fetch(
+          `https://must-lms-backend.onrender.com/api/assignments?student_username=${encodeURIComponent(currentUser.username)}`
+        );
+        
+        if (!assignmentsResponse.ok) {
+          throw new Error(`HTTP error! status: ${assignmentsResponse.status}`);
+        }
+        
+        const assignmentsResult = await assignmentsResponse.json();
+        
+        if (!assignmentsResult.success) {
+          console.warn('Failed to fetch assignments:', assignmentsResult.error);
+        } else {
+          const studentTraditionalAssignments = assignmentsResult.data || [];
+          console.log(`✅ Received ${studentTraditionalAssignments.length} filtered assignments from backend`);
+          
+          // Convert traditional assignments to unified format
+          const formattedTraditionalAssignments = studentTraditionalAssignments.map(assignment => ({
+            id: `assignment_${assignment.id}`,
+            original_id: assignment.id,
+            type: 'assignment',
+            title: assignment.title,
+            description: assignment.description || '',
+            program_name: assignment.program_name,
+            deadline: assignment.deadline,
+            submission_type: assignment.submission_type || 'text' as const,
+            max_points: assignment.max_points || 100,
+            lecturer_name: assignment.lecturer_name || 'Lecturer',
+            status: 'active' as const,
+            created_at: assignment.created_at
+          }));
+          
+          allAssignments = [...allAssignments, ...formattedTraditionalAssignments];
+        }
+      } catch (error) {
+        console.error('Error fetching traditional assignments:', error);
+      }
+      
+      // Sort all assignments by deadline (earliest first)
+      allAssignments.sort((a, b) => {
+        const dateA = new Date(a.deadline).getTime();
+        const dateB = new Date(b.deadline).getTime();
+        return dateA - dateB;
+      });
+      
+      console.log('=== FINAL COMBINED ASSIGNMENTS ===');
+      console.log(`✅ Total assignments found: ${allAssignments.length}`);
+      
+      if (allAssignments.length === 0) {
+        console.warn('⚠️ NO ASSIGNMENTS FOUND for this student');
+      } else {
+        allAssignments.forEach(a => {
+          console.log(`  - ${a.title} (${a.program_name})`);
+        });
+      }
+      
+      setAssignments(allAssignments);
+      
     } catch (error) {
-      console.error('Error fetching assignments:', error);
-      // Set empty assignments on error
+      console.error('❌ Error fetching assignments:', error);
+      alert('Failed to load assignments. Please refresh the page.');
       setAssignments([]);
     } finally {
       setLoading(false);

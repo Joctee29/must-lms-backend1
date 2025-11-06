@@ -49,32 +49,28 @@ export const Assignments = () => {
         console.log('=== LECTURER ASSIGNMENTS DEBUG ===');
         console.log('Current User:', currentUser);
         
-        // Fetch lecturer's regular programs
-        const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
+        // Fetch lecturer's regular programs using secure endpoint
+        const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/lecturer-programs?lecturer_id=${currentUser.id}`);
         let allPrograms = [];
         
         if (programsResponse.ok) {
           const programsResult = await programsResponse.json();
           console.log('Regular Programs from API:', programsResult.data);
           
-          // Filter regular programs for current lecturer
-          const lecturerPrograms = programsResult.data?.filter(program => 
-            program.lecturer_name === currentUser.username || program.lecturer_id === currentUser.id
-          ) || [];
+          // Programs already filtered by backend
+          const lecturerPrograms = programsResult.data || [];
           
           allPrograms = [...lecturerPrograms];
         }
         
-        // Fetch lecturer's short-term programs
-        const shortTermResponse = await fetch('https://must-lms-backend.onrender.com/api/short-term-programs');
+        // Fetch lecturer's short-term programs using lecturer-specific endpoint
+        const shortTermResponse = await fetch(`https://must-lms-backend.onrender.com/api/short-term-programs/lecturer/${currentUser.id}`);
         if (shortTermResponse.ok) {
           const shortTermResult = await shortTermResponse.json();
           console.log('Short-Term Programs from API:', shortTermResult.data);
           
-          // Filter short-term programs for current lecturer
-          const lecturerShortTermPrograms = shortTermResult.data?.filter(program => 
-            program.lecturer_name === currentUser.username || program.lecturer_id === currentUser.id
-          ) || [];
+          // Programs are already filtered by backend
+          const lecturerShortTermPrograms = shortTermResult.data || [];
           
           // Convert short-term programs to same format as regular programs
           const formattedShortTermPrograms = lecturerShortTermPrograms.map(program => ({

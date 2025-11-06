@@ -59,32 +59,26 @@ export const LiveClassroom = () => {
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       
-      // Get lecturer's regular programs
-      const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
+      // Get lecturer's regular programs using secure endpoint
+      const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/lecturer-programs?lecturer_id=${currentUser.id}`);
       let allPrograms = [];
       
       if (programsResponse.ok) {
         const programsResult = await programsResponse.json();
         
-        // Filter regular programs for current lecturer
-        const lecturerPrograms = programsResult.data?.filter(program => 
-          program.lecturer_name === currentUser.username ||
-          program.lecturer_id === currentUser.id
-        ) || [];
+        // Programs already filtered by backend
+        const lecturerPrograms = programsResult.data || [];
         
         allPrograms = [...lecturerPrograms];
       }
       
-      // Get lecturer's short-term programs
-      const shortTermResponse = await fetch('https://must-lms-backend.onrender.com/api/short-term-programs');
+      // Get lecturer's short-term programs using lecturer-specific endpoint
+      const shortTermResponse = await fetch(`https://must-lms-backend.onrender.com/api/short-term-programs/lecturer/${currentUser.id}`);
       if (shortTermResponse.ok) {
         const shortTermResult = await shortTermResponse.json();
         
-        // Filter short-term programs for current lecturer
-        const lecturerShortTermPrograms = shortTermResult.data?.filter(program => 
-          program.lecturer_name === currentUser.username ||
-          program.lecturer_id === currentUser.id
-        ) || [];
+        // Programs are already filtered by backend
+        const lecturerShortTermPrograms = shortTermResult.data || [];
         
         // Convert short-term programs to same format as regular programs
         const formattedShortTermPrograms = lecturerShortTermPrograms.map(program => ({
@@ -332,19 +326,19 @@ export const LiveClassroom = () => {
 
   // Main lecturer interface
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Live Classroom</h1>
-        <Badge variant="outline" className="text-sm">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Live Classroom</h1>
+        <Badge variant="outline" className="text-xs sm:text-sm w-fit">
           Jitsi Meet Integration
         </Badge>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <Button 
           onClick={() => setShowCreateClass(true)}
-          className="flex items-center gap-2"
+          className="w-full sm:w-auto flex items-center justify-center gap-2"
         >
           <Calendar className="h-4 w-4" />
           Schedule Live Class
@@ -353,7 +347,7 @@ export const LiveClassroom = () => {
         <Button 
           onClick={() => setShowInstantClassForm(true)}
           variant="outline"
-          className="flex items-center gap-2"
+          className="w-full sm:w-auto flex items-center justify-center gap-2"
         >
           <Play className="h-4 w-4" />
           Start Instant Live Class
@@ -371,48 +365,60 @@ export const LiveClassroom = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {activeLiveClasses.map((liveClass) => (
-              <div key={liveClass.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className={`w-3 h-3 rounded-full ${
-                      liveClass.status === 'live' ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'
-                    }`}></div>
-                    <Badge variant={liveClass.status === 'live' ? 'destructive' : 'secondary'}>
-                      {liveClass.status === 'live' ? 'LIVE NOW' : 'SCHEDULED'}
-                    </Badge>
+              <div key={liveClass.id} className="p-4 border rounded-lg">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                        liveClass.status === 'live' ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'
+                      }`}></div>
+                      <Badge variant={liveClass.status === 'live' ? 'destructive' : 'secondary'} className="text-xs">
+                        {liveClass.status === 'live' ? '🔴 LIVE NOW' : '⏰ SCHEDULED'}
+                      </Badge>
+                      {liveClass.status === 'scheduled' && (
+                        <span className="text-xs text-gray-500">
+                          Starts at {liveClass.time} on {liveClass.date}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <h3 className="text-lg md:text-xl font-semibold mb-2">{liveClass.title}</h3>
+                    <p className="text-sm md:text-base text-gray-600 mb-3">{liveClass.description}</p>
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <Globe className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">{liveClass.program_name}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4 flex-shrink-0" />
+                        <span>
+                          {liveClass.date} at {liveClass.time}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   
-                  <h3 className="font-semibold">{liveClass.title}</h3>
-                  <p className="text-sm text-gray-600">{liveClass.description}</p>
-                  
-                  <div className="flex items-center gap-4 text-sm text-gray-500 mt-2">
-                    <div className="flex items-center gap-1">
-                      <Globe className="h-4 w-4" />
-                      <span>{liveClass.program_name}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>{liveClass.date} at {liveClass.time}</span>
-                    </div>
+                  <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto md:ml-6">
+                    <Button 
+                      onClick={() => joinLiveClass(liveClass.meeting_url)}
+                      className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                      size="lg"
+                    >
+                      <Video className="h-4 w-4 mr-2" />
+                      Join Class
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => endLiveClass(liveClass.id)}
+                      variant="destructive"
+                      className="w-full sm:w-auto"
+                      size="lg"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      End Class
+                    </Button>
                   </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Button 
-                    onClick={() => joinLiveClass(liveClass.meeting_url)}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Video className="h-4 w-4 mr-2" />
-                    Join Class
-                  </Button>
-                  
-                  <Button 
-                    onClick={() => endLiveClass(liveClass.id)}
-                    variant="destructive"
-                    size="sm"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
               </div>
             ))}
@@ -461,7 +467,7 @@ export const LiveClassroom = () => {
               </select>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Date</label>
                 <Input
@@ -491,14 +497,15 @@ export const LiveClassroom = () => {
               />
             </div>
             
-            <div className="flex gap-2">
-              <Button onClick={handleScheduleClass} className="flex-1">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button onClick={handleScheduleClass} className="flex-1 w-full sm:w-auto">
                 <Calendar className="h-4 w-4 mr-2" />
                 Schedule Class
               </Button>
               <Button 
                 onClick={() => setShowCreateClass(false)} 
                 variant="outline"
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
@@ -558,14 +565,15 @@ export const LiveClassroom = () => {
               />
             </div>
             
-            <div className="flex gap-2">
-              <Button onClick={handleStartInstantClass} className="flex-1 bg-green-600 hover:bg-green-700">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button onClick={handleStartInstantClass} className="flex-1 w-full sm:w-auto bg-green-600 hover:bg-green-700">
                 <Play className="h-4 w-4 mr-2" />
                 Start Live Class Now
               </Button>
               <Button 
                 onClick={() => setShowInstantClassForm(false)} 
                 variant="outline"
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>

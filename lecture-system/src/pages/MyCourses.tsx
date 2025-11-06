@@ -69,38 +69,21 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
           setLecturerData(lecturer);
         }
 
-        // Fetch programs after lecturer data is available
-        const programsResponse = await fetch(`${API_BASE_URL}/programs`);
+        // Fetch programs using secure endpoint
+        const programsResponse = await fetch(`${API_BASE_URL}/lecturer-programs?lecturer_id=${currentUser.id}`);
         const programsResult = await programsResponse.json();
         
         if (programsResult.success) {
-          // Filter programs assigned to this lecturer - REAL FILTERING
-          const assignedPrograms = programsResult.data.filter((p: any) => {
-            // Check against lecturer data from database
-            const isAssigned = p.lecturer_name === currentUser.username || 
-                              p.lecturer_name === lecturer?.name ||
-                              p.lecturer_name === lecturer?.employee_id ||
-                              p.lecturerName === currentUser.username || 
-                              p.lecturerName === lecturer?.name ||
-                              p.lecturerName === lecturer?.employee_id;
-            
-            return isAssigned;
-          });
-          
-          setPrograms(assignedPrograms);
+          setPrograms(programsResult.data || []);
         }
 
-        // Fetch short-term programs assigned to this lecturer
-        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs`);
+        // Fetch short-term programs assigned to this lecturer using lecturer-specific endpoint
+        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs/lecturer/${currentUser.id}`);
         const shortTermResult = await shortTermResponse.json();
         
         if (shortTermResult.success) {
-          const assignedShortTermPrograms = shortTermResult.data.filter((p: any) => {
-            return p.lecturer_name === currentUser.username || 
-                   p.lecturer_name === lecturer?.name ||
-                   p.lecturer_name === lecturer?.employee_id;
-          });
-          setShortTermPrograms(assignedShortTermPrograms);
+          // Programs are already filtered by backend
+          setShortTermPrograms(shortTermResult.data || []);
         }
 
         // Fetch courses

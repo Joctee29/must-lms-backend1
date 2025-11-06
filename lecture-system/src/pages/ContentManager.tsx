@@ -55,27 +55,23 @@ export const ContentManager = () => {
 
         const user = JSON.parse(currentUser);
         
-        // Fetch lecturer's regular programs from database
-        const response = await fetch('https://must-lms-backend.onrender.com/api/programs');
+        // Fetch lecturer's programs using secure endpoint
+        const response = await fetch(`https://must-lms-backend.onrender.com/api/lecturer-programs?lecturer_id=${user.id}`);
         let allPrograms = [];
         
         if (response.ok) {
           const result = await response.json();
-          // Filter regular programs assigned to current lecturer
-          const lecturerPrograms = result.data?.filter(program => 
-            program.lecturer_name === user.username || program.lecturer_id === user.id
-          ) || [];
+          // Programs already filtered by backend
+          const lecturerPrograms = result.data || [];
           allPrograms = [...lecturerPrograms];
         }
         
-        // Fetch lecturer's short-term programs from database
-        const shortTermResponse = await fetch('https://must-lms-backend.onrender.com/api/short-term-programs');
+        // Fetch lecturer's short-term programs using lecturer-specific endpoint
+        const shortTermResponse = await fetch(`https://must-lms-backend.onrender.com/api/short-term-programs/lecturer/${user.id}`);
         if (shortTermResponse.ok) {
           const shortTermResult = await shortTermResponse.json();
-          // Filter short-term programs assigned to current lecturer
-          const lecturerShortTermPrograms = shortTermResult.data?.filter(program => 
-            program.lecturer_name === user.username || program.lecturer_id === user.id
-          ) || [];
+          // Programs are already filtered by backend
+          const lecturerShortTermPrograms = shortTermResult.data || [];
           
           // Convert short-term programs to same format as regular programs
           const formattedShortTermPrograms = lecturerShortTermPrograms.map(program => ({

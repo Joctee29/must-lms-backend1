@@ -84,16 +84,16 @@ export const LiveClassSetup = ({ courseId, courseName, onStartClass, onCancel }:
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Video className="h-8 w-8 text-green-600" />
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold flex items-center gap-2 sm:gap-3">
+            <Video className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
             Start Live Class
           </h1>
           {courseName && (
-            <p className="text-muted-foreground mt-1">
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">
               Setting up live class for: <span className="font-semibold text-green-600">{courseName}</span>
             </p>
           )}
@@ -129,7 +129,7 @@ export const LiveClassSetup = ({ courseId, courseName, onStartClass, onCancel }:
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Start Time *</label>
                 <Input
@@ -170,7 +170,7 @@ export const LiveClassSetup = ({ courseId, courseName, onStartClass, onCancel }:
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Max Students</label>
                 <Input
@@ -206,11 +206,11 @@ export const LiveClassSetup = ({ courseId, courseName, onStartClass, onCancel }:
           <CardContent className="space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Video className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="font-medium">Record Session</p>
-                    <p className="text-sm text-muted-foreground">Save class for later viewing</p>
+                <div className="flex items-center gap-2 sm:gap-3 flex-1">
+                  <Video className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm sm:text-base">Record Session</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Save class for later viewing</p>
                   </div>
                 </div>
                 <input
@@ -303,15 +303,15 @@ export const LiveClassSetup = ({ courseId, courseName, onStartClass, onCancel }:
       </div>
 
       {/* Action Buttons */}
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={onCancel}>
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <Button variant="outline" onClick={onCancel} className="w-full sm:w-auto">
           Cancel
         </Button>
         
         <Button 
           onClick={handleStartClass}
           disabled={!classDetails.title || !classDetails.startTime || isStarting}
-          className="bg-green-600 hover:bg-green-700 text-white px-8"
+          className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-8"
         >
           {isStarting ? (
             <>

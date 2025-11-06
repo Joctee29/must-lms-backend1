@@ -23,146 +23,52 @@ export const AnnouncementsNews = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch announcements from database
+  // Fetch announcements from database - OPTIMIZED VERSION
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        console.log('=== STUDENT ANNOUNCEMENTS FETCH ===');
+        console.log('=== STUDENT ANNOUNCEMENTS FETCH (OPTIMIZED) ===');
         
-        // Get current student info
+        // Get current student info from localStorage
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        console.log('Current Student:', currentUser);
         
-        // Fetch student details to get program/course info
-        const studentsResponse = await fetch('https://must-lms-backend.onrender.com/api/students');
-        let studentInfo = null;
-        let studentPrograms = [];
-        
-        if (studentsResponse.ok) {
-          const studentsResult = await studentsResponse.json();
-          studentInfo = studentsResult.data?.find(s => 
-            s.name === currentUser.username || 
-            s.email === currentUser.username ||
-            s.registration_number === currentUser.username ||
-            s.name?.toLowerCase() === currentUser.username?.toLowerCase()
-          );
-          console.log('Student Info:', studentInfo);
-          
-          // Fetch student's programs (regular + short-term)
-          if (studentInfo) {
-            // Fetch regular programs
-            const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
-            if (programsResponse.ok) {
-              const programsResult = await programsResponse.json();
-              studentPrograms = programsResult.data?.filter(program => 
-                program.course_id === studentInfo.course_id
-              ) || [];
-              console.log('Student Regular Programs:', studentPrograms);
-            }
-            
-            // Fetch short-term programs that student is eligible for
-            const shortTermResponse = await fetch('https://must-lms-backend.onrender.com/api/short-term-programs');
-            if (shortTermResponse.ok) {
-              const shortTermResult = await shortTermResponse.json();
-              if (shortTermResult.success) {
-                const eligibleShortTermPrograms = shortTermResult.data.filter((program) => {
-                  // Check if program is active (not expired)
-                  const now = new Date();
-                  const endDate = new Date(program.end_date);
-                  if (now > endDate) return false;
-                  
-                  // Check targeting for short-term programs
-                  if (program.target_type === 'all') return true;
-                  if (program.target_type === 'college' && program.target_value === studentInfo.college_name) return true;
-                  if (program.target_type === 'department' && program.target_value === studentInfo.department_name) return true;
-                  if (program.target_type === 'course' && program.target_value === studentInfo.course_name) return true;
-                  
-                  // For program targeting, check if student's programs match
-                  if (program.target_type === 'program') {
-                    return studentPrograms.some(p => p.name === program.target_value);
-                  }
-                  
-                  return false;
-                });
-                
-                // Add short-term programs to student programs list for announcement filtering
-                const shortTermProgramsFormatted = eligibleShortTermPrograms.map(p => ({
-                  id: p.id,
-                  name: p.title,
-                  course_id: studentInfo.course_id
-                }));
-                
-                studentPrograms = [...studentPrograms, ...shortTermProgramsFormatted];
-                console.log('Student Programs (Regular + Short-Term):', studentPrograms);
-              }
-            }
-          }
+        if (!currentUser.username) {
+          console.error('No username found in localStorage');
+          setAnnouncements([]);
+          setLoading(false);
+          return;
         }
         
-        // Fetch announcements
-        const announcementsResponse = await fetch('https://must-lms-backend.onrender.com/api/announcements');
-        if (announcementsResponse.ok) {
-          const result = await announcementsResponse.json();
-          let allAnnouncements = result.data || [];
-          
-          // Filter announcements based on targeting
-          const relevantAnnouncements = allAnnouncements.filter(announcement => {
-            console.log('=== ANNOUNCEMENT FILTERING ===');
-            console.log('Announcement:', announcement.title, 'Target Type:', announcement.target_type, 'Target Value:', announcement.target_value);
-            
-            // Show all announcements targeted to "All Students"
-            if (announcement.target_type === 'all') {
-              console.log('✅ Showing - All Students announcement');
-              return true;
-            }
-            
-            if (studentInfo) {
-              // Show announcements targeted to student's college
-              if (announcement.target_type === 'college' && 
-                  announcement.target_value === studentInfo.college_name) {
-                console.log('✅ Showing - College match:', announcement.target_value);
-                return true;
-              }
-              
-              // Show announcements targeted to student's department
-              if (announcement.target_type === 'department' && 
-                  announcement.target_value === studentInfo.department_name) {
-                console.log('✅ Showing - Department match:', announcement.target_value);
-                return true;
-              }
-              
-              // Show announcements targeted to student's course
-              if (announcement.target_type === 'course' && 
-                  announcement.target_value === studentInfo.course_name) {
-                console.log('✅ Showing - Course match:', announcement.target_value);
-                return true;
-              }
-              
-              // Show announcements targeted to student's programs
-              if (announcement.target_type === 'program') {
-                const programMatch = studentPrograms.some(program => 
-                  program.name === announcement.target_value ||
-                  program.name?.toLowerCase().includes(announcement.target_value?.toLowerCase()) ||
-                  announcement.target_value?.toLowerCase().includes(program.name?.toLowerCase())
-                );
-                if (programMatch) {
-                  console.log('✅ Showing - Program match:', announcement.target_value);
-                  return true;
-                }
-              }
-            }
-            
-            console.log('❌ Hiding - No match found');
-            return false;
-          });
-          
-          console.log('Relevant Announcements:', relevantAnnouncements);
-          setAnnouncements(relevantAnnouncements);
+        console.log('Fetching announcements for:', currentUser.username);
+        
+        // Fetch announcements with student filtering from backend
+        // Backend handles ALL filtering logic - no need for frontend filtering!
+        const announcementsResponse = await fetch(
+          `https://must-lms-backend.onrender.com/api/announcements?student_username=${encodeURIComponent(currentUser.username)}`
+        );
+        
+        if (!announcementsResponse.ok) {
+          throw new Error(`HTTP error! status: ${announcementsResponse.status}`);
         }
         
+        const result = await announcementsResponse.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to fetch announcements');
+        }
+        
+        const filteredAnnouncements = result.data || [];
+        
+        console.log(`✅ Received ${filteredAnnouncements.length} filtered announcements from backend`);
+        
+        // Backend already filtered - just set the data!
+        setAnnouncements(filteredAnnouncements);
         setLoading(false);
+        
       } catch (error) {
-        console.error('Error fetching announcements:', error);
+        console.error('❌ Error fetching announcements:', error);
+        // Show user-friendly error
+        alert('Failed to load announcements. Please refresh the page.');
         setAnnouncements([]);
         setLoading(false);
       }

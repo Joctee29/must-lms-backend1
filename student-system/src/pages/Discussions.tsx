@@ -85,66 +85,70 @@ export const Discussions = () => {
   const [newReply, setNewReply] = useState("");
   const [showReplies, setShowReplies] = useState(false);
 
-  // Fetch real data from database
+  // Fetch real data from database - OPTIMIZED VERSION
   useEffect(() => {
     const fetchDiscussionsData = async () => {
       try {
+        console.log('=== DISCUSSIONS FETCH (OPTIMIZED) ===');
+        
         // Get current student info from localStorage
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         
-        // Get all students to find current student's real ID
-        const studentsResponse = await fetch('https://must-lms-backend.onrender.com/api/students');
-        if (studentsResponse.ok) {
-          const studentsResult = await studentsResponse.json();
-          
-          // Find current student with multiple matching strategies
-          const currentStudent = studentsResult.data?.find(student => 
-            student.name === currentUser.username || 
-            student.name?.toLowerCase() === currentUser.username?.toLowerCase() ||
-            student.name?.toUpperCase() === currentUser.username?.toUpperCase() ||
-            student.registration_number === currentUser.username ||
-            student.email === currentUser.username ||
-            student.name?.includes(currentUser.username) ||
-            currentUser.username?.includes(student.name)
-          );
-          
-          if (currentStudent) {
-            // Get programs for this specific student
-            const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/students/${currentStudent.id}/programs`);
-            if (programsResponse.ok) {
-              const programsResult = await programsResponse.json();
-              const studentPrograms = programsResult.data || [];
-              setPrograms(studentPrograms);
-            } else {
-              setPrograms([]);
-            }
-          } else {
-            // Fallback: if student not found by name, try to get programs for any student
-            // This ensures at least some programs are shown
-            const allProgramsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
-            if (allProgramsResponse.ok) {
-              const allProgramsResult = await allProgramsResponse.json();
-              // Show first few programs as fallback
-              const fallbackPrograms = allProgramsResult.data?.slice(0, 3) || [];
-              setPrograms(fallbackPrograms);
-            } else {
-              setPrograms([]);
+        if (!currentUser.username) {
+          console.error('No username found in localStorage');
+          setPrograms([]);
+          setDiscussions([]);
+          setLoading(false);
+          return;
+        }
+        
+        console.log('Fetching data for:', currentUser.username);
+        
+        // Fetch student's programs - single optimized API call
+        try {
+          const studentsResponse = await fetch(`https://must-lms-backend.onrender.com/api/students/me?username=${encodeURIComponent(currentUser.username)}`);
+          if (studentsResponse.ok) {
+            const studentsResult = await studentsResponse.json();
+            const currentStudent = studentsResult.data;
+            
+            if (currentStudent) {
+              const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/students/${currentStudent.id}/programs`);
+              if (programsResponse.ok) {
+                const programsResult = await programsResponse.json();
+                setPrograms(programsResult.data || []);
+              }
             }
           }
-        } else {
+        } catch (error) {
+          console.error('Error fetching programs:', error);
           setPrograms([]);
         }
         
-        // Fetch discussions from database
-        const discussionsResponse = await fetch('https://must-lms-backend.onrender.com/api/discussions');
-        if (discussionsResponse.ok) {
-          const discussionsResult = await discussionsResponse.json();
-          const realDiscussions = discussionsResult.data || [];
-          setDiscussions(realDiscussions);
+        // Fetch discussions with backend filtering - single API call
+        const discussionsResponse = await fetch(
+          `https://must-lms-backend.onrender.com/api/discussions?student_username=${encodeURIComponent(currentUser.username)}`
+        );
+        
+        if (!discussionsResponse.ok) {
+          throw new Error(`HTTP error! status: ${discussionsResponse.status}`);
         }
         
+        const discussionsResult = await discussionsResponse.json();
+        
+        if (!discussionsResult.success) {
+          throw new Error(discussionsResult.error || 'Failed to fetch discussions');
+        }
+        
+        const filteredDiscussions = discussionsResult.data || [];
+        console.log(`✅ Received ${filteredDiscussions.length} filtered discussions from backend`);
+        
+        // Backend already filtered - just set the data!
+        setDiscussions(filteredDiscussions);
         setLoading(false);
+        
       } catch (error) {
+        console.error('❌ Error fetching discussions:', error);
+        alert('Failed to load discussions. Please refresh the page.');
         setPrograms([]);
         setDiscussions([]);
         setLoading(false);

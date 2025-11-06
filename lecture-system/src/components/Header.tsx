@@ -26,11 +26,21 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
   const [lecturerData, setLecturerData] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const user = localStorage.getItem('currentUser');
     if (user) {
       setCurrentUser(JSON.parse(user));
+    }
+  }, []);
+
+  // Load read notifications from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('lecturer_read_notifications');
+    if (stored) {
+      setReadNotifications(new Set(JSON.parse(stored)));
     }
   }, []);
 
@@ -63,6 +73,7 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
           
           recentSubmissions.slice(0, 10).forEach((s: any) => {
             newNotifications.push({
+              id: `submission_${s.id || s.student_name}_${s.submitted_at}`,
               title: '📝 New Submission',
               message: `${s.student_name} submitted ${s.assignment_title}`,
               time: new Date(s.submitted_at).toLocaleString()
@@ -78,6 +89,7 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
           
           activeClasses.forEach((c: any) => {
             newNotifications.push({
+              id: `class_${c.id || c.title}_${c.date}_${c.time}`,
               title: c.status === 'live' ? '🔴 Live Class Active' : '⏰ Scheduled Class',
               message: `${c.title} - ${c.program_name}`,
               time: `${c.date} at ${c.time}`
@@ -95,6 +107,7 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
           
           recentAnnouncements.slice(0, 5).forEach((a: any) => {
             newNotifications.push({
+              id: `announcement_${a.id || a.title}_${a.created_at}`,
               title: '📢 Announcement',
               message: a.title,
               time: new Date(a.created_at).toLocaleString()
@@ -103,6 +116,10 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
         }
         
         setNotifications(newNotifications);
+        
+        // Calculate unread count
+        const unread = newNotifications.filter(n => !readNotifications.has(n.id)).length;
+        setUnreadCount(unread);
       } catch (error) {
         console.error('Error fetching notifications:', error);
       }
@@ -112,7 +129,7 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
     // Refresh every 2 minutes
     const interval = setInterval(fetchNotifications, 120000);
     return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [currentUser, readNotifications]);
 
   // Fetch lecturer data
   useEffect(() => {
@@ -136,6 +153,21 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
 
     fetchLecturerData();
   }, [currentUser]);
+
+  const handleNotificationOpen = (open: boolean) => {
+    if (open && notifications.length > 0) {
+      // Mark all current notifications as read
+      const newReadNotifications = new Set(readNotifications);
+      notifications.forEach(n => newReadNotifications.add(n.id));
+      setReadNotifications(newReadNotifications);
+      
+      // Save to localStorage
+      localStorage.setItem('lecturer_read_notifications', JSON.stringify(Array.from(newReadNotifications)));
+      
+      // Update unread count to 0
+      setUnreadCount(0);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
@@ -227,13 +259,13 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
         {/* Actions */}
         <div className="flex items-center space-x-2 md:space-x-4">
           {/* Notifications */}
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={handleNotificationOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="relative">
                 <Bell className="h-5 w-5" />
-                {notifications.length > 0 && (
+                {unreadCount > 0 && (
                   <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs bg-red-500">
-                    {notifications.length}
+                    {unreadCount}
                   </Badge>
                 )}
               </Button>

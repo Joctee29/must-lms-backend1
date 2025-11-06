@@ -139,8 +139,8 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
         
         console.log('Found lecturer:', currentLecturer);
         
-        // 2. Get regular programs assigned to this lecturer
-        const programsResponse = await fetch(`${API_BASE_URL}/programs`);
+        // 2. Get regular programs using secure endpoint
+        const programsResponse = await fetch(`${API_BASE_URL}/lecturer-programs?lecturer_id=${currentLecturer.id}`);
         let lecturerPrograms = [];
         
         if (programsResponse.ok) {
@@ -148,31 +148,22 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
           console.log('Regular Programs API Response:', programsResult);
           
           if (programsResult.success) {
-            console.log('All Regular Programs:', programsResult.data);
-            const regularPrograms = programsResult.data.filter((p: any) => 
-              p.lecturer_name === currentLecturer.name ||
-              p.lecturer_name === currentLecturer.employee_id ||
-              p.lecturer_id === currentLecturer.id
-            );
-            console.log('Filtered Regular Lecturer Programs:', regularPrograms);
-            lecturerPrograms = [...regularPrograms];
+            console.log('All Programs:', programsResult.data);
+            lecturerPrograms = programsResult.data || []; // Programs already filtered by backend
+            console.log('Lecturer Programs:', lecturerPrograms);
           }
         }
         
-        // 3. Get short-term programs assigned to this lecturer
-        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs`);
+        // 3. Get short-term programs using lecturer-specific endpoint
+        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs/lecturer/${currentLecturer.id}`);
         if (shortTermResponse.ok) {
           const shortTermResult = await shortTermResponse.json();
           console.log('Short-Term Programs API Response:', shortTermResult);
           
           if (shortTermResult.success) {
-            console.log('All Short-Term Programs:', shortTermResult.data);
-            const shortTermPrograms = shortTermResult.data.filter((p: any) => 
-              p.lecturer_name === currentLecturer.name ||
-              p.lecturer_name === currentLecturer.employee_id ||
-              p.lecturer_id === currentLecturer.id
-            );
-            console.log('Filtered Short-Term Lecturer Programs:', shortTermPrograms);
+            // Programs are already filtered by backend
+            const shortTermPrograms = shortTermResult.data || [];
+            console.log('Lecturer Short-Term Programs:', shortTermPrograms);
             
             // Convert short-term programs to same format as regular programs
             const formattedShortTermPrograms = shortTermPrograms.map((program: any) => ({
@@ -198,8 +189,8 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
           return;
         }
         
-        // 3. Get students enrolled in lecturer's programs
-        const studentsResponse = await fetch(`${API_BASE_URL}/students`);
+        // 3. Get students enrolled in lecturer's programs using secure endpoint
+        const studentsResponse = await fetch(`${API_BASE_URL}/students/by-lecturer?lecturer_id=${currentLecturer.id}`);
         if (!studentsResponse.ok) {
           throw new Error('Failed to fetch students');
         }
@@ -208,16 +199,9 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
         
         let lecturerStudents = [];
         if (studentsResult.success) {
-          console.log('All Students:', studentsResult.data);
-          // Get course IDs from lecturer's programs
-          const courseIds = lecturerPrograms.map(p => p.course_id);
-          console.log('Course IDs for lecturer programs:', courseIds);
-          
-          // Filter students by course IDs
-          lecturerStudents = studentsResult.data.filter((student: any) => 
-            courseIds.includes(student.course_id)
-          );
-          console.log('Filtered Students by Course IDs:', lecturerStudents);
+          // Students are already filtered by backend - no need for frontend filtering
+          lecturerStudents = studentsResult.data || [];
+          console.log('Lecturer Students (backend filtered):', lecturerStudents);
         }
         
         console.log('Final Students in lecturer courses:', lecturerStudents);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, BookOpen, LogOut, Search, User, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,16 @@ const mustLogo = "/must-logo.png";
 export const Header = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
+
+  // Load read notifications from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('admin_read_notifications');
+    if (stored) {
+      setReadNotifications(new Set(JSON.parse(stored)));
+    }
+  }, []);
 
   // Fetch notifications
   useEffect(() => {
@@ -47,6 +57,7 @@ export const Header = () => {
           
           if (recentStudents.length > 0) {
             newNotifications.push({
+              id: `students_${recentStudents.length}`,
               title: '🎓 New Students',
               message: `${recentStudents.length} new student(s) registered`,
               time: 'Last 7 days'
@@ -65,6 +76,7 @@ export const Header = () => {
           
           if (recentLecturers.length > 0) {
             newNotifications.push({
+              id: `lecturers_${recentLecturers.length}`,
               title: '👨‍🏫 New Lecturers',
               message: `${recentLecturers.length} new lecturer(s) added`,
               time: 'Last 7 days'
@@ -75,6 +87,7 @@ export const Header = () => {
         // System stats
         if (students.success && lecturers.success && courses.success) {
           newNotifications.push({
+            id: `stats_${students.data?.length}_${lecturers.data?.length}_${courses.data?.length}`,
             title: '📊 System Overview',
             message: `${students.data?.length || 0} students, ${lecturers.data?.length || 0} lecturers, ${courses.data?.length || 0} courses`,
             time: 'Current'
@@ -82,6 +95,10 @@ export const Header = () => {
         }
         
         setNotifications(newNotifications);
+        
+        // Calculate unread count
+        const unread = newNotifications.filter(n => !readNotifications.has(n.id)).length;
+        setUnreadCount(unread);
       } catch (error) {
         console.error('Error fetching notifications:', error);
       }
@@ -91,7 +108,22 @@ export const Header = () => {
     // Refresh every 5 minutes
     const interval = setInterval(fetchNotifications, 300000);
     return () => clearInterval(interval);
-  }, []);
+  }, [readNotifications]);
+
+  const handleNotificationOpen = (open: boolean) => {
+    if (open && notifications.length > 0) {
+      // Mark all current notifications as read
+      const newReadNotifications = new Set(readNotifications);
+      notifications.forEach(n => newReadNotifications.add(n.id));
+      setReadNotifications(newReadNotifications);
+      
+      // Save to localStorage
+      localStorage.setItem('admin_read_notifications', JSON.stringify(Array.from(newReadNotifications)));
+      
+      // Update unread count to 0
+      setUnreadCount(0);
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,13 +185,13 @@ export const Header = () => {
         {/* Actions */}
         <div className="flex items-center space-x-4">
           {/* Notifications */}
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={handleNotificationOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="relative">
                 <Bell className="h-5 w-5" />
-                {notifications.length > 0 && (
+                {unreadCount > 0 && (
                   <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs bg-red-500">
-                    {notifications.length}
+                    {unreadCount}
                   </Badge>
                 )}
               </Button>

@@ -45,34 +45,23 @@ export const Announcements = () => {
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         console.log('Current Lecturer:', currentUser);
 
-        // Fetch lecturer's regular programs
-        const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
+        // Fetch lecturer's regular programs using secure endpoint (backend filters)
+        const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/lecturer-programs?lecturer_id=${currentUser.id}`);
         let allPrograms = [];
         
         if (programsResponse.ok) {
           const programsResult = await programsResponse.json();
-          const regularPrograms = programsResult.data || [];
-          
-          // Filter regular programs for current lecturer
-          const lecturerRegularPrograms = regularPrograms.filter(program => 
-            program.lecturer_name === currentUser.username || 
-            program.lecturer_id === currentUser.id
-          );
+          // Programs are already filtered by backend - no need for frontend filtering
+          const lecturerRegularPrograms = programsResult.data || [];
           
           allPrograms = [...lecturerRegularPrograms];
         }
         
-        // Fetch lecturer's short-term programs
-        const shortTermResponse = await fetch('https://must-lms-backend.onrender.com/api/short-term-programs');
+        // Fetch lecturer's short-term programs using lecturer-specific endpoint
+        const shortTermResponse = await fetch(`https://must-lms-backend.onrender.com/api/short-term-programs/lecturer/${currentUser.id}`);
         if (shortTermResponse.ok) {
           const shortTermResult = await shortTermResponse.json();
-          const shortTermPrograms = shortTermResult.data || [];
-          
-          // Filter short-term programs for current lecturer
-          const lecturerShortTermPrograms = shortTermPrograms.filter(program => 
-            program.lecturer_name === currentUser.username || 
-            program.lecturer_id === currentUser.id
-          );
+          const lecturerShortTermPrograms = shortTermResult.data || [];
           
           // Convert short-term programs to same format as regular programs
           const formattedShortTermPrograms = lecturerShortTermPrograms.map(program => ({
@@ -89,19 +78,14 @@ export const Announcements = () => {
         console.log('All Lecturer Programs (Regular + Short-Term):', allPrograms);
         setLecturerPrograms(allPrograms);
 
-        // Fetch announcements created by this lecturer
-        const announcementsResponse = await fetch('https://must-lms-backend.onrender.com/api/announcements');
+        // Fetch announcements using secure endpoint (backend filters by lecturer)
+        const announcementsResponse = await fetch(`https://must-lms-backend.onrender.com/api/announcements/lecturer?lecturer_id=${currentUser.id}`);
         if (announcementsResponse.ok) {
           const result = await announcementsResponse.json();
-          const allAnnouncements = result.data || [];
+          // Announcements already filtered by backend - no need for frontend filtering
+          const lecturerAnnouncements = result.data || [];
           
-          // Filter announcements created by current lecturer
-          const lecturerAnnouncements = allAnnouncements.filter(announcement => 
-            announcement.created_by === currentUser.username || 
-            announcement.created_by_id === currentUser.id
-          );
-          
-          console.log('Lecturer Announcements:', lecturerAnnouncements);
+          console.log('Lecturer Announcements (backend filtered):', lecturerAnnouncements);
           setAnnouncements(lecturerAnnouncements);
         }
 

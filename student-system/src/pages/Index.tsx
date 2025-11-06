@@ -315,102 +315,28 @@ const MaterialsComponent = () => {
                     console.log('Opening viewable file:', fullUrl);
                     window.open(fullUrl, '_blank');
                   } else if (videoTypes.includes(fileExtension)) {
-                    // Create video player page for video files
-                    const videoContent = `
-                      <!DOCTYPE html>
-                      <html>
-                      <head>
-                        <title>Video: ${material.title}</title>
-                        <style>
-                          body { font-family: Arial, sans-serif; padding: 20px; background: #000; margin: 0; }
-                          .container { max-width: 1200px; margin: 0 auto; }
-                          .header { text-align: center; margin-bottom: 20px; color: white; }
-                          .video-container { text-align: center; margin: 20px 0; }
-                          video { width: 100%; max-width: 800px; height: auto; border-radius: 10px; }
-                          .info { background: white; padding: 20px; border-radius: 10px; margin-top: 20px; }
-                          .label { font-weight: bold; color: #333; }
-                        </style>
-                      </head>
-                      <body>
-                        <div class="container">
-                          <div class="header">
-                            <h1>${material.title}</h1>
-                          </div>
-                          
-                          <div class="video-container">
-                            <video controls>
-                              <source src="https://must-lms-backend.onrender.com${material.file_url}" type="video/${fileExtension}">
-                              Your browser does not support the video tag.
-                            </video>
-                          </div>
-                          
-                          <div class="info">
-                            <p><span class="label">Program:</span> ${material.program_name}</p>
-                            <p><span class="label">File Size:</span> ${material.file_size}</p>
-                            <p><span class="label">Upload Date:</span> ${material.upload_date ? new Date(material.upload_date).toLocaleDateString() : 'N/A'}</p>
-                            ${material.description ? `<p><span class="label">Description:</span> ${material.description}</p>` : ''}
-                          </div>
-                        </div>
-                      </body>
-                      </html>
-                    `;
-                    
-                    const blob = new Blob([videoContent], { type: 'text/html' });
-                    const url = URL.createObjectURL(blob);
-                    window.open(url, '_blank');
+                    // Open video directly in new tab with native browser player
+                    console.log('Opening video file:', fullUrl);
+                    window.open(fullUrl, '_blank');
                   } else {
-                    // For non-viewable files (DOC, PPT, Excel), create preview page
-                    const previewContent = `
-                      <!DOCTYPE html>
-                      <html>
-                      <head>
-                        <title>Preview: ${material.title}</title>
-                        <style>
-                          body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
-                          .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                          .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
-                          .info { margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 5px; }
-                          .label { font-weight: bold; color: #333; }
-                          .download-btn { display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
-                          .file-icon { font-size: 48px; margin: 20px 0; }
-                        </style>
-                      </head>
-                      <body>
-                        <div class="container">
-                          <div class="header">
-                            <div class="file-icon">${material.content_type === 'video' ? 'VIDEO' : material.content_type === 'document' ? 'DOCUMENT' : 'FILE'}</div>
-                            <h1>${material.title}</h1>
-                            <p style="color: #666;">File Preview</p>
-                          </div>
-                          
-                          <div class="info">
-                            <p><span class="label">Program:</span> ${material.program_name}</p>
-                            <p><span class="label">File Size:</span> ${material.file_size}</p>
-                            <p><span class="label">Upload Date:</span> ${material.upload_date ? new Date(material.upload_date).toLocaleDateString() : 'N/A'}</p>
-                            <p><span class="label">File Type:</span> ${fileExtension?.toUpperCase() || 'Unknown'}</p>
-                          </div>
-                          
-                          ${material.description ? `
-                          <div class="info">
-                            <p><span class="label">Description:</span></p>
-                            <p>${material.description}</p>
-                          </div>
-                          ` : ''}
-                          
-                          <div style="text-align: center; margin-top: 30px;">
-                            <p>This file type requires downloading to view the full content.</p>
-                            <a href="https://must-lms-backend.onrender.com${material.file_url}" class="download-btn" download>
-                              Download ${material.title}
-                            </a>
-                          </div>
-                        </div>
-                      </body>
-                      </html>
-                    `;
+                    // For non-viewable files (DOC, PPT, Excel), try Google Docs Viewer or download
+                    console.log('Opening non-viewable file:', fullUrl);
                     
-                    const blob = new Blob([previewContent], { type: 'text/html' });
-                    const url = URL.createObjectURL(blob);
-                    window.open(url, '_blank');
+                    // Try to use Google Docs Viewer for office documents
+                    const officeTypes = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
+                    if (officeTypes.includes(fileExtension)) {
+                      const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fullUrl)}&embedded=true`;
+                      window.open(viewerUrl, '_blank');
+                    } else {
+                      // For other file types, trigger download
+                      const link = document.createElement('a');
+                      link.href = fullUrl;
+                      link.download = material.file_name || material.title;
+                      link.target = '_blank';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }
                   }
                 }}
               >
