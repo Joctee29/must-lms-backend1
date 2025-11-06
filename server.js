@@ -830,11 +830,29 @@ app.get('/api/lecturers', optionalAuth, async (req, res) => {
     
     // If username is provided, find specific lecturer by username/employee_id
     if (username) {
+      console.log('=== SEARCHING FOR LECTURER ===');
+      console.log('Username/Employee ID:', username);
+      
       const result = await pool.query(
         'SELECT id, name, employee_id, specialization, email, phone, created_at FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
         [username]
       );
-      console.log(`Found lecturer by username: ${username}`);
+      console.log(`Found ${result.rows.length} lecturer(s) by username: ${username}`);
+      
+      if (result.rows.length > 0) {
+        console.log('Lecturer found:', result.rows[0]);
+      } else {
+        console.log('=== LECTURER NOT FOUND - DEBUGGING ===');
+        
+        // Check total lecturers in database
+        const totalLecturers = await pool.query('SELECT COUNT(*) FROM lecturers');
+        console.log('Total lecturers in database:', totalLecturers.rows[0].count);
+        
+        // Show sample lecturer employee_ids
+        const sampleLecturers = await pool.query('SELECT employee_id, name FROM lecturers LIMIT 5');
+        console.log('Sample lecturer employee_ids:', sampleLecturers.rows);
+      }
+      
       return res.json({ success: true, data: result.rows });
     }
     
@@ -1308,6 +1326,11 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       }
       
       const lecturer = lecturerResult.rows[0];
+      console.log('=== LECTURER DATA FOUND ===');
+      console.log('Lecturer ID:', lecturer.id);
+      console.log('Lecturer Employee ID:', lecturer.employee_id);
+      console.log('Lecturer Name:', lecturer.name);
+      
       const result = await pool.query(
         `SELECT * FROM programs 
          WHERE lecturer_id = $1 
@@ -1317,6 +1340,33 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
         [lecturer.id, lecturer.employee_id, lecturer.name]
       );
       console.log(`Found ${result.rows.length} programs for lecturer username: ${lecturer_username}`);
+      
+      // If no programs found, check what programs exist and their lecturer assignments
+      if (result.rows.length === 0) {
+        console.log('=== NO PROGRAMS FOUND - DEBUGGING ===');
+        
+        // Check total programs in database
+        const totalPrograms = await pool.query('SELECT COUNT(*) FROM programs');
+        console.log('Total programs in database:', totalPrograms.rows[0].count);
+        
+        // Check programs with lecturer assignments
+        const programsWithLecturer = await pool.query(`
+          SELECT id, name, lecturer_id, lecturer_name, course_id 
+          FROM programs 
+          WHERE lecturer_id IS NOT NULL OR lecturer_name IS NOT NULL 
+          LIMIT 10
+        `);
+        console.log('Sample programs with lecturer assigned:', programsWithLecturer.rows);
+        
+        // Check if any programs match this lecturer by different criteria
+        const possibleMatches = await pool.query(`
+          SELECT id, name, lecturer_id, lecturer_name, course_id 
+          FROM programs 
+          WHERE lecturer_name ILIKE $1 OR lecturer_name ILIKE $2 OR lecturer_id::text = $3
+        `, [`%${lecturer.employee_id}%`, `%${lecturer.name}%`, lecturer.id.toString()]);
+        console.log('Possible program matches:', possibleMatches.rows);
+      }
+      
       return res.json({ success: true, data: result.rows });
     }
     
@@ -5483,6 +5533,11 @@ app.get('/api/short-term-programs', async (req, res) => {
       }
       
       const lecturer = lecturerResult.rows[0];
+      console.log('=== SHORT-TERM PROGRAMS - LECTURER DATA ===');
+      console.log('Lecturer ID:', lecturer.id);
+      console.log('Lecturer Employee ID:', lecturer.employee_id);
+      console.log('Lecturer Name:', lecturer.name);
+      
       const result = await pool.query(
         `SELECT * FROM short_term_programs 
          WHERE lecturer_id = $1 
@@ -5493,6 +5548,25 @@ app.get('/api/short-term-programs', async (req, res) => {
       );
       
       console.log(`Found ${result.rows.length} short-term programs for lecturer`);
+      
+      // If no short-term programs found, check what exists
+      if (result.rows.length === 0) {
+        console.log('=== NO SHORT-TERM PROGRAMS FOUND - DEBUGGING ===');
+        
+        // Check total short-term programs in database
+        const totalShortTermPrograms = await pool.query('SELECT COUNT(*) FROM short_term_programs');
+        console.log('Total short-term programs in database:', totalShortTermPrograms.rows[0].count);
+        
+        // Check short-term programs with lecturer assignments
+        const shortTermWithLecturer = await pool.query(`
+          SELECT id, name, lecturer_id, lecturer_name 
+          FROM short_term_programs 
+          WHERE lecturer_id IS NOT NULL OR lecturer_name IS NOT NULL 
+          LIMIT 5
+        `);
+        console.log('Sample short-term programs with lecturer assigned:', shortTermWithLecturer.rows);
+      }
+      
       return res.json({ success: true, data: result.rows });
     }
     
