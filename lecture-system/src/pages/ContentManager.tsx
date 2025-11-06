@@ -55,14 +55,16 @@ export const ContentManager = () => {
 
         const user = JSON.parse(currentUser);
         
-        // Fetch lecturer's programs using secure endpoint
-        const response = await fetch(`https://must-lms-backend.onrender.com/api/lecturer-programs?lecturer_id=${user.id}`);
+        // Fetch lecturer's regular programs from database
+        const response = await fetch('https://must-lms-backend.onrender.com/api/programs');
         let allPrograms = [];
         
         if (response.ok) {
           const result = await response.json();
-          // Programs already filtered by backend
-          const lecturerPrograms = result.data || [];
+          // Filter regular programs assigned to current lecturer
+          const lecturerPrograms = result.data?.filter(program => 
+            program.lecturer_name === user.username || program.lecturer_id === user.id
+          ) || [];
           allPrograms = [...lecturerPrograms];
         }
         

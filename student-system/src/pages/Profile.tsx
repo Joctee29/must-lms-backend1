@@ -35,19 +35,21 @@ export const Profile = () => {
       try {
         setLoading(true);
         
-        // Fetch ONLY this student's data using secure endpoint
-        const response = await fetch(`${API_BASE_URL}/students/me?username=${encodeURIComponent(currentUser.username)}`);
+        // Fetch ONLY this student's data by registration number
+        const response = await fetch(`${API_BASE_URL}/students`);
         const result = await response.json();
         
-        if (result.success && result.data) {
-          const foundStudent = result.data;
+        if (result.success) {
+          const student = result.data.find((s: any) => 
+            s.registration_number === currentUser.username
+          );
           
-          if (foundStudent) {
-            setStudentData(foundStudent);
+          if (student) {
+            setStudentData(student);
             setEditForm({
-              name: foundStudent.name || "",
-              email: foundStudent.email || "",
-              phone: foundStudent.phone || ""
+              name: student.name || "",
+              email: student.email || "",
+              phone: student.phone || ""
             });
           }
         }

@@ -50,11 +50,11 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
       if (!currentUser?.username) return;
       
       try {
-        // Fetch assignments, live classes, and announcements using secure endpoints
+        // Fetch assignments, live classes, and announcements
         const [assignmentsRes, liveClassesRes, announcementsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/assignments/student?student_username=${encodeURIComponent(currentUser.username)}`),
-          fetch(`${API_BASE_URL}/live-classes/student?student_username=${encodeURIComponent(currentUser.username)}`),
-          fetch(`${API_BASE_URL}/announcements?student_username=${encodeURIComponent(currentUser.username)}`)
+          fetch(`${API_BASE_URL}/assignments`),
+          fetch(`${API_BASE_URL}/live-classes`),
+          fetch(`${API_BASE_URL}/announcements`)
         ]);
         
         const assignments = await assignmentsRes.json();
@@ -137,11 +137,13 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
       if (!currentUser?.username) return;
       
       try {
-        const response = await fetch(`${API_BASE_URL}/students/me?username=${encodeURIComponent(currentUser.username)}`);
+        const response = await fetch(`${API_BASE_URL}/students`);
         const result = await response.json();
         
-        if (result.success && result.data) {
-          const student = result.data;
+        if (result.success) {
+          const student = result.data.find((s: any) => 
+            s.registration_number === currentUser.username
+          );
           setStudentData(student);
         }
       } catch (error) {

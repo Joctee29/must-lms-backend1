@@ -139,8 +139,8 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
         
         console.log('Found lecturer:', currentLecturer);
         
-        // 2. Get regular programs using secure endpoint
-        const programsResponse = await fetch(`${API_BASE_URL}/lecturer-programs?lecturer_id=${currentLecturer.id}`);
+        // 2. Get regular programs assigned to this lecturer
+        const programsResponse = await fetch(`${API_BASE_URL}/programs`);
         let lecturerPrograms = [];
         
         if (programsResponse.ok) {
@@ -148,9 +148,14 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
           console.log('Regular Programs API Response:', programsResult);
           
           if (programsResult.success) {
-            console.log('All Programs:', programsResult.data);
-            lecturerPrograms = programsResult.data || []; // Programs already filtered by backend
-            console.log('Lecturer Programs:', lecturerPrograms);
+            console.log('All Regular Programs:', programsResult.data);
+            const regularPrograms = programsResult.data.filter((p: any) => 
+              p.lecturer_name === currentLecturer.name ||
+              p.lecturer_name === currentLecturer.employee_id ||
+              p.lecturer_id === currentLecturer.id
+            );
+            console.log('Filtered Regular Lecturer Programs:', regularPrograms);
+            lecturerPrograms = [...regularPrograms];
           }
         }
         
@@ -189,8 +194,8 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
           return;
         }
         
-        // 3. Get students enrolled in lecturer's programs using secure endpoint
-        const studentsResponse = await fetch(`${API_BASE_URL}/students/by-lecturer?lecturer_id=${currentLecturer.id}`);
+        // 3. Get students enrolled in lecturer's programs
+        const studentsResponse = await fetch(`${API_BASE_URL}/students`);
         if (!studentsResponse.ok) {
           throw new Error('Failed to fetch students');
         }
@@ -199,9 +204,16 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
         
         let lecturerStudents = [];
         if (studentsResult.success) {
-          // Students are already filtered by backend - no need for frontend filtering
-          lecturerStudents = studentsResult.data || [];
-          console.log('Lecturer Students (backend filtered):', lecturerStudents);
+          console.log('All Students:', studentsResult.data);
+          // Get course IDs from lecturer's programs
+          const courseIds = lecturerPrograms.map(p => p.course_id);
+          console.log('Course IDs for lecturer programs:', courseIds);
+          
+          // Filter students by course IDs
+          lecturerStudents = studentsResult.data.filter((student: any) => 
+            courseIds.includes(student.course_id)
+          );
+          console.log('Filtered Students by Course IDs:', lecturerStudents);
         }
         
         console.log('Final Students in lecturer courses:', lecturerStudents);

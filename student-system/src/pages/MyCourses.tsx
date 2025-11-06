@@ -37,23 +37,30 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
       try {
         setLoading(true);
         
-        // Fetch student info using secure endpoint (only current student's data)
-        const studentResponse = await fetch(`${API_BASE_URL}/students/me?username=${encodeURIComponent(currentUser.username)}`);
+        // Fetch student info
+        const studentResponse = await fetch(`${API_BASE_URL}/students`);
         const studentResult = await studentResponse.json();
         
         let student = null;
-        if (studentResult.success && studentResult.data) {
-          student = studentResult.data;
+        if (studentResult.success) {
+          student = studentResult.data.find((s: any) => 
+            s.registration_number === currentUser.username
+          );
           setStudentData(student);
           
           if (student) {
-            // Fetch programs using secure endpoint (backend filters by student)
-            const programsResponse = await fetch(`${API_BASE_URL}/students/${student.id}/programs`);
+            // Fetch programs for this student's course
+            const programsResponse = await fetch(`${API_BASE_URL}/programs`);
             const programsResult = await programsResponse.json();
             
             if (programsResult.success) {
-              // Programs already filtered by backend - no need for frontend filtering
-              setEnrolledPrograms(programsResult.data || []);
+              // Filter programs that match student's course
+              const relatedPrograms = programsResult.data.filter((program: any) => {
+                return program.course_id == student.course_id || 
+                       parseInt(program.course_id) === parseInt(student.course_id);
+              });
+              
+              setEnrolledPrograms(relatedPrograms);
             } else {
               setEnrolledPrograms([]);
             }

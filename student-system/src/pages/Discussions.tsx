@@ -106,10 +106,14 @@ export const Discussions = () => {
         
         // Fetch student's programs - single optimized API call
         try {
-          const studentsResponse = await fetch(`https://must-lms-backend.onrender.com/api/students/me?username=${encodeURIComponent(currentUser.username)}`);
+          const studentsResponse = await fetch('https://must-lms-backend.onrender.com/api/students');
           if (studentsResponse.ok) {
             const studentsResult = await studentsResponse.json();
-            const currentStudent = studentsResult.data;
+            const currentStudent = studentsResult.data?.find(student => 
+              student.registration_number === currentUser.username ||
+              student.email === currentUser.username ||
+              student.name?.toLowerCase() === currentUser.username?.toLowerCase()
+            );
             
             if (currentStudent) {
               const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/students/${currentStudent.id}/programs`);

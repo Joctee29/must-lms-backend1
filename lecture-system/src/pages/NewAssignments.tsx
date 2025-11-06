@@ -49,16 +49,18 @@ export const Assignments = () => {
         console.log('=== LECTURER ASSIGNMENTS DEBUG ===');
         console.log('Current User:', currentUser);
         
-        // Fetch lecturer's regular programs using secure endpoint
-        const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/lecturer-programs?lecturer_id=${currentUser.id}`);
+        // Fetch lecturer's regular programs
+        const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
         let allPrograms = [];
         
         if (programsResponse.ok) {
           const programsResult = await programsResponse.json();
           console.log('Regular Programs from API:', programsResult.data);
           
-          // Programs already filtered by backend
-          const lecturerPrograms = programsResult.data || [];
+          // Filter regular programs for current lecturer
+          const lecturerPrograms = programsResult.data?.filter(program => 
+            program.lecturer_name === currentUser.username || program.lecturer_id === currentUser.id
+          ) || [];
           
           allPrograms = [...lecturerPrograms];
         }

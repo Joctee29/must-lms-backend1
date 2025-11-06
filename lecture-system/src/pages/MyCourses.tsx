@@ -69,12 +69,25 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
           setLecturerData(lecturer);
         }
 
-        // Fetch programs using secure endpoint
-        const programsResponse = await fetch(`${API_BASE_URL}/lecturer-programs?lecturer_id=${currentUser.id}`);
+        // Fetch programs after lecturer data is available
+        const programsResponse = await fetch(`${API_BASE_URL}/programs`);
         const programsResult = await programsResponse.json();
         
         if (programsResult.success) {
-          setPrograms(programsResult.data || []);
+          // Filter programs assigned to this lecturer - REAL FILTERING
+          const assignedPrograms = programsResult.data.filter((p: any) => {
+            // Check against lecturer data from database
+            const isAssigned = p.lecturer_name === currentUser.username || 
+                              p.lecturer_name === lecturer?.name ||
+                              p.lecturer_name === lecturer?.employee_id ||
+                              p.lecturerName === currentUser.username || 
+                              p.lecturerName === lecturer?.name ||
+                              p.lecturerName === lecturer?.employee_id;
+            
+            return isAssigned;
+          });
+          
+          setPrograms(assignedPrograms);
         }
 
         // Fetch short-term programs assigned to this lecturer using lecturer-specific endpoint

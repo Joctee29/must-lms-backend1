@@ -214,15 +214,17 @@ export const Assessment = () => {
       try {
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         
-        // 1. Fetch lecturer's regular programs using secure endpoint
-        const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/lecturer-programs?lecturer_id=${currentUser.id}`);
+        // 1. Fetch lecturer's regular programs from backend
+        const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
         let allPrograms = [];
         
         if (programsResponse.ok) {
           const result = await programsResponse.json();
           
-          // Programs already filtered by backend
-          const lecturerPrograms = result.data || [];
+          // Filter regular programs assigned to current lecturer
+          const lecturerPrograms = result.data?.filter(program => 
+            program.lecturer_name === currentUser.username || program.lecturer_id === currentUser.id
+          ) || [];
           
           allPrograms = [...lecturerPrograms];
         }

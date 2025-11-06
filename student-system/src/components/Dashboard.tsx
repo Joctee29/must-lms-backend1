@@ -52,15 +52,20 @@ export const Dashboard = () => {
         console.log('=== STUDENT DASHBOARD DATA FETCH ===');
         console.log('Current User:', currentUser);
         
-        // Fetch student data using secure endpoint
-        const response = await fetch(`${API_BASE_URL}/students/me?username=${encodeURIComponent(currentUser.username)}`);
+        // Try to fetch real data from students table
+        const response = await fetch(`${API_BASE_URL}/students`);
         if (response.ok) {
           const result = await response.json();
           console.log('Students API Response:', result);
           
           if (result.success && result.data) {
-            // Use secure endpoint for student data
-            const student = result.data;
+            // Multiple matching strategies for finding student
+            const student = result.data.find((s: any) => 
+              s.registration_number === currentUser.username ||
+              s.name === currentUser.username ||
+              s.email === currentUser.username ||
+              s.username === currentUser.username
+            );
             
             console.log('Found Student:', student);
             

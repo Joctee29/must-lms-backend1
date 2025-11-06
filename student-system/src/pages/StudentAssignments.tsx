@@ -57,7 +57,7 @@ export const StudentAssignments = () => {
     try {
       console.log('=== FETCHING ASSIGNMENTS ===');
       
-      // Get current user and their student data
+      // Get current user
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       console.log('Current User:', currentUser);
       
@@ -68,7 +68,7 @@ export const StudentAssignments = () => {
         return;
       }
 
-      // Backend handles all filtering - no need to fetch student programs here
+      // OPTIMIZED: Backend handles all filtering
       console.log('Fetching assignments for student:', currentUser.username);
       
       let allAssignments: any[] = [];

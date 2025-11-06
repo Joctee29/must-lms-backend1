@@ -53,8 +53,8 @@ export const Discussions = () => {
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         console.log('Current Lecturer:', currentUser);
         
-        // Fetch lecturer's regular programs using secure endpoint
-        const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/lecturer-programs?lecturer_id=${currentUser.id}`);
+        // Fetch lecturer's regular programs
+        const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
         let allPrograms = [];
         let allCourses = [];
         
@@ -62,8 +62,10 @@ export const Discussions = () => {
           const programsResult = await programsResponse.json();
           console.log('Regular Programs Response:', programsResult);
           
-          // Programs already filtered by backend
-          const lecturerPrograms = programsResult.data || [];
+          // Get lecturer's regular programs
+          const lecturerPrograms = programsResult.data?.filter(program => 
+            program.lecturer_name === currentUser.username || program.lecturer_id === currentUser.id
+          ) || [];
           
           allPrograms = [...lecturerPrograms];
           allCourses = [...lecturerPrograms.map(program => program.name)];

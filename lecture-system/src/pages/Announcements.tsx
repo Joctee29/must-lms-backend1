@@ -45,14 +45,19 @@ export const Announcements = () => {
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         console.log('Current Lecturer:', currentUser);
 
-        // Fetch lecturer's regular programs using secure endpoint (backend filters)
-        const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/lecturer-programs?lecturer_id=${currentUser.id}`);
+        // Fetch lecturer's regular programs
+        const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
         let allPrograms = [];
         
         if (programsResponse.ok) {
           const programsResult = await programsResponse.json();
-          // Programs are already filtered by backend - no need for frontend filtering
-          const lecturerRegularPrograms = programsResult.data || [];
+          const regularPrograms = programsResult.data || [];
+          
+          // Filter regular programs for current lecturer
+          const lecturerRegularPrograms = regularPrograms.filter(program => 
+            program.lecturer_name === currentUser.username || 
+            program.lecturer_id === currentUser.id
+          );
           
           allPrograms = [...lecturerRegularPrograms];
         }
@@ -78,14 +83,19 @@ export const Announcements = () => {
         console.log('All Lecturer Programs (Regular + Short-Term):', allPrograms);
         setLecturerPrograms(allPrograms);
 
-        // Fetch announcements using secure endpoint (backend filters by lecturer)
-        const announcementsResponse = await fetch(`https://must-lms-backend.onrender.com/api/announcements/lecturer?lecturer_id=${currentUser.id}`);
+        // Fetch announcements created by this lecturer
+        const announcementsResponse = await fetch('https://must-lms-backend.onrender.com/api/announcements');
         if (announcementsResponse.ok) {
           const result = await announcementsResponse.json();
-          // Announcements already filtered by backend - no need for frontend filtering
-          const lecturerAnnouncements = result.data || [];
+          const allAnnouncements = result.data || [];
           
-          console.log('Lecturer Announcements (backend filtered):', lecturerAnnouncements);
+          // Filter announcements created by current lecturer
+          const lecturerAnnouncements = allAnnouncements.filter(announcement => 
+            announcement.created_by === currentUser.username || 
+            announcement.created_by_id === currentUser.id
+          );
+          
+          console.log('Lecturer Announcements:', lecturerAnnouncements);
           setAnnouncements(lecturerAnnouncements);
         }
 

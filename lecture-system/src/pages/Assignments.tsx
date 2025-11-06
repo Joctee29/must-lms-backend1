@@ -68,9 +68,9 @@ export const Assignments = () => {
           console.error('Failed to fetch programs:', programsResponse.status);
         }
         
-        // Fetch assignments using secure endpoint (backend filters by lecturer)
+        // Fetch assignments
         console.log('Fetching assignments for lecturer ID:', currentUser.id);
-        const assignmentsResponse = await fetch(`https://must-lms-backend.onrender.com/api/assignments/lecturer?lecturer_id=${currentUser.id}`);
+        const assignmentsResponse = await fetch(`https://must-lms-backend.onrender.com/api/assignments?lecturer_id=${currentUser.id}`);
         if (assignmentsResponse.ok) {
           const assignmentsResult = await assignmentsResponse.json();
           console.log('Assignments fetched:', assignmentsResult.data);
