@@ -2682,7 +2682,31 @@ app.get('/api/student-assessments', async (req, res) => {
     console.log('Student ID:', student_id);
     console.log('Student Program:', student_program);
 
-    // Get ALL published assessments (let frontend handle filtering)
+    if (!student_id) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // Get student's programs first to filter assessments
+    const studentResult = await pool.query(
+      'SELECT course_id FROM students WHERE id = $1',
+      [student_id]
+    );
+    
+    if (studentResult.rows.length === 0) {
+      console.log('Student not found');
+      return res.json({ success: true, data: [] });
+    }
+    
+    // Get all programs for student's course
+    const programsResult = await pool.query(
+      'SELECT name FROM programs WHERE course_id = $1',
+      [studentResult.rows[0].course_id]
+    );
+    
+    const programNames = programsResult.rows.map(p => p.name);
+    console.log('Student Programs:', programNames);
+
+    // Get published assessments for student's programs only
     let query = `
       SELECT a.*, 
         CASE WHEN s.id IS NOT NULL THEN true ELSE false END as submitted,
@@ -2690,13 +2714,14 @@ app.get('/api/student-assessments', async (req, res) => {
       FROM assessments a
       LEFT JOIN assessment_submissions s ON a.id = s.assessment_id AND s.student_id = $1
       WHERE a.status = 'published'
+        AND a.program_name = ANY($2)
     `;
     
-    let params = [student_id];
+    let params = [student_id, programNames];
 
-    // Filter by student's program if provided
+    // Further filter by specific program if provided
     if (student_program) {
-      query += ' AND a.program_name = $2';
+      query += ' AND a.program_name = $3';
       params.push(student_program);
     }
 
