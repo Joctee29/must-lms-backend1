@@ -65,17 +65,15 @@ const MaterialsComponent = () => {
           return;
         }
         
-        // Get student's enrolled programs
-        const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
+        // Get student's enrolled programs - pass user_type and student_id for authorization
+        const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs?user_type=student&student_id=${currentStudent.id}`);
         let studentPrograms = [];
         
         if (programsResponse.ok) {
           const programsResult = await programsResponse.json();
           if (programsResult.success) {
-            // Filter programs for student's course
-            studentPrograms = programsResult.data.filter(p => 
-              p.course_id === currentStudent.course_id
-            );
+            // Backend already filters by student's course
+            studentPrograms = programsResult.data;
           }
         }
         

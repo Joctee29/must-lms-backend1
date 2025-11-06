@@ -51,19 +51,32 @@ export const AssessmentResults = () => {
       console.log('=== ASSESSMENT RESULTS DEBUG ===');
       console.log('Current User:', currentUser);
 
-      // Fetch submitted assessments for current student
-      const response = await fetch('https://must-lms-backend.onrender.com/api/assessment-submissions');
+      // Get current student ID first
+      const studentResponse = await fetch(`https://must-lms-backend.onrender.com/api/students/me?username=${encodeURIComponent(currentUser.username)}`);
+      if (!studentResponse.ok) {
+        console.error('Failed to fetch student info');
+        setLoading(false);
+        return;
+      }
+      
+      const studentData = await studentResponse.json();
+      const currentStudentId = studentData.data?.id;
+      
+      if (!currentStudentId) {
+        console.error('No student ID found');
+        setLoading(false);
+        return;
+      }
+
+      // Fetch submitted assessments for current student with student_id parameter
+      const response = await fetch(`https://must-lms-backend.onrender.com/api/assessment-submissions?student_id=${currentStudentId}`);
       if (response.ok) {
         const result = await response.json();
-        console.log('All Submissions:', result.data);
+        console.log('Student Submissions:', result.data);
         
-        // Filter submissions for current student
-        const studentSubmissions = result.data?.filter((submission: any) => 
-          submission.student_name === currentUser.username || 
-          submission.student_id === currentUser.id
-        ) || [];
+        const studentSubmissions = result.data || [];
 
-        console.log('Student Submissions:', studentSubmissions);
+        console.log('Found Submissions:', studentSubmissions.length);
 
         // Fetch assessment details for each submission
         const resultsWithDetails = await Promise.all(

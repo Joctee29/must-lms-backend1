@@ -38,13 +38,24 @@ export const Assignments = () => {
       console.log('=== ASSIGNMENTS PAGE DEBUG ===');
       console.log('Current User:', currentUser);
 
-      if (!currentUser.id) {
-        console.log('No user ID found');
+      // Get student ID first from backend
+      const studentResponse = await fetch(`https://must-lms-backend.onrender.com/api/students/me?username=${encodeURIComponent(currentUser.username)}`);
+      if (!studentResponse.ok) {
+        console.error('Failed to fetch student info');
+        setLoading(false);
+        return;
+      }
+      
+      const studentData = await studentResponse.json();
+      const studentId = studentData.data?.id;
+
+      if (!studentId) {
+        console.log('No student ID found');
         setLoading(false);
         return;
       }
 
-      const response = await fetch(`https://must-lms-backend.onrender.com/api/student-graded-assessments?student_id=${currentUser.id}`);
+      const response = await fetch(`https://must-lms-backend.onrender.com/api/student-graded-assessments?student_id=${studentId}`);
       
       if (response.ok) {
         const result = await response.json();

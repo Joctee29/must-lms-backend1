@@ -66,13 +66,12 @@ export const TakeAssessment = () => {
           console.log('Found Student:', currentStudent);
 
           if (currentStudent) {
-            // Get student's programs
-            const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
+            // Get student's programs - pass authorization parameters
+            const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs?user_type=student&student_id=${currentStudent.id}`);
             if (programsResponse.ok) {
               const programsResult = await programsResponse.json();
-              const studentPrograms = programsResult.data?.filter(p => 
-                p.course_id === currentStudent.course_id
-              ) || [];
+              // Backend already filters by student's course
+              const studentPrograms = programsResult.data || [];
 
               console.log('Student Programs:', studentPrograms);
 

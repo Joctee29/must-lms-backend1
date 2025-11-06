@@ -59,14 +59,12 @@ export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps
       const liveClassResponse = await fetch('https://must-lms-backend.onrender.com/api/live-classes');
       const liveClassResult = await liveClassResponse.json();
       
-      // Get student's programs (both regular and short-term)
-      const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
+      // Get student's programs (both regular and short-term) - pass authorization parameters
+      const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs?user_type=student&student_id=${currentStudent.id}`);
       const programsResult = await programsResponse.json();
       
-      // Find student's programs based on course_id
-      const studentPrograms = programsResult.data?.filter(p => 
-        p.course_id === currentStudent.course_id
-      ) || [];
+      // Backend already filters by student's course
+      const studentPrograms = programsResult.data || [];
       
       console.log('=== LIVE CLASS FILTERING DEBUG ===');
       console.log('All Live Classes:', liveClassResult.data);

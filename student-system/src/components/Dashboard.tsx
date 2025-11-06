@@ -158,33 +158,27 @@ export const Dashboard = () => {
         console.log('=== FETCHING PROGRAMS AND ASSIGNMENTS ===');
         console.log('Student Data for Programs:', studentInfo);
         
-        const programsResponse = await fetch(`${API_BASE_URL}/programs`);
+        // Pass user_type and student_id for proper authorization
+        const programsResponse = await fetch(`${API_BASE_URL}/programs?user_type=student&student_id=${studentInfo.id}`);
         
         if (programsResponse.ok) {
           const programsResult = await programsResponse.json();
           console.log('Programs API Response:', programsResult);
           
           if (programsResult.success && programsResult.data) {
-            const foundStudentPrograms = programsResult.data.filter((p: any) => 
-              p.course_id === studentInfo.course_id
-            );
-            console.log('Student Programs Found:', foundStudentPrograms);
-            setStudentPrograms(foundStudentPrograms);
+            console.log('Student Programs Found:', programsResult.data);
+            setStudentPrograms(programsResult.data);
             
-            // Now fetch assignments based on found programs
-            const assignmentsResponse = await fetch(`${API_BASE_URL}/assignments`);
+            // Now fetch assignments based on found programs - pass student_id for filtering
+            const assignmentsResponse = await fetch(`${API_BASE_URL}/assignments?user_type=student&student_id=${studentInfo.id}`);
             
             if (assignmentsResponse.ok) {
               const assignmentsResult = await assignmentsResponse.json();
               console.log('Assignments API Response:', assignmentsResult);
               
               if (assignmentsResult.success && assignmentsResult.data) {
-                // Filter assignments for student's programs
-                const studentAssignments = assignmentsResult.data.filter((a: any) => 
-                  foundStudentPrograms.some((p: any) => p.name === a.program || p.id === a.program_id)
-                );
-                console.log('Student Assignments Found:', studentAssignments);
-                setAssignments(studentAssignments);
+                console.log('Student Assignments Found:', assignmentsResult.data);
+                setAssignments(assignmentsResult.data);
               }
             } else {
               console.log('No assignments endpoint available');
