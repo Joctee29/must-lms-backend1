@@ -1006,6 +1006,21 @@ app.get('/api/students', optionalAuth, async (req, res) => {
     
     // For lecturers - only their students (students in their programs)
     if (effectiveUserType === 'lecturer' && effectiveUserId) {
+      // First get lecturer info to match by both ID and name/employee_id
+      const lecturerResult = await pool.query(
+        'SELECT id, employee_id, name FROM lecturers WHERE id = $1',
+        [effectiveUserId]
+      );
+      
+      if (lecturerResult.rows.length === 0) {
+        console.log('Lecturer not found with ID:', effectiveUserId);
+        return res.json({ success: true, data: [] });
+      }
+      
+      const lecturer = lecturerResult.rows[0];
+      console.log('Fetching students for lecturer:', lecturer);
+      
+      // Get students from programs matching lecturer by ID OR name/employee_id
       const result = await pool.query(`
         SELECT DISTINCT s.id, s.name, s.registration_number, s.academic_year, 
                s.course_id, s.current_semester, s.email, s.phone, s.created_at,
@@ -1014,11 +1029,16 @@ app.get('/api/students', optionalAuth, async (req, res) => {
         LEFT JOIN courses c ON s.course_id = c.id
         WHERE s.course_id IN (
           SELECT DISTINCT course_id FROM programs 
-          WHERE lecturer_id = $1
+          WHERE lecturer_id = $1 
+             OR lecturer_name = $2 
+             OR lecturer_name = $3
+             OR lecturer_name ILIKE $4
+             OR lecturer_name ILIKE $5
         )
         ORDER BY s.created_at DESC
-      `, [effectiveUserId]);
-      console.log(`Found ${result.rows.length} students for lecturer`);
+      `, [lecturer.id, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`]);
+      
+      console.log(`Found ${result.rows.length} students for lecturer ${lecturer.name} (ID: ${lecturer.id})`);
       return res.json({ success: true, data: result.rows });
     }
     
