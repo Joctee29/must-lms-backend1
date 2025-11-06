@@ -5,8 +5,15 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
+const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
+
+// JWT Configuration
+const JWT_SECRET = process.env.JWT_SECRET || 'must-lms-secret-key-change-in-production-2024';
+const JWT_EXPIRES_IN = '24h';
+const JWT_REFRESH_EXPIRES_IN = '7d';
 
 // Track active sessions
 const activeSessions = new Map(); // userId -> { userType, username, loginTime }
@@ -228,7 +235,15 @@ const corsOptions = {
       callback(null, true);
     } else {
       console.log('CORS blocked origin:', origin);
-      callback(null, true); // Allow anyway for now - change to false in production
+      // SECURITY: Block unauthorized origins in production
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+      if (isDevelopment) {
+        console.log('⚠️  Development mode - allowing origin anyway');
+        callback(null, true);
+      } else {
+        console.log('❌ Production mode - blocking unauthorized origin');
+        callback(new Error('Not allowed by CORS'));
+      }
     }
   },
   credentials: true,
@@ -239,6 +254,65 @@ const corsOptions = {
 // Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
+
+// Rate Limiting Configuration
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 login attempts per window
+  message: { success: false, error: 'Too many login attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100, // 100 requests per minute
+  message: { success: false, error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply general rate limiting to all API routes
+app.use('/api/', apiLimiter);
+
+// JWT Authentication Middleware
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, error: 'No token provided' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded; // { userId, userType, username }
+    next();
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ success: false, error: 'Token expired', expired: true });
+    }
+    return res.status(401).json({ success: false, error: 'Invalid token' });
+  }
+};
+
+// Optional auth middleware - doesn't fail if no token
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.user = decoded;
+    } catch (error) {
+      // Token invalid but continue anyway
+      req.user = null;
+    }
+  }
+  next();
+};
 
 // Serve static files from uploads directory
 app.use('/content', express.static(uploadsDir));
@@ -740,13 +814,51 @@ app.post('/api/lecturers', async (req, res) => {
   }
 });
 
-app.get('/api/lecturers', async (req, res) => {
+// Get lecturers with proper filtering based on user type
+app.get('/api/lecturers', optionalAuth, async (req, res) => {
   try {
-    // SECURITY: Exclude password from response
-    const result = await pool.query(
-      'SELECT id, name, employee_id, specialization, email, phone, created_at, updated_at FROM lecturers ORDER BY created_at DESC'
-    );
-    res.json({ success: true, data: result.rows });
+    const { lecturer_id, user_type } = req.query;
+    const userFromToken = req.user; // From JWT if provided
+    
+    console.log('=== FETCHING LECTURERS ===');
+    console.log('Query params:', { lecturer_id, user_type });
+    console.log('User from token:', userFromToken);
+    
+    // Determine user type from token or query
+    const effectiveUserType = userFromToken?.userType || user_type;
+    const effectiveUserId = userFromToken?.userId || lecturer_id;
+    
+    // For specific lecturer - only their info
+    if (effectiveUserType === 'lecturer' && effectiveUserId) {
+      const result = await pool.query(
+        'SELECT id, name, employee_id, specialization, email, phone, created_at FROM lecturers WHERE id = $1',
+        [effectiveUserId]
+      );
+      console.log(`Found lecturer info for ID ${effectiveUserId}`);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // For admin - all lecturers
+    if (effectiveUserType === 'admin') {
+      const result = await pool.query(
+        'SELECT id, name, employee_id, specialization, email, phone, created_at, updated_at FROM lecturers ORDER BY created_at DESC'
+      );
+      console.log(`Found ${result.rows.length} lecturers (admin view)`);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // For students - can see basic lecturer info (names only for program display)
+    if (effectiveUserType === 'student') {
+      const result = await pool.query(
+        'SELECT id, name, employee_id, specialization FROM lecturers ORDER BY name ASC'
+      );
+      console.log(`Found ${result.rows.length} lecturers (student view - basic info only)`);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // No authorization - return empty
+    console.log('Unauthorized - returning empty');
+    res.status(403).json({ success: false, error: 'Unauthorized to view lecturers list' });
   } catch (error) {
     console.error('Error fetching lecturers:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -836,18 +948,55 @@ app.post('/api/students', async (req, res) => {
   }
 });
 
-app.get('/api/students', async (req, res) => {
+// Get students with proper filtering based on user type
+app.get('/api/students', optionalAuth, async (req, res) => {
   try {
-    // SECURITY: Exclude password from response
-    const result = await pool.query(`
-      SELECT s.id, s.name, s.registration_number, s.academic_year, s.course_id, 
-             s.current_semester, s.email, s.phone, s.created_at, s.updated_at,
-             c.name as course_name 
-      FROM students s 
-      LEFT JOIN courses c ON s.course_id = c.id 
-      ORDER BY s.created_at DESC
-    `);
-    res.json({ success: true, data: result.rows });
+    const { lecturer_id, user_type } = req.query;
+    const userFromToken = req.user; // From JWT if provided
+    
+    console.log('=== FETCHING STUDENTS ===');
+    console.log('Query params:', { lecturer_id, user_type });
+    console.log('User from token:', userFromToken);
+    
+    // Determine user type from token or query
+    const effectiveUserType = userFromToken?.userType || user_type;
+    const effectiveUserId = userFromToken?.userId || lecturer_id;
+    
+    // For lecturers - only their students (students in their programs)
+    if (effectiveUserType === 'lecturer' && effectiveUserId) {
+      const result = await pool.query(`
+        SELECT DISTINCT s.id, s.name, s.registration_number, s.academic_year, 
+               s.course_id, s.current_semester, s.email, s.phone, s.created_at,
+               c.name as course_name
+        FROM students s
+        LEFT JOIN courses c ON s.course_id = c.id
+        WHERE s.course_id IN (
+          SELECT DISTINCT course_id FROM programs 
+          WHERE lecturer_id = $1
+        )
+        ORDER BY s.created_at DESC
+      `, [effectiveUserId]);
+      console.log(`Found ${result.rows.length} students for lecturer`);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // For admin - all students
+    if (effectiveUserType === 'admin') {
+      const result = await pool.query(`
+        SELECT s.id, s.name, s.registration_number, s.academic_year, s.course_id, 
+               s.current_semester, s.email, s.phone, s.created_at, s.updated_at,
+               c.name as course_name 
+        FROM students s 
+        LEFT JOIN courses c ON s.course_id = c.id 
+        ORDER BY s.created_at DESC
+      `);
+      console.log(`Found ${result.rows.length} students (admin view)`);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // For students or no authorization - return empty for security
+    console.log('Unauthorized or student trying to access students list - returning empty');
+    res.status(403).json({ success: false, error: 'Unauthorized to view students list' });
   } catch (error) {
     console.error('Error fetching students:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -1106,20 +1255,89 @@ app.post('/api/programs', async (req, res) => {
   }
 });
 
-app.get('/api/programs', async (req, res) => {
+// Get programs with proper filtering based on user type
+app.get('/api/programs', optionalAuth, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM programs ORDER BY created_at DESC');
-    res.json({ success: true, data: result.rows });
+    const { student_id, lecturer_id, user_type } = req.query;
+    const userFromToken = req.user; // From JWT if provided
+    
+    console.log('=== FETCHING PROGRAMS ===');
+    console.log('Query params:', { student_id, lecturer_id, user_type });
+    console.log('User from token:', userFromToken);
+    
+    // Determine user type from token or query
+    const effectiveUserType = userFromToken?.userType || user_type;
+    const effectiveUserId = userFromToken?.userId || student_id || lecturer_id;
+    
+    // For students - only their course programs
+    if (effectiveUserType === 'student' && effectiveUserId) {
+      const studentResult = await pool.query(
+        'SELECT course_id FROM students WHERE id = $1',
+        [effectiveUserId]
+      );
+      
+      if (studentResult.rows.length === 0) {
+        console.log('Student not found');
+        return res.json({ success: true, data: [] });
+      }
+      
+      const result = await pool.query(
+        'SELECT * FROM programs WHERE course_id = $1 ORDER BY created_at DESC',
+        [studentResult.rows[0].course_id]
+      );
+      console.log(`Found ${result.rows.length} programs for student`);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // For lecturers - only their programs
+    if (effectiveUserType === 'lecturer' && effectiveUserId) {
+      const lecturerResult = await pool.query(
+        'SELECT employee_id, name FROM lecturers WHERE id = $1',
+        [effectiveUserId]
+      );
+      
+      if (lecturerResult.rows.length === 0) {
+        console.log('Lecturer not found');
+        return res.json({ success: true, data: [] });
+      }
+      
+      const lecturer = lecturerResult.rows[0];
+      const result = await pool.query(
+        `SELECT * FROM programs 
+         WHERE lecturer_id = $1 
+            OR lecturer_name = $2 
+            OR lecturer_name = $3
+         ORDER BY created_at DESC`,
+        [effectiveUserId, lecturer.employee_id, lecturer.name]
+      );
+      console.log(`Found ${result.rows.length} programs for lecturer`);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // For admin - all programs
+    if (effectiveUserType === 'admin') {
+      const result = await pool.query('SELECT * FROM programs ORDER BY created_at DESC');
+      console.log(`Found ${result.rows.length} programs (admin view)`);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // No user info - return empty for security
+    console.log('No valid user info - returning empty');
+    res.json({ success: true, data: [] });
   } catch (error) {
     console.error('Error fetching programs:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Authentication route
-app.post('/api/auth', async (req, res) => {
+// Authentication route with JWT
+app.post('/api/auth', loginLimiter, async (req, res) => {
   try {
     const { username, password, userType } = req.body;
+    
+    console.log('=== LOGIN ATTEMPT ===');
+    console.log('Username:', username);
+    console.log('User Type:', userType);
     
     const result = await pool.query(
       'SELECT * FROM password_records WHERE username = $1 AND password_hash = $2 AND user_type = $3',
@@ -1129,19 +1347,98 @@ app.post('/api/auth', async (req, res) => {
     if (result.rows.length > 0) {
       const user = result.rows[0];
       
+      // Generate JWT access token
+      const accessToken = jwt.sign(
+        { 
+          userId: user.user_id, 
+          userType: user.user_type, 
+          username: user.username 
+        },
+        JWT_SECRET,
+        { expiresIn: JWT_EXPIRES_IN }
+      );
+      
+      // Generate refresh token
+      const refreshToken = jwt.sign(
+        { 
+          userId: user.user_id, 
+          userType: user.user_type 
+        },
+        JWT_SECRET,
+        { expiresIn: JWT_REFRESH_EXPIRES_IN }
+      );
+      
       // Track active session
       activeSessions.set(user.user_id, {
         userType: user.user_type,
         username: user.username,
-        loginTime: new Date()
+        loginTime: new Date(),
+        refreshToken
       });
       
-      res.json({ success: true, data: user });
+      console.log('✅ Login successful for:', username);
+      
+      // Return user data without password + tokens
+      res.json({ 
+        success: true, 
+        data: {
+          userId: user.user_id,
+          username: user.username,
+          userType: user.user_type
+        },
+        accessToken,
+        refreshToken,
+        expiresIn: JWT_EXPIRES_IN
+      });
     } else {
+      console.log('❌ Invalid credentials for:', username);
       res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
   } catch (error) {
     console.error('Error authenticating user:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Token refresh endpoint
+app.post('/api/auth/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(401).json({ success: false, error: 'Refresh token required' });
+    }
+    
+    try {
+      const decoded = jwt.verify(refreshToken, JWT_SECRET);
+      
+      // Check if session exists
+      const session = activeSessions.get(decoded.userId);
+      if (!session || session.refreshToken !== refreshToken) {
+        return res.status(401).json({ success: false, error: 'Invalid refresh token' });
+      }
+      
+      // Generate new access token
+      const accessToken = jwt.sign(
+        { 
+          userId: decoded.userId, 
+          userType: decoded.userType, 
+          username: session.username 
+        },
+        JWT_SECRET,
+        { expiresIn: JWT_EXPIRES_IN }
+      );
+      
+      res.json({ 
+        success: true, 
+        accessToken,
+        expiresIn: JWT_EXPIRES_IN
+      });
+    } catch (error) {
+      return res.status(401).json({ success: false, error: 'Invalid or expired refresh token' });
+    }
+  } catch (error) {
+    console.error('Error refreshing token:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
