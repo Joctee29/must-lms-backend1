@@ -213,42 +213,40 @@ export const Assessment = () => {
     const fetchLecturerData = async () => {
       try {
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        console.log('=== ASSESSMENT DATA FETCH ===');
+        console.log('Current User:', currentUser);
         
-        // 1. Fetch lecturer's regular programs from backend
-        const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
+        // 1. Fetch lecturer's regular programs using efficient endpoint
+        const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
         let allPrograms = [];
         
         if (programsResponse.ok) {
           const result = await programsResponse.json();
-          
-          // Filter regular programs assigned to current lecturer
-          const lecturerPrograms = result.data?.filter(program => 
-            program.lecturer_name === currentUser.username || program.lecturer_id === currentUser.id
-          ) || [];
-          
-          allPrograms = [...lecturerPrograms];
+          if (result.success) {
+            allPrograms = [...result.data];
+            console.log('Lecturer Regular Programs:', allPrograms.length);
+          }
         }
         
-        // 2. Fetch lecturer's short-term programs from backend
-        const shortTermResponse = await fetch('https://must-lms-backend.onrender.com/api/short-term-programs');
+        // 2. Fetch lecturer's short-term programs using efficient endpoint
+        const shortTermResponse = await fetch(`https://must-lms-backend.onrender.com/api/short-term-programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
         if (shortTermResponse.ok) {
           const shortTermResult = await shortTermResponse.json();
-          
-          // Filter short-term programs assigned to current lecturer
-          const lecturerShortTermPrograms = shortTermResult.data?.filter(program => 
-            program.lecturer_name === currentUser.username || program.lecturer_id === currentUser.id
-          ) || [];
-          
-          // Convert short-term programs to same format as regular programs
-          const formattedShortTermPrograms = lecturerShortTermPrograms.map(program => ({
-            id: `short-${program.id}`,
-            name: program.title,
-            lecturer_name: program.lecturer_name,
-            lecturer_id: program.lecturer_id,
-            type: 'short-term'
-          }));
-          
-          allPrograms = [...allPrograms, ...formattedShortTermPrograms];
+          if (shortTermResult.success) {
+            const lecturerShortTermPrograms = shortTermResult.data || [];
+            console.log('Lecturer Short-Term Programs:', lecturerShortTermPrograms.length);
+            
+            // Convert short-term programs to same format as regular programs
+            const formattedShortTermPrograms = lecturerShortTermPrograms.map(program => ({
+              id: `short-${program.id}`,
+              name: program.title,
+              lecturer_name: program.lecturer_name,
+              lecturer_id: program.lecturer_id,
+              type: 'short-term'
+            }));
+            
+            allPrograms = [...allPrograms, ...formattedShortTermPrograms];
+          }
         }
         
         console.log('=== LECTURER PROGRAMS DEBUG ===');

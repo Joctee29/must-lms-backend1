@@ -77,7 +77,7 @@ export const lecturerOperations = {
   // Get all lecturers
   getAll: async () => {
     try {
-      return await apiCall('/lecturers');
+      return await apiCall('/lecturers?user_type=admin');
     } catch (error) {
       console.error('Error fetching lecturers:', error);
       return []; // Return empty array on error
@@ -191,7 +191,7 @@ export const courseOperations = {
   // Get all programs
   getAllPrograms: async () => {
     try {
-      return await apiCall('/programs');
+      return await apiCall('/programs?user_type=admin');
     } catch (error) {
       console.error('Error fetching programs:', error);
       return [];
@@ -201,7 +201,7 @@ export const courseOperations = {
   // Get all lecturers
   getAllLecturers: async () => {
     try {
-      return await apiCall('/lecturers');
+      return await apiCall('/lecturers?user_type=admin');
     } catch (error) {
       console.error('Error fetching lecturers:', error);
       return [];
@@ -306,7 +306,7 @@ export const studentOperations = {
   // Get all students
   getAll: async () => {
     try {
-      return await apiCall('/students');
+      return await apiCall('/students?user_type=admin');
     } catch (error) {
       console.error('Error fetching students:', error);
       return [];

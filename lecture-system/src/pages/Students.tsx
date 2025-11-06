@@ -25,74 +25,13 @@ interface StudentsProps {
 
 export const Students = ({ selectedProgramId, selectedProgramName }: StudentsProps = {}) => {
   const [searchTerm, setSearchTerm] = useState("");
-  // Initialize with demo data immediately so students show by default
-  const [students, setStudents] = useState<any[]>([
-    {
-      id: 1,
-      name: "Maria Mwalimu",
-      registration_number: "CS001/2024",
-      email: "maria.mwalimu@must.ac.tz",
-      course_id: 1,
-      academic_year: "2024/2025",
-      current_semester: 1
-    },
-    {
-      id: 2,
-      name: "John Kimaro",
-      registration_number: "CS002/2024", 
-      email: "john.kimaro@must.ac.tz",
-      course_id: 1,
-      academic_year: "2024/2025",
-      current_semester: 1
-    },
-    {
-      id: 3,
-      name: "Grace Moshi",
-      registration_number: "IT001/2024",
-      email: "grace.moshi@must.ac.tz", 
-      course_id: 2,
-      academic_year: "2024/2025",
-      current_semester: 1
-    }
-  ]);
-  
-  const [programs, setPrograms] = useState<any[]>([
-    {
-      id: 1,
-      name: "Computer Science Program",
-      course_id: 1,
-      lecturer_name: "lecturer1",
-      total_semesters: 8
-    },
-    {
-      id: 2, 
-      name: "Information Technology Program",
-      course_id: 2,
-      lecturer_name: "lecturer1",
-      total_semesters: 8
-    }
-  ]);
-  
-  const [loading, setLoading] = useState(false); // Start with false since we have demo data
+  // Start with empty arrays - fetch real data only
+  const [students, setStudents] = useState<any[]>([]);
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [selectedProgramFilter, setSelectedProgramFilter] = useState("all");
-  const [allPrograms, setAllPrograms] = useState<any[]>([
-    {
-      id: 1,
-      name: "Computer Science Program",
-      course_id: 1,
-      lecturer_name: "lecturer1",
-      total_semesters: 8
-    },
-    {
-      id: 2, 
-      name: "Information Technology Program",
-      course_id: 2,
-      lecturer_name: "lecturer1",
-      total_semesters: 8
-    }
-  ]);
-  const [isDemoData, setIsDemoData] = useState(false);
+  const [allPrograms, setAllPrograms] = useState<any[]>([]);
 
   useEffect(() => {
     const user = localStorage.getItem('currentUser');
@@ -112,20 +51,17 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
         console.log('Current User:', currentUser);
         console.log('API Base URL:', API_BASE_URL);
         
-        // 1. First get lecturer info to identify lecturer
-        const lecturerResponse = await fetch(`${API_BASE_URL}/lecturers`);
+        // 1. Get lecturer info using efficient endpoint
+        const lecturerResponse = await fetch(`${API_BASE_URL}/lecturers?username=${encodeURIComponent(currentUser.username)}`);
         if (!lecturerResponse.ok) {
-          throw new Error('Failed to fetch lecturers');
+          throw new Error('Failed to fetch lecturer');
         }
         const lecturerResult = await lecturerResponse.json();
-        console.log('Lecturers API Response:', lecturerResult);
+        console.log('Lecturer API Response:', lecturerResult);
         
         let currentLecturer = null;
-        if (lecturerResult.success) {
-          console.log('All Lecturers:', lecturerResult.data);
-          currentLecturer = lecturerResult.data.find((l: any) => 
-            l.employee_id === currentUser.username || l.name === currentUser.username
-          );
+        if (lecturerResult.success && lecturerResult.data.length > 0) {
+          currentLecturer = lecturerResult.data[0];
           console.log('Current Lecturer Found:', currentLecturer);
         }
         
@@ -139,8 +75,8 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
         
         console.log('Found lecturer:', currentLecturer);
         
-        // 2. Get regular programs assigned to this lecturer
-        const programsResponse = await fetch(`${API_BASE_URL}/programs`);
+        // 2. Get regular programs using efficient endpoint
+        const programsResponse = await fetch(`${API_BASE_URL}/programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
         let lecturerPrograms = [];
         
         if (programsResponse.ok) {
@@ -148,31 +84,20 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
           console.log('Regular Programs API Response:', programsResult);
           
           if (programsResult.success) {
-            console.log('All Regular Programs:', programsResult.data);
-            const regularPrograms = programsResult.data.filter((p: any) => 
-              p.lecturer_name === currentLecturer.name ||
-              p.lecturer_name === currentLecturer.employee_id ||
-              p.lecturer_id === currentLecturer.id
-            );
-            console.log('Filtered Regular Lecturer Programs:', regularPrograms);
-            lecturerPrograms = [...regularPrograms];
+            lecturerPrograms = [...programsResult.data];
+            console.log('Lecturer Regular Programs:', lecturerPrograms.length);
           }
         }
         
-        // 3. Get short-term programs assigned to this lecturer
-        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs`);
+        // 3. Get short-term programs using efficient endpoint
+        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
         if (shortTermResponse.ok) {
           const shortTermResult = await shortTermResponse.json();
           console.log('Short-Term Programs API Response:', shortTermResult);
           
           if (shortTermResult.success) {
-            console.log('All Short-Term Programs:', shortTermResult.data);
-            const shortTermPrograms = shortTermResult.data.filter((p: any) => 
-              p.lecturer_name === currentLecturer.name ||
-              p.lecturer_name === currentLecturer.employee_id ||
-              p.lecturer_id === currentLecturer.id
-            );
-            console.log('Filtered Short-Term Lecturer Programs:', shortTermPrograms);
+            const shortTermPrograms = shortTermResult.data;
+            console.log('Lecturer Short-Term Programs:', shortTermPrograms.length);
             
             // Convert short-term programs to same format as regular programs
             const formattedShortTermPrograms = shortTermPrograms.map((program: any) => ({
@@ -231,7 +156,6 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
         // 5. Set the real data
         setStudents(lecturerStudents);
         setAllPrograms(lecturerPrograms);
-        setIsDemoData(false);
         
         console.log('=== FINAL DATA SET ===');
         console.log('Students Count:', lecturerStudents.length);
@@ -241,62 +165,12 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
         
       } catch (error) {
         console.error('Error fetching real data:', error);
-        console.log('API connection failed - checking if server is running');
+        console.log('API connection failed - check if backend server is running');
         
-        // API connection failed - use demo data so students are visible
-        console.log('API connection failed - using demo data');
-        
-        const demoStudents = [
-          {
-            id: 1,
-            name: "Maria Mwalimu",
-            registration_number: "CS001/2024",
-            email: "maria.mwalimu@must.ac.tz",
-            course_id: 1,
-            academic_year: "2024/2025",
-            current_semester: 1
-          },
-          {
-            id: 2,
-            name: "John Kimaro",
-            registration_number: "CS002/2024", 
-            email: "john.kimaro@must.ac.tz",
-            course_id: 1,
-            academic_year: "2024/2025",
-            current_semester: 1
-          },
-          {
-            id: 3,
-            name: "Grace Moshi",
-            registration_number: "IT001/2024",
-            email: "grace.moshi@must.ac.tz", 
-            course_id: 2,
-            academic_year: "2024/2025",
-            current_semester: 1
-          }
-        ];
-        
-        const demoPrograms = [
-          {
-            id: 1,
-            name: "Computer Science Program",
-            course_id: 1,
-            lecturer_name: currentUser?.username,
-            total_semesters: 8
-          },
-          {
-            id: 2, 
-            name: "Information Technology Program",
-            course_id: 2,
-            lecturer_name: currentUser?.username,
-            total_semesters: 8
-          }
-        ];
-        
-        setStudents(demoStudents);
-        setPrograms(demoPrograms);
-        setAllPrograms(demoPrograms);
-        setIsDemoData(false);
+        // Don't use demo data - show empty state
+        setStudents([]);
+        setPrograms([]);
+        setAllPrograms([]);
       } finally {
         setLoading(false);
       }
@@ -430,7 +304,7 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
             <h3 className="mt-4 text-lg font-semibold">No Students Found</h3>
             <p className="mt-2 text-muted-foreground">
               {students.length === 0 
-                ? "No students found. This could mean: (1) No students are enrolled in your assigned programs yet, (2) Backend server is not running, or (3) You don't have programs assigned. Check browser console for details."
+                ? "No students are enrolled in your assigned programs yet."
                 : "No students match the current filter. Try selecting 'All My Programs' or a different program filter."
               }
             </p>
@@ -438,9 +312,6 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
               <div className="mt-4 space-y-2">
                 <p className="text-sm text-orange-600">
                   You don't have any programs assigned yet. Contact admin to assign programs to you.
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Debug: Check browser console for API connection details.
                 </p>
                 <Button 
                   variant="outline" 

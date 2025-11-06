@@ -53,16 +53,24 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
         
         if (result.success && result.data) {
           // Store user info in localStorage for the session
-          localStorage.setItem('currentUser', JSON.stringify({
+          // CRITICAL: Store employee_id as username for API queries
+          const userData = {
             id: result.data.id,
-            username: result.data.employee_id || result.data.name,
+            username: result.data.employee_id || loginData.checkNumber, // Use employee_id for queries
+            employee_id: result.data.employee_id,
             name: result.data.name,
             email: result.data.email,
             specialization: result.data.specialization,
+            phone: result.data.phone,
             type: 'lecturer'
-          }));
+          };
           
-          console.log('Login successful! User:', result.data.name);
+          localStorage.setItem('currentUser', JSON.stringify(userData));
+          
+          console.log('✅ Login successful!');
+          console.log('User Data:', userData);
+          console.log('Username for API queries:', userData.username);
+          
           alert(`Welcome ${result.data.name}!`);
           onLogin();
         } else {

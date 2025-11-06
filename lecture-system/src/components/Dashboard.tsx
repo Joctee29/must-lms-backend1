@@ -36,42 +36,119 @@ export const Dashboard = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!currentUser?.username) return;
+      if (!currentUser?.username) {
+        console.log('❌ No current user or username found');
+        console.log('Current User Object:', currentUser);
+        return;
+      }
       
       try {
         setLoading(true);
         setError(null);
         
-        // Fetch lecturer info first
-        const lecturerResponse = await fetch(`${API_BASE_URL}/lecturers`);
+        console.log('=== DASHBOARD DATA FETCH ===');
+        console.log('Current User:', currentUser);
+        console.log('Username for query:', currentUser.username);
+        
+        // Fetch lecturer info using efficient endpoint
+        const lecturerUrl = `${API_BASE_URL}/lecturers?username=${encodeURIComponent(currentUser.username)}`;
+        console.log('Fetching from:', lecturerUrl);
+        
+        const lecturerResponse = await fetch(lecturerUrl);
+        console.log('Lecturer Response Status:', lecturerResponse.status);
+        
         let lecturer = null;
         if (lecturerResponse.ok) {
           const lecturerResult = await lecturerResponse.json();
-          if (lecturerResult.success) {
-            lecturer = lecturerResult.data.find((l: any) => 
-              l.employee_id === currentUser.username
-            );
+          console.log('Lecturer Response:', lecturerResult);
+          if (lecturerResult.success && lecturerResult.data.length > 0) {
+            lecturer = lecturerResult.data[0];
+            console.log('✅ Found Lecturer:', lecturer);
             setLecturerData(lecturer);
+          } else {
+            console.log('⚠️ No lecturer data in response');
           }
+        } else {
+          const errorText = await lecturerResponse.text();
+          console.log('❌ Lecturer response not OK:', errorText);
+          console.log('❌ Lecturer response status:', lecturerResponse.status);
+          console.log('❌ Lecturer URL called:', lecturerUrl);
         }
 
-        // Fetch programs after lecturer data is available
-        const programsResponse = await fetch(`${API_BASE_URL}/programs`);
+        if (!lecturer) {
+          console.log('❌ Lecturer not found in database');
+          console.log('Searched for username:', currentUser.username);
+          setError('Lecturer profile not found. Please contact admin to ensure your account exists in the system.');
+          setLoading(false);
+          return;
+        }
+
+        // Fetch regular programs using efficient endpoint with lecturer_username filter
+        const programsUrl = `${API_BASE_URL}/programs?lecturer_username=${encodeURIComponent(currentUser.username)}`;
+        console.log('Fetching programs from:', programsUrl);
+        
+        const programsResponse = await fetch(programsUrl);
+        console.log('Programs Response Status:', programsResponse.status);
+        
+        let allPrograms = [];
         if (programsResponse.ok) {
           const programsResult = await programsResponse.json();
+          console.log('Regular Programs Response:', programsResult);
           if (programsResult.success) {
-            // Filter programs assigned to this lecturer - use local lecturer variable
-            const assignedPrograms = programsResult.data.filter((p: any) => 
-              p.lecturer_name === lecturer?.name ||
-              p.lecturer_name === lecturer?.employee_id ||
-              p.lecturerName === lecturer?.name ||
-              p.lecturerName === lecturer?.employee_id ||
-              p.lecturer_name === currentUser.username ||
-              p.lecturerName === currentUser.username
-            );
-            
-            setPrograms(assignedPrograms);
+            allPrograms = [...programsResult.data];
+            console.log('✅ Lecturer Regular Programs:', allPrograms.length);
+            if (allPrograms.length === 0) {
+              console.log('⚠️ No regular programs assigned to this lecturer');
+            }
           }
+        } else {
+          const errorText = await programsResponse.text();
+          console.log('❌ Programs response not OK:', errorText);
+          console.log('❌ Programs response status:', programsResponse.status);
+          console.log('❌ Programs URL called:', programsUrl);
+        }
+
+        // Fetch short-term programs using efficient endpoint with lecturer_username filter
+        const shortTermUrl = `${API_BASE_URL}/short-term-programs?lecturer_username=${encodeURIComponent(currentUser.username)}`;
+        console.log('Fetching short-term programs from:', shortTermUrl);
+        
+        const shortTermResponse = await fetch(shortTermUrl);
+        console.log('Short-Term Programs Response Status:', shortTermResponse.status);
+        
+        if (shortTermResponse.ok) {
+          const shortTermResult = await shortTermResponse.json();
+          console.log('Short-Term Programs Response:', shortTermResult);
+          if (shortTermResult.success) {
+            const shortTermCount = shortTermResult.data.length;
+            allPrograms = [...allPrograms, ...shortTermResult.data];
+            console.log('✅ Added Short-Term Programs:', shortTermCount);
+            console.log('Total Programs (Regular + Short-Term):', allPrograms.length);
+            if (shortTermCount === 0) {
+              console.log('⚠️ No short-term programs assigned to this lecturer');
+            }
+          }
+        } else {
+          const errorText = await shortTermResponse.text();
+          console.log('❌ Short-term programs response not OK:', errorText);
+          console.log('❌ Short-term programs response status:', shortTermResponse.status);
+          console.log('❌ Short-term programs URL called:', shortTermUrl);
+        }
+        
+        setPrograms(allPrograms);
+        console.log('📊 FINAL PROGRAMS COUNT:', allPrograms.length);
+        
+        if (allPrograms.length === 0) {
+          console.log('⚠️ WARNING: No programs found for this lecturer!');
+          console.log('This could mean:');
+          console.log('1. No programs assigned in database');
+          console.log('2. lecturer_name field does not match employee_id');
+          console.log('3. lecturer_id field is not set correctly');
+          console.log('');
+          console.log('🔍 DEBUGGING STEPS:');
+          console.log('1. Check backend logs for detailed debugging info');
+          console.log('2. Verify lecturer exists in database');
+          console.log('3. Check if programs have lecturer_name or lecturer_id set');
+          console.log('4. Ensure lecturer_name matches employee_id or name');
         }
 
         // Fetch courses
@@ -83,12 +160,21 @@ export const Dashboard = () => {
           }
         }
 
-        // Fetch students
+        // Fetch students - only those in lecturer's programs
         const studentsResponse = await fetch(`${API_BASE_URL}/students`);
         if (studentsResponse.ok) {
           const studentsResult = await studentsResponse.json();
           if (studentsResult.success) {
-            setStudents(studentsResult.data);
+            // Get course IDs from lecturer's programs
+            const courseIds = allPrograms.map(p => p.course_id).filter(Boolean);
+            console.log('Course IDs for filtering students:', courseIds);
+            
+            // Filter students by course IDs
+            const lecturerStudents = studentsResult.data.filter((s: any) => 
+              courseIds.includes(s.course_id)
+            );
+            console.log('Filtered Students:', lecturerStudents.length);
+            setStudents(lecturerStudents);
           }
         }
         
@@ -203,27 +289,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-secondary">
-              {(() => {
-                // Count real students in lecturer's programs
-                const lecturerPrograms = programs?.filter(p => 
-                  p.lecturer_name === currentUser?.username || 
-                  p.lecturerName === currentUser?.username ||
-                  p.lecturer_name === lecturerData?.name ||
-                  p.lecturerName === lecturerData?.name ||
-                  p.lecturer_name === lecturerData?.employee_id ||
-                  p.lecturerName === lecturerData?.employee_id
-                ) || [];
-                
-                // Get course IDs from lecturer's programs
-                const courseIds = lecturerPrograms.map(p => p.course_id);
-                
-                // Count students enrolled in these courses
-                const studentsInLecturerCourses = students?.filter(student => 
-                  courseIds.includes(student.course_id)
-                ) || [];
-                
-                return studentsInLecturerCourses.length;
-              })()}
+              {students?.length || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               Students in your programs

@@ -57,51 +57,51 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
       try {
         setLoading(true);
         
-        // Fetch lecturer info first
-        const lecturerResponse = await fetch(`${API_BASE_URL}/lecturers`);
+        console.log('=== MY PROGRAMS DATA FETCH ===');
+        console.log('Current User:', currentUser);
+        
+        // Fetch lecturer info using efficient endpoint
+        const lecturerResponse = await fetch(`${API_BASE_URL}/lecturers?username=${encodeURIComponent(currentUser.username)}`);
         const lecturerResult = await lecturerResponse.json();
+        console.log('Lecturer Response:', lecturerResult);
         
         let lecturer = null;
-        if (lecturerResult.success) {
-          lecturer = lecturerResult.data.find((l: any) => 
-            l.employee_id === currentUser.username
-          );
+        if (lecturerResult.success && lecturerResult.data.length > 0) {
+          lecturer = lecturerResult.data[0];
+          console.log('Found Lecturer:', lecturer);
           setLecturerData(lecturer);
         }
-
-        // Fetch programs after lecturer data is available
-        const programsResponse = await fetch(`${API_BASE_URL}/programs`);
-        const programsResult = await programsResponse.json();
         
-        if (programsResult.success) {
-          // Filter programs assigned to this lecturer - REAL FILTERING
-          const assignedPrograms = programsResult.data.filter((p: any) => {
-            // Check against lecturer data from database
-            const isAssigned = p.lecturer_name === currentUser.username || 
-                              p.lecturer_name === lecturer?.name ||
-                              p.lecturer_name === lecturer?.employee_id ||
-                              p.lecturerName === currentUser.username || 
-                              p.lecturerName === lecturer?.name ||
-                              p.lecturerName === lecturer?.employee_id;
-            
-            return isAssigned;
-          });
-          
-          setPrograms(assignedPrograms);
+        if (!lecturer) {
+          console.log('Lecturer not found in database');
+          setLoading(false);
+          return;
         }
 
-        // Fetch short-term programs assigned to this lecturer
-        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs`);
+        // Fetch regular programs using efficient endpoint
+        const programsResponse = await fetch(`${API_BASE_URL}/programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
+        const programsResult = await programsResponse.json();
+        console.log('Regular Programs Response:', programsResult);
+        
+        let allPrograms = [];
+        if (programsResult.success) {
+          allPrograms = [...programsResult.data];
+          console.log('Lecturer Regular Programs:', allPrograms.length);
+        }
+
+        // Fetch short-term programs using efficient endpoint
+        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
         const shortTermResult = await shortTermResponse.json();
+        console.log('Short-Term Programs Response:', shortTermResult);
         
         if (shortTermResult.success) {
-          const assignedShortTermPrograms = shortTermResult.data.filter((p: any) => {
-            return p.lecturer_name === currentUser.username || 
-                   p.lecturer_name === lecturer?.name ||
-                   p.lecturer_name === lecturer?.employee_id;
-          });
-          setShortTermPrograms(assignedShortTermPrograms);
+          setShortTermPrograms(shortTermResult.data);
+          console.log('Lecturer Short-Term Programs:', shortTermResult.data.length);
         }
+        
+        setPrograms(allPrograms);
+        console.log('Total Regular Programs:', allPrograms.length);
+        console.log('Total Short-Term Programs:', shortTermPrograms.length)
 
         // Fetch courses
         const coursesResponse = await fetch(`${API_BASE_URL}/courses`);
@@ -137,6 +137,9 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
         
       } catch (error) {
         console.error('Error fetching data:', error);
+        // Don't set fallback data - show empty state
+        setPrograms([]);
+        setShortTermPrograms([]);
       } finally {
         setLoading(false);
       }

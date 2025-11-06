@@ -34,7 +34,7 @@ interface LecturerInfo {
 
 export const LecturerInformation = () => {
   const [lecturers, setLecturers] = useState<LecturerInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedLecturer, setSelectedLecturer] = useState<LecturerInfo | null>(null);
 
   useEffect(() => {
