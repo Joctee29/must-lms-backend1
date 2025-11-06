@@ -817,16 +817,26 @@ app.post('/api/lecturers', async (req, res) => {
 // Get lecturers with proper filtering based on user type
 app.get('/api/lecturers', optionalAuth, async (req, res) => {
   try {
-    const { lecturer_id, user_type } = req.query;
+    const { lecturer_id, user_type, username } = req.query;
     const userFromToken = req.user; // From JWT if provided
     
     console.log('=== FETCHING LECTURERS ===');
-    console.log('Query params:', { lecturer_id, user_type });
+    console.log('Query params:', { lecturer_id, user_type, username });
     console.log('User from token:', userFromToken);
     
     // Determine user type from token or query
     const effectiveUserType = userFromToken?.userType || user_type;
     const effectiveUserId = userFromToken?.userId || lecturer_id;
+    
+    // If username is provided, find specific lecturer by username/employee_id
+    if (username) {
+      const result = await pool.query(
+        'SELECT id, name, employee_id, specialization, email, phone, created_at FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
+        [username]
+      );
+      console.log(`Found lecturer by username: ${username}`);
+      return res.json({ success: true, data: result.rows });
+    }
     
     // For specific lecturer - only their info
     if (effectiveUserType === 'lecturer' && effectiveUserId) {
@@ -1254,11 +1264,11 @@ app.post('/api/programs', async (req, res) => {
 // Get programs with proper filtering based on user type
 app.get('/api/programs', optionalAuth, async (req, res) => {
   try {
-    const { student_id, lecturer_id, user_type } = req.query;
+    const { student_id, lecturer_id, user_type, lecturer_username } = req.query;
     const userFromToken = req.user; // From JWT if provided
     
     console.log('=== FETCHING PROGRAMS ===');
-    console.log('Query params:', { student_id, lecturer_id, user_type });
+    console.log('Query params:', { student_id, lecturer_id, user_type, lecturer_username });
     console.log('User from token:', userFromToken);
     
     // Determine user type from token or query
@@ -1282,6 +1292,31 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
         [studentResult.rows[0].course_id]
       );
       console.log(`Found ${result.rows.length} programs for student`);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // For lecturers by username - find programs by lecturer username/employee_id
+    if (lecturer_username) {
+      const lecturerResult = await pool.query(
+        'SELECT id, employee_id, name FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
+        [lecturer_username]
+      );
+      
+      if (lecturerResult.rows.length === 0) {
+        console.log('Lecturer not found by username');
+        return res.json({ success: true, data: [] });
+      }
+      
+      const lecturer = lecturerResult.rows[0];
+      const result = await pool.query(
+        `SELECT * FROM programs 
+         WHERE lecturer_id = $1 
+            OR lecturer_name = $2 
+            OR lecturer_name = $3
+         ORDER BY created_at DESC`,
+        [lecturer.id, lecturer.employee_id, lecturer.name]
+      );
+      console.log(`Found ${result.rows.length} programs for lecturer username: ${lecturer_username}`);
       return res.json({ success: true, data: result.rows });
     }
     
@@ -5426,9 +5461,42 @@ app.delete('/api/announcements/:id', async (req, res) => {
 
 // Short-Term Programs API Endpoints
 
-// Get all short-term programs (ADMIN ONLY - returns all programs)
+// Get all short-term programs (supports filtering by lecturer_username)
 app.get('/api/short-term-programs', async (req, res) => {
   try {
+    const { lecturer_username } = req.query;
+    
+    // If lecturer_username is provided, filter by lecturer
+    if (lecturer_username) {
+      console.log('=== FETCHING SHORT-TERM PROGRAMS FOR LECTURER ===');
+      console.log('Lecturer Username:', lecturer_username);
+      
+      // Find lecturer first
+      const lecturerResult = await pool.query(
+        'SELECT id, employee_id, name FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
+        [lecturer_username]
+      );
+      
+      if (lecturerResult.rows.length === 0) {
+        console.log('Lecturer not found');
+        return res.json({ success: true, data: [] });
+      }
+      
+      const lecturer = lecturerResult.rows[0];
+      const result = await pool.query(
+        `SELECT * FROM short_term_programs 
+         WHERE lecturer_id = $1 
+            OR lecturer_name = $2 
+            OR lecturer_name = $3
+         ORDER BY created_at DESC`,
+        [lecturer.id, lecturer.employee_id, lecturer.name]
+      );
+      
+      console.log(`Found ${result.rows.length} short-term programs for lecturer`);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // Otherwise return all programs (admin view)
     const result = await pool.query(
       'SELECT * FROM short_term_programs ORDER BY created_at DESC'
     );
