@@ -3154,6 +3154,143 @@ app.post('/api/assessment-submissions/:id/auto-grade', async (req, res) => {
   }
 });
 
+// Get comprehensive student progress for lecturer view
+app.get('/api/student-progress/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    
+    console.log('=== FETCHING STUDENT PROGRESS ===');
+    console.log('Student ID:', studentId);
+    
+    // Get student basic info
+    const studentResult = await pool.query(
+      'SELECT * FROM students WHERE id = $1',
+      [studentId]
+    );
+    
+    if (studentResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+    
+    const student = studentResult.rows[0];
+    
+    // Get student's program/course info
+    const programResult = await pool.query(
+      'SELECT * FROM programs WHERE course_id = $1',
+      [student.course_id]
+    );
+    
+    // Get assessment submissions with details
+    const assessmentsQuery = `
+      SELECT 
+        a.id,
+        a.title,
+        a.program_name,
+        a.total_points,
+        a.created_at as assessment_created_at,
+        s.score,
+        s.percentage,
+        s.status,
+        s.submitted_at,
+        s.graded_at,
+        s.published_to_students
+      FROM assessments a
+      INNER JOIN assessment_submissions s ON a.id = s.assessment_id
+      WHERE s.student_id = $1
+      ORDER BY s.submitted_at DESC
+    `;
+    
+    const assessmentsResult = await pool.query(assessmentsQuery, [studentId]);
+    
+    // Get assignment submissions (if any)
+    const assignmentsQuery = `
+      SELECT 
+        a.id,
+        a.title,
+        a.description,
+        a.program_name,
+        a.deadline,
+        a.max_points,
+        a.status,
+        a.created_at,
+        s.id as submission_id,
+        s.submission_type,
+        s.submitted_at,
+        s.grade,
+        s.feedback
+      FROM assignments a
+      LEFT JOIN assignment_submissions s ON a.id = s.assignment_id AND s.student_id = $1
+      WHERE a.program_name = $2 OR a.lecturer_id IN (
+        SELECT lecturer_id FROM programs WHERE course_id = $3
+      )
+      ORDER BY a.created_at DESC
+    `;
+    
+    const assignmentsResult = await pool.query(
+      assignmentsQuery, 
+      [studentId, student.program_name || '', student.course_id]
+    );
+    
+    // Calculate statistics
+    const totalAssessments = assessmentsResult.rows.length;
+    const completedAssessments = assessmentsResult.rows.filter(a => a.status === 'auto-graded' || a.status === 'manually-graded').length;
+    const averageScore = totalAssessments > 0 
+      ? Math.round(assessmentsResult.rows.reduce((sum, a) => sum + (a.percentage || 0), 0) / totalAssessments)
+      : 0;
+    
+    const totalAssignments = assignmentsResult.rows.length;
+    const submittedAssignments = assignmentsResult.rows.filter(a => a.submission_id).length;
+    
+    // Get content/materials accessed (if tracking exists)
+    const contentQuery = `
+      SELECT COUNT(*) as total_materials
+      FROM content
+      WHERE program_name = $1
+    `;
+    
+    const contentResult = await pool.query(contentQuery, [student.program_name || '']);
+    
+    const progressData = {
+      student: {
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        registration_number: student.registration_number,
+        program_name: student.program_name,
+        academic_year: student.academic_year,
+        current_semester: student.current_semester
+      },
+      program: programResult.rows[0] || null,
+      statistics: {
+        totalAssessments,
+        completedAssessments,
+        averageScore,
+        totalAssignments,
+        submittedAssignments,
+        assignmentCompletionRate: totalAssignments > 0 
+          ? Math.round((submittedAssignments / totalAssignments) * 100) 
+          : 0,
+        totalMaterials: contentResult.rows[0]?.total_materials || 0
+      },
+      assessments: assessmentsResult.rows,
+      assignments: assignmentsResult.rows
+    };
+    
+    console.log('Student progress data compiled:', {
+      studentId,
+      totalAssessments,
+      totalAssignments,
+      averageScore
+    });
+    
+    res.json({ success: true, data: progressData });
+    
+  } catch (error) {
+    console.error('Error fetching student progress:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // LECTURER DONE - PUBLISH RESULTS TO ASSESSMENT RESULTS
 app.post('/api/submit-results-to-students/:assessmentId', async (req, res) => {
   try {
