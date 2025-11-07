@@ -3949,9 +3949,11 @@ app.post('/api/assignments', async (req, res) => {
 
     // Get program_id from program_name for precise targeting
     // CRITICAL: This ensures assignments are sent to the correct program ONLY
+    // SUPPORTS BOTH REGULAR PROGRAMS AND SHORT-TERM PROGRAMS
     let programId = null;
+    let isShortTermProgram = false;
     try {
-      // First, try to find program by exact name match
+      // First, try to find program by exact name match in regular programs
       const programResult = await pool.query(
         'SELECT id, name, lecturer_id FROM programs WHERE name = $1 LIMIT 1',
         [program_name]
@@ -3959,7 +3961,7 @@ app.post('/api/assignments', async (req, res) => {
       
       if (programResult.rows.length > 0) {
         programId = programResult.rows[0].id;
-        console.log('✅ Found program_id:', programId, 'for program:', program_name);
+        console.log('✅ Found regular program_id:', programId, 'for program:', program_name);
         
         // VALIDATION: Check if lecturer is assigned to this program
         const programLecturerId = programResult.rows[0].lecturer_id;
@@ -3968,7 +3970,7 @@ app.post('/api/assignments', async (req, res) => {
           // Allow it but log warning - lecturer might be teaching multiple sections
         }
       } else {
-        // If no exact match, try case-insensitive search
+        // If no exact match in regular programs, try case-insensitive search
         const programResultCaseInsensitive = await pool.query(
           'SELECT id, name FROM programs WHERE LOWER(name) = LOWER($1) LIMIT 1',
           [program_name]
@@ -3976,16 +3978,45 @@ app.post('/api/assignments', async (req, res) => {
         
         if (programResultCaseInsensitive.rows.length > 0) {
           programId = programResultCaseInsensitive.rows[0].id;
-          console.log('✅ Found program_id (case-insensitive):', programId, 'for program:', program_name);
+          console.log('✅ Found regular program_id (case-insensitive):', programId, 'for program:', program_name);
         } else {
-          console.error('❌ CRITICAL: No program found with name:', program_name);
-          console.error('   This assignment will NOT be visible to students!');
-          console.error('   Available programs should be fetched from /api/lecturer-programs');
+          // NOT FOUND IN REGULAR PROGRAMS - CHECK SHORT-TERM PROGRAMS
+          console.log('🔍 Program not found in regular programs, checking short-term programs...');
           
-          return res.status(400).json({ 
-            success: false, 
-            error: `Program "${program_name}" not found in database. Please select a valid program from the dropdown.` 
-          });
+          // Try exact match in short-term programs (match by title)
+          const shortTermResult = await pool.query(
+            'SELECT id, title FROM short_term_programs WHERE title = $1 LIMIT 1',
+            [program_name]
+          );
+          
+          if (shortTermResult.rows.length > 0) {
+            programId = shortTermResult.rows[0].id;
+            isShortTermProgram = true;
+            console.log('✅ Found short-term program_id:', programId, 'for program:', program_name);
+          } else {
+            // Try case-insensitive match in short-term programs
+            const shortTermResultCaseInsensitive = await pool.query(
+              'SELECT id, title FROM short_term_programs WHERE LOWER(title) = LOWER($1) LIMIT 1',
+              [program_name]
+            );
+            
+            if (shortTermResultCaseInsensitive.rows.length > 0) {
+              programId = shortTermResultCaseInsensitive.rows[0].id;
+              isShortTermProgram = true;
+              console.log('✅ Found short-term program_id (case-insensitive):', programId, 'for program:', program_name);
+            } else {
+              // NOT FOUND IN EITHER TABLE
+              console.error('❌ CRITICAL: No program found with name:', program_name);
+              console.error('   Checked both regular programs and short-term programs');
+              console.error('   This assignment will NOT be visible to students!');
+              console.error('   Available programs should be fetched from /api/lecturer-programs');
+              
+              return res.status(400).json({ 
+                success: false, 
+                error: `Program "${program_name}" not found in database. Please select a valid program from the dropdown.` 
+              });
+            }
+          }
         }
       }
     } catch (err) {
