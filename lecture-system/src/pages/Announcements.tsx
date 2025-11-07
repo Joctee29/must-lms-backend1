@@ -91,17 +91,13 @@ export const Announcements = () => {
         console.log('All Lecturer Programs (Regular + Short-Term):', allPrograms.length);
         setLecturerPrograms(allPrograms);
 
-        // Fetch announcements created by this lecturer
-        const announcementsResponse = await fetch('https://must-lms-backend.onrender.com/api/announcements');
+        // Fetch announcements created by this lecturer - use dedicated endpoint
+        const announcementsResponse = await fetch(
+          `https://must-lms-backend.onrender.com/api/announcements/lecturer?lecturer_id=${currentUser.id}`
+        );
         if (announcementsResponse.ok) {
           const result = await announcementsResponse.json();
-          const allAnnouncements = result.data || [];
-          
-          // Filter announcements created by current lecturer
-          const lecturerAnnouncements = allAnnouncements.filter(announcement => 
-            announcement.created_by === currentUser.username || 
-            announcement.created_by_id === currentUser.id
-          );
+          const lecturerAnnouncements = result.data || [];
           
           console.log('Lecturer Announcements:', lecturerAnnouncements);
           setAnnouncements(lecturerAnnouncements);

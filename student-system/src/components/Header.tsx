@@ -50,20 +50,29 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
       if (!currentUser?.username) return;
       
       try {
+        console.log('=== FETCHING NOTIFICATIONS ===');
+        console.log('Student Username:', currentUser.username);
+        
         // Fetch assignments, live classes, and announcements
-        const [assignmentsRes, liveClassesRes, announcementsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/assignments`),
+        // CRITICAL: Filter ALL data by student username to show only relevant notifications
+        const [assignmentsRes, assessmentsRes, liveClassesRes, announcementsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/assignments?student_username=${encodeURIComponent(currentUser.username)}`),
+          fetch(`${API_BASE_URL}/assessments?status=published&student_username=${encodeURIComponent(currentUser.username)}`),
           fetch(`${API_BASE_URL}/live-classes`),
-          fetch(`${API_BASE_URL}/announcements`)
+          fetch(`${API_BASE_URL}/announcements?student_username=${encodeURIComponent(currentUser.username)}`)
         ]);
         
         const assignments = await assignmentsRes.json();
+        const assessments = await assessmentsRes.json();
         const liveClasses = await liveClassesRes.json();
         const announcements = await announcementsRes.json();
         
+        console.log('Filtered Assignments:', assignments.data?.length || 0);
+        console.log('Filtered Assessments:', assessments.data?.length || 0);
+        
         const newNotifications: any[] = [];
         
-        // Add new assignments
+        // Add new assignments (filtered by student's program)
         if (assignments.success && assignments.data) {
           const recentAssignments = assignments.data.filter((a: any) => {
             const createdDate = new Date(a.created_at);
@@ -71,12 +80,36 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
             return daysSinceCreated <= 3; // Last 3 days
           });
           
+          console.log('Recent Assignments (last 3 days):', recentAssignments.length);
+          
           recentAssignments.forEach((a: any) => {
             newNotifications.push({
               id: `assignment_${a.id || a.title}_${a.created_at}`,
               title: '📝 New Assignment',
               message: `${a.title} - Due: ${new Date(a.deadline).toLocaleDateString()}`,
-              time: new Date(a.created_at).toLocaleString()
+              time: new Date(a.created_at).toLocaleString(),
+              program: a.program_name
+            });
+          });
+        }
+        
+        // Add new assessments (filtered by student's program)
+        if (assessments.success && assessments.data) {
+          const recentAssessments = assessments.data.filter((a: any) => {
+            const createdDate = new Date(a.created_at);
+            const daysSinceCreated = (Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
+            return daysSinceCreated <= 3; // Last 3 days
+          });
+          
+          console.log('Recent Assessments (last 3 days):', recentAssessments.length);
+          
+          recentAssessments.forEach((a: any) => {
+            newNotifications.push({
+              id: `assessment_${a.id || a.title}_${a.created_at}`,
+              title: '📝 New Assessment',
+              message: `${a.title} - ${a.program_name}`,
+              time: new Date(a.created_at).toLocaleString(),
+              program: a.program_name
             });
           });
         }

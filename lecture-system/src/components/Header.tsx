@@ -51,10 +51,11 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
       
       try {
         // Fetch assignment submissions, live classes, and announcements
+        // CRITICAL: Use lecturer-specific endpoint to get only this lecturer's announcements
         const [submissionsRes, liveClassesRes, announcementsRes] = await Promise.all([
           fetch(`${API_BASE_URL}/assignment-submissions`),
           fetch(`${API_BASE_URL}/live-classes`),
-          fetch(`${API_BASE_URL}/announcements`)
+          fetch(`${API_BASE_URL}/announcements/lecturer?lecturer_id=${currentUser.id}`)
         ]);
         
         const submissions = await submissionsRes.json();
