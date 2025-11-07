@@ -115,11 +115,15 @@ export const Assignments = () => {
         
         setLecturerPrograms(allPrograms);
         
-        // Fetch assignments
-        const assignmentsResponse = await fetch(`https://must-lms-backend.onrender.com/api/assignments?lecturer_id=${currentUser.id}`);
+        // Fetch assignments - use dedicated lecturer endpoint
+        const assignmentsResponse = await fetch(`https://must-lms-backend.onrender.com/api/assignments/lecturer?lecturer_id=${currentUser.id}`);
         if (assignmentsResponse.ok) {
           const assignmentsResult = await assignmentsResponse.json();
           console.log('Assignments from API:', assignmentsResult.data);
+          
+          if (!assignmentsResult.success) {
+            console.error('Failed to fetch assignments:', assignmentsResult.error);
+          }
           
           // Add submission count to each assignment
           const assignmentsWithCounts = await Promise.all(
