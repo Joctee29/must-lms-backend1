@@ -5825,21 +5825,32 @@ app.get('/api/announcements', async (req, res) => {
           return true;
         }
         
-        // Show announcements targeted to student's programs
+        // Show announcements targeted to student's programs - STRICT MATCH ONLY
         if (announcement.target_type === 'program') {
-          const programMatch = studentPrograms.some(program => 
-            program === announcement.target_value ||
-            program?.toLowerCase().includes(announcement.target_value?.toLowerCase()) ||
-            announcement.target_value?.toLowerCase().includes(program?.toLowerCase())
-          );
+          const programMatch = studentPrograms.some(program => {
+            if (!program || !announcement.target_value) return false;
+            
+            // ONLY exact match (case-insensitive) - prevents cross-program leakage
+            const programLower = program.toLowerCase().trim();
+            const targetLower = announcement.target_value.toLowerCase().trim();
+            
+            if (programLower === targetLower) {
+              console.log(`✅ Admin Announcement - Exact program match: ${announcement.target_value}`);
+              return true;
+            }
+            
+            return false;
+          });
+          
           if (programMatch) {
-            console.log(`✅ Admin Announcement - Program match: ${announcement.target_value}`);
             return true;
+          } else {
+            console.log(`❌ Admin Announcement - No exact match: ${announcement.target_value} (Student programs: ${studentPrograms.join(', ')})`);
           }
         }
       }
       
-      // LECTURER ANNOUNCEMENTS - Only show if student is in the targeted program
+      // LECTURER ANNOUNCEMENTS - Only show if student is in the targeted program - STRICT MATCH
       if (announcement.created_by_type === 'lecturer') {
         // Lecturer announcements are ALWAYS program-specific
         if (announcement.target_type === 'program') {
@@ -5849,30 +5860,19 @@ app.get('/api/announcements', async (req, res) => {
             const programLower = program.toLowerCase().trim();
             const targetLower = announcement.target_value.toLowerCase().trim();
             
-            // Exact match
-            if (programLower === targetLower) return true;
-            
-            // Contains match (either direction)
-            if (programLower.includes(targetLower) || targetLower.includes(programLower)) return true;
-            
-            // Word-based matching (at least 2 common significant words)
-            const programWords = programLower.split(/\s+/).filter(w => w.length > 3);
-            const targetWords = targetLower.split(/\s+/).filter(w => w.length > 3);
-            const commonWords = programWords.filter(word => targetWords.includes(word));
-            
-            if (commonWords.length >= 2) return true;
-            
-            // Single significant word match for short program names
-            if (programWords.length === 1 && targetWords.length === 1 && programWords[0] === targetWords[0]) return true;
+            // ONLY exact match (case-insensitive) - prevents cross-program leakage
+            if (programLower === targetLower) {
+              console.log(`✅ Lecturer Announcement - Exact program match: ${announcement.target_value}`);
+              return true;
+            }
             
             return false;
           });
           
           if (programMatch) {
-            console.log(`✅ Lecturer Announcement - Program match: ${announcement.target_value}`);
             return true;
           } else {
-            console.log(`❌ Lecturer Announcement - No match: ${announcement.target_value} (Student programs: ${studentPrograms.join(', ')})`);
+            console.log(`❌ Lecturer Announcement - No exact match: ${announcement.target_value} (Student programs: ${studentPrograms.join(', ')})`);
           }
         }
       }
