@@ -79,11 +79,14 @@ export const ShortTermPrograms = () => {
           setCourses(result.data || []);
         }
 
-        // Fetch regular programs
-        const regularProgramsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
+        // Fetch regular programs (admin needs all programs)
+        const regularProgramsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs?user_type=admin');
         if (regularProgramsResponse.ok) {
           const result = await regularProgramsResponse.json();
+          console.log('Regular programs loaded for target selection:', result.data?.length || 0);
           setRegularPrograms(result.data || []);
+        } else {
+          console.error('Failed to fetch regular programs for target selection');
         }
 
         // Fetch lecturers

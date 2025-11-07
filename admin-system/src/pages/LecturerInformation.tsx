@@ -34,12 +34,13 @@ interface LecturerInfo {
 
 export const LecturerInformation = () => {
   const [lecturers, setLecturers] = useState<LecturerInfo[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [selectedLecturer, setSelectedLecturer] = useState<LecturerInfo | null>(null);
 
   useEffect(() => {
     const loadLecturers = async () => {
       try {
+        setLoading(true);
         await initializeDatabase();
         const lecturersData = await lecturerOperations.getAll();
         
@@ -118,24 +119,20 @@ export const LecturerInformation = () => {
           try {
             console.log(`=== FETCHING ASSIGNMENTS FOR LECTURER ${lecturer.name} (ID: ${lecturer.id}) ===`);
             
-            // Try to fetch real programs from database where this lecturer is assigned
-            const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs`);
+            // Use efficient endpoint to fetch ONLY this lecturer's programs
+            const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs?lecturer_username=${encodeURIComponent(lecturer.employee_id)}`);
             if (programsResponse.ok) {
               const programsResult = await programsResponse.json();
               console.log('Programs API Response:', programsResult);
               
               if (programsResult.success && programsResult.data) {
-                // Filter programs assigned to this lecturer
-                const lecturerPrograms = programsResult.data.filter((program: any) => 
-                  program.lecturer_id === lecturer.id || 
-                  program.lecturer_name === lecturer.name
-                );
+                const lecturerPrograms = programsResult.data;
                 
                 console.log(`Programs found for lecturer ${lecturer.name}:`, lecturerPrograms);
                 
                 if (lecturerPrograms.length > 0) {
-                  // Get real course information and actual student count for each program
-                  assignedCourses = await Promise.all(lecturerPrograms.map(async (program: any) => {
+                  // Get real course information and create entries for each semester
+                  const assignedCoursesPromises = lecturerPrograms.map(async (program: any) => {
                     let courseInfo = null;
                     let actualStudentCount = 0;
                     
@@ -171,15 +168,26 @@ export const LecturerInformation = () => {
                       }
                     }
                     
-                    return {
-                      id: program.id.toString(),
-                      subjectName: program.name || courseInfo?.name || 'Program Subject',
-                      subjectCode: courseInfo?.code || program.code || 'N/A',
-                      program: courseInfo?.name || program.name || 'Program',
-                      semester: program.semester || 1,
-                      students: actualStudentCount // Real student count from database
-                    };
-                  }));
+                    // Create entries for EACH semester in the program
+                    const totalSemesters = program.total_semesters || program.totalSemesters || 1;
+                    const semesterEntries = [];
+                    
+                    for (let sem = 1; sem <= totalSemesters; sem++) {
+                      semesterEntries.push({
+                        id: `${program.id}-sem${sem}`,
+                        subjectName: program.name || courseInfo?.name || 'Program Subject',
+                        subjectCode: courseInfo?.code || program.code || 'N/A',
+                        program: courseInfo?.name || program.name || 'Program',
+                        semester: sem,
+                        students: actualStudentCount // Real student count from database
+                      });
+                    }
+                    
+                    return semesterEntries;
+                  });
+                  
+                  const allSemesterEntries = await Promise.all(assignedCoursesPromises);
+                  assignedCourses = allSemesterEntries.flat();
                 } else {
                   // No programs found for this lecturer - keep empty array
                   console.log(`No programs assigned to lecturer ${lecturer.name}`);
@@ -222,8 +230,10 @@ export const LecturerInformation = () => {
         }));
 
         setLecturers(formattedLecturers);
+        console.log('✅ Lecturers loaded successfully:', formattedLecturers.length);
       } catch (error) {
-        console.error('Error loading lecturers:', error);
+        console.error('❌ Error loading lecturers:', error);
+        setLecturers([]);
       } finally {
         setLoading(false);
       }

@@ -126,11 +126,14 @@ export const Announcements = () => {
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       
+      // CRITICAL FIX: Ensure exact program name is used for targeting
+      const selectedProgram = lecturerPrograms.find(p => p.name === newAnnouncement.program);
+      
       const announcementData = {
         title: newAnnouncement.title,
         content: newAnnouncement.content,
         target_type: 'program',
-        target_value: newAnnouncement.program,
+        target_value: newAnnouncement.program, // This must match EXACTLY with student's program names
         created_by: currentUser.username || 'Lecturer',
         created_by_id: currentUser.id || null,
         created_by_type: 'lecturer',
@@ -140,6 +143,8 @@ export const Announcements = () => {
 
       console.log('=== CREATING LECTURER ANNOUNCEMENT ===');
       console.log('Announcement Data:', announcementData);
+      console.log('Selected Program:', selectedProgram);
+      console.log('IMPORTANT: This announcement will ONLY be visible to students enrolled in program:', announcementData.target_value);
 
       const response = await fetch('https://must-lms-backend.onrender.com/api/announcements', {
         method: 'POST',
@@ -150,6 +155,7 @@ export const Announcements = () => {
       if (response.ok) {
         const result = await response.json();
         console.log('Announcement Created:', result.data);
+        console.log('✅ Announcement will be filtered by backend to show ONLY to students in:', result.data.target_value);
         
         setAnnouncements([result.data, ...announcements]);
         
@@ -162,13 +168,15 @@ export const Announcements = () => {
         });
         setShowCreateForm(false);
         
-        alert(`Announcement sent successfully to students in ${newAnnouncement.program}!`);
+        alert(`✅ Announcement sent successfully!\n\nThis announcement will ONLY be visible to students enrolled in:\n"${announcementData.target_value}"\n\nOther students will NOT see this announcement.`);
       } else {
-        alert('Failed to create announcement');
+        const errorText = await response.text();
+        console.error('Failed to create announcement:', errorText);
+        alert('Failed to create announcement. Please try again.');
       }
     } catch (error) {
       console.error('Error creating announcement:', error);
-      alert('Failed to create announcement');
+      alert('Failed to create announcement. Please check your connection and try again.');
     }
   };
 

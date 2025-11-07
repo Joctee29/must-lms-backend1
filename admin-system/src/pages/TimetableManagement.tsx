@@ -144,10 +144,13 @@ const TimetableManagement = () => {
 
   const fetchPrograms = async () => {
     try {
-      const response = await fetch('https://must-lms-backend.onrender.com/api/programs');
+      const response = await fetch('https://must-lms-backend.onrender.com/api/programs?user_type=admin');
       if (response.ok) {
         const result = await response.json();
+        console.log('Programs loaded for timetable:', result.data?.length || 0);
         setPrograms(result.data || []);
+      } else {
+        console.error('Failed to fetch programs for timetable');
       }
     } catch (error) {
       console.error('Error fetching programs:', error);

@@ -75,11 +75,14 @@ export const AnnouncementManagement = () => {
           setCourses(result.data || []);
         }
 
-        // Fetch programs
-        const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
+        // Fetch programs (admin needs all programs)
+        const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs?user_type=admin');
         if (programsResponse.ok) {
           const result = await programsResponse.json();
+          console.log('Programs loaded for announcements:', result.data?.length || 0);
           setPrograms(result.data || []);
+        } else {
+          console.error('Failed to fetch programs for announcements');
         }
 
         setLoading(false);

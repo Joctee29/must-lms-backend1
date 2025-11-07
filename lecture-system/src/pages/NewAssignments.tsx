@@ -49,46 +49,70 @@ export const Assignments = () => {
         console.log('=== LECTURER ASSIGNMENTS DEBUG ===');
         console.log('Current User:', currentUser);
         
-        // Fetch lecturer's regular programs
-        const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
+        if (!currentUser.username) {
+          console.error('No username found for current user');
+          setLecturerPrograms([]);
+          return;
+        }
+        
         let allPrograms = [];
         
-        if (programsResponse.ok) {
-          const programsResult = await programsResponse.json();
-          console.log('Regular Programs from API:', programsResult.data);
+        // Fetch lecturer's regular programs using lecturer_username parameter
+        try {
+          const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
           
-          // Filter regular programs for current lecturer
-          const lecturerPrograms = programsResult.data?.filter(program => 
-            program.lecturer_name === currentUser.username || program.lecturer_id === currentUser.id
-          ) || [];
-          
-          allPrograms = [...lecturerPrograms];
+          if (programsResponse.ok) {
+            const programsResult = await programsResponse.json();
+            console.log('Regular Programs from API:', programsResult);
+            
+            if (programsResult.success && programsResult.data) {
+              allPrograms = [...programsResult.data];
+              console.log(`✅ Found ${programsResult.data.length} regular programs`);
+            }
+          } else {
+            console.error('Failed to fetch regular programs:', programsResponse.status);
+          }
+        } catch (error) {
+          console.error('Error fetching regular programs:', error);
         }
         
-        // Fetch lecturer's short-term programs
-        const shortTermResponse = await fetch('https://must-lms-backend.onrender.com/api/short-term-programs');
-        if (shortTermResponse.ok) {
-          const shortTermResult = await shortTermResponse.json();
-          console.log('Short-Term Programs from API:', shortTermResult.data);
+        // Fetch lecturer's short-term programs using lecturer_username parameter
+        try {
+          const shortTermResponse = await fetch(`https://must-lms-backend.onrender.com/api/short-term-programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
           
-          // Filter short-term programs for current lecturer
-          const lecturerShortTermPrograms = shortTermResult.data?.filter(program => 
-            program.lecturer_name === currentUser.username || program.lecturer_id === currentUser.id
-          ) || [];
-          
-          // Convert short-term programs to same format as regular programs
-          const formattedShortTermPrograms = lecturerShortTermPrograms.map(program => ({
-            id: `short-${program.id}`,
-            name: program.title,
-            lecturer_name: program.lecturer_name,
-            lecturer_id: program.lecturer_id,
-            type: 'short-term'
-          }));
-          
-          allPrograms = [...allPrograms, ...formattedShortTermPrograms];
+          if (shortTermResponse.ok) {
+            const shortTermResult = await shortTermResponse.json();
+            console.log('Short-Term Programs from API:', shortTermResult);
+            
+            if (shortTermResult.success && shortTermResult.data) {
+              // Convert short-term programs to same format as regular programs
+              const formattedShortTermPrograms = shortTermResult.data.map(program => ({
+                id: `short-${program.id}`,
+                name: program.title,
+                lecturer_name: program.lecturer_name,
+                lecturer_id: program.lecturer_id,
+                type: 'short-term'
+              }));
+              
+              allPrograms = [...allPrograms, ...formattedShortTermPrograms];
+              console.log(`✅ Found ${shortTermResult.data.length} short-term programs`);
+            }
+          } else {
+            console.error('Failed to fetch short-term programs:', shortTermResponse.status);
+          }
+        } catch (error) {
+          console.error('Error fetching short-term programs:', error);
         }
         
-        console.log('All Programs (Regular + Short-Term):', allPrograms);
+        console.log('=== TOTAL PROGRAMS LOADED ===');
+        console.log('Total Programs (Regular + Short-Term):', allPrograms.length);
+        console.log('Programs:', allPrograms);
+        
+        if (allPrograms.length === 0) {
+          console.warn('⚠️ No programs found for lecturer:', currentUser.username);
+          console.warn('Make sure lecturer is assigned to programs in the database');
+        }
+        
         setLecturerPrograms(allPrograms);
         
         // Fetch assignments
@@ -375,19 +399,34 @@ export const Assignments = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="program">Select Program</Label>
+                <Label htmlFor="program">Select Program *</Label>
                 <Select value={newAssignment.program} onValueChange={(value) => setNewAssignment({...newAssignment, program: value})}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose program" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {lecturerPrograms.map((program) => (
-                      <SelectItem key={program.id} value={program.name}>
-                        {program.name}
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="max-h-[300px] overflow-y-auto">
+                    {lecturerPrograms.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                        <p className="font-semibold">No programs available</p>
+                        <p className="text-xs mt-1">Contact admin to assign programs</p>
+                      </div>
+                    ) : (
+                      lecturerPrograms.map((program) => (
+                        <SelectItem key={program.id} value={program.name}>
+                          <div className="flex flex-col">
+                            <span>{program.name}</span>
+                            {program.type === 'short-term' && (
+                              <span className="text-xs text-muted-foreground">Short-term program</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {lecturerPrograms.length} program(s) available
+                </p>
               </div>
             </div>
 

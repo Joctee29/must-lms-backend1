@@ -53,6 +53,8 @@ export const StudentInformation = () => {
   const [students, setStudents] = useState<StudentInfo[]>([]);
   const [studentPrograms, setStudentPrograms] = useState<any>({});
   const [selectedLevel, setSelectedLevel] = useState<string>("all");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Advanced filtering states
   const [colleges, setColleges] = useState<any[]>([]);
@@ -67,6 +69,8 @@ export const StudentInformation = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
+        setLoading(true);
+        setError(null);
         await initializeDatabase();
         
         // Load colleges, departments, and courses for filtering
@@ -202,30 +206,45 @@ export const StudentInformation = () => {
           try {
             console.log(`=== FETCHING PROGRAMS FOR STUDENT ${student.name} (ID: ${student.id}) ===`);
             
-            // Try to fetch actual programs from database based on student's course
-            const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs`);
+            // Get the original student record to find course_id
+            const originalStudent = dbStudents.find((s: any) => s.id.toString() === student.id);
+            
+            if (!originalStudent?.course_id) {
+              console.log(`No course_id for student ${student.name}`);
+              programsData[student.id] = [];
+              continue;
+            }
+            
+            // Use efficient endpoint to fetch programs for this student's course
+            const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs?user_type=student&student_id=${originalStudent.id}`);
             if (programsResponse.ok) {
               const programsResult = await programsResponse.json();
               console.log('Programs API Response:', programsResult);
               
               if (programsResult.success && programsResult.data) {
-                // Filter programs for this student's course - use course_id from student record
-                const studentPrograms = programsResult.data.filter((program: any) => {
-                  // Get the original student record to find course_id
-                  const originalStudent = dbStudents.find((s: any) => s.id.toString() === student.id);
-                  return program.course_id === originalStudent?.course_id || 
-                         program.course_name === student.course;
-                });
+                const studentPrograms = programsResult.data;
                 
                 console.log(`Programs found for student ${student.name}:`, studentPrograms);
                 
                 if (studentPrograms.length > 0) {
-                  programsData[student.id] = studentPrograms.map((program: any) => ({
-                    id: program.id,
-                    name: program.name,
-                    semester: program.semester || 1,
-                    lecturer_name: program.lecturer_name || 'Lecturer Not Assigned'
-                  }));
+                  // Organize programs by semester
+                  const programsBySemester: any[] = [];
+                  
+                  studentPrograms.forEach((program: any) => {
+                    const totalSemesters = program.total_semesters || program.totalSemesters || 1;
+                    
+                    // Create entry for each semester
+                    for (let sem = 1; sem <= totalSemesters; sem++) {
+                      programsBySemester.push({
+                        id: `${program.id}-sem${sem}`,
+                        name: program.name,
+                        semester: sem,
+                        lecturer_name: program.lecturer_name || 'Lecturer Not Assigned'
+                      });
+                    }
+                  });
+                  
+                  programsData[student.id] = programsBySemester;
                 } else {
                   // No programs found - keep empty array (no fake data)
                   programsData[student.id] = [];
@@ -244,11 +263,14 @@ export const StudentInformation = () => {
           }
         }
         setStudentPrograms(programsData);
+        console.log('✅ Students loaded successfully:', formattedStudents.length);
         
       } catch (error) {
-        console.error('Error loading students:', error);
-        // Set empty array on error
+        console.error('❌ Error loading students:', error);
+        setError('Failed to load student data. Please try again.');
         setStudents([]);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -344,6 +366,34 @@ export const StudentInformation = () => {
     if (gpa >= 2.5) return 'text-yellow-600';
     return 'text-red-600';
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading student data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-500 mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -622,8 +672,19 @@ export const StudentInformation = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {filteredStudents.map((student) => (
+          {filteredStudents.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Students Found</h3>
+              <p className="text-muted-foreground">
+                {students.length === 0 
+                  ? "No students registered in the system yet."
+                  : "No students match your current filters. Try adjusting your search criteria."}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredStudents.map((student) => (
               <Card key={student.id} className="border-l-4 border-l-blue-500">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
@@ -711,8 +772,9 @@ export const StudentInformation = () => {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

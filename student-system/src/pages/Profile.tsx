@@ -27,7 +27,7 @@ export const Profile = () => {
     }
   }, []);
 
-  // Fetch ONLY student's own data - kama ulivyoeleza
+  // Fetch ONLY student's own data using efficient endpoint
   useEffect(() => {
     const fetchStudentData = async () => {
       if (!currentUser?.username) return;
@@ -35,23 +35,26 @@ export const Profile = () => {
       try {
         setLoading(true);
         
-        // Fetch ONLY this student's data by registration number
-        const response = await fetch(`${API_BASE_URL}/students`);
-        const result = await response.json();
+        console.log('=== STUDENT PROFILE DATA FETCH ===');
+        console.log('Current User:', currentUser);
         
-        if (result.success) {
-          const student = result.data.find((s: any) => 
-            s.registration_number === currentUser.username
-          );
-          
-          if (student) {
-            setStudentData(student);
-            setEditForm({
-              name: student.name || "",
-              email: student.email || "",
-              phone: student.phone || ""
-            });
-          }
+        // Use efficient endpoint to fetch ONLY this student's data
+        const response = await fetch(`${API_BASE_URL}/students/me?username=${encodeURIComponent(currentUser.username)}`);
+        const result = await response.json();
+        console.log('Student Response:', result);
+        
+        if (result.success && result.data) {
+          const student = result.data;
+          console.log('Found Student:', student);
+          setStudentData(student);
+          setEditForm({
+            name: student.name || "",
+            email: student.email || "",
+            phone: student.phone || ""
+          });
+        } else {
+          console.log('Student not found in database');
+          toast.error("Profile not found");
         }
         
       } catch (error) {

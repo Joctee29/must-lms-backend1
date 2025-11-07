@@ -123,31 +123,42 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
           return;
         }
         
-        // 3. Get students enrolled in lecturer's programs (with proper authorization)
-        const studentsResponse = await fetch(`${API_BASE_URL}/students?lecturer_id=${lecturerData.id}&user_type=lecturer`);
+        // 3. Get ALL students and filter by lecturer's program courses
+        console.log('=== FETCHING STUDENTS FOR LECTURER PROGRAMS ===');
+        
+        // Get unique course IDs from lecturer's programs
+        const lecturerCourseIds = [...new Set(
+          lecturerPrograms
+            .filter(p => p.course_id) // Only regular programs with course_id
+            .map(p => p.course_id)
+        )];
+        
+        console.log('Lecturer Course IDs:', lecturerCourseIds);
+        
+        // Fetch ALL students
+        const studentsResponse = await fetch(`${API_BASE_URL}/students`);
         if (!studentsResponse.ok) {
           throw new Error('Failed to fetch students');
         }
         const studentsResult = await studentsResponse.json();
-        console.log('Students API Response:', studentsResult);
+        console.log('All Students API Response:', studentsResult);
         
         let lecturerStudents = [];
-        if (studentsResult.success) {
-          lecturerStudents = studentsResult.data || [];
-          console.log('Students from backend (filtered by lecturer):', lecturerStudents.length);
+        if (studentsResult.success && studentsResult.data) {
+          // Filter students who are enrolled in lecturer's program courses
+          lecturerStudents = studentsResult.data.filter((student: any) => 
+            lecturerCourseIds.includes(student.course_id)
+          );
+          console.log(`Filtered ${lecturerStudents.length} students from ${studentsResult.data.length} total students`);
+          console.log('Students in lecturer courses:', lecturerStudents);
         }
         
-        console.log('Final Students in lecturer courses:', lecturerStudents);
-        
-        // 4. Always set all lecturer programs for filter dropdown
+        // 4. Set all lecturer programs for filter dropdown
         setPrograms(lecturerPrograms);
-        
-        // 5. Always show ALL students first (don't filter by selectedProgramId here)
-        // The filtering will be handled by the filteredStudents logic based on selectedProgramFilter
-        
-        // 5. Set the real data
-        setStudents(lecturerStudents);
         setAllPrograms(lecturerPrograms);
+        
+        // 5. Set the students data
+        setStudents(lecturerStudents);
         
         console.log('=== FINAL DATA SET ===');
         console.log('Students Count:', lecturerStudents.length);
