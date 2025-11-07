@@ -611,10 +611,55 @@ export const Assignments = () => {
                             PDF
                           </Badge>
                         )}
-                        <Button size="sm" variant="outline">
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
+                        {submission.submission_type === 'pdf' && submission.file_path ? (
+                          <>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => {
+                                // Open PDF in new tab
+                                const pdfUrl = submission.file_path.startsWith('http') 
+                                  ? submission.file_path 
+                                  : `https://must-lms-backend.onrender.com${submission.file_path}`;
+                                window.open(pdfUrl, '_blank');
+                              }}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => {
+                                // Download PDF
+                                const pdfUrl = submission.file_path.startsWith('http') 
+                                  ? submission.file_path 
+                                  : `https://must-lms-backend.onrender.com${submission.file_path}`;
+                                const link = document.createElement('a');
+                                link.href = pdfUrl;
+                                link.download = submission.file_name || 'submission.pdf';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                            >
+                              <Download className="h-4 w-4 mr-1" />
+                              Download
+                            </Button>
+                          </>
+                        ) : submission.submission_type === 'text' ? (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => {
+                              // Show text content in alert or modal
+                              alert(submission.text_content || 'No content');
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                     {submission.submission_type === 'text' && submission.text_content && (
