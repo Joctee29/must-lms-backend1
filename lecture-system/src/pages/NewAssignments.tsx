@@ -204,7 +204,10 @@ export const Assignments = () => {
         lecturer_name: currentUser.username || currentUser.name
       };
 
+      console.log('=== CREATING ASSIGNMENT ===');
       console.log('Assignment Data to Send:', assignmentData);
+      console.log('Selected Program:', newAssignment.program);
+      console.log('Available Programs:', lecturerPrograms.map(p => p.name));
 
       const response = await fetch('https://must-lms-backend.onrender.com/api/assignments', {
         method: 'POST',
