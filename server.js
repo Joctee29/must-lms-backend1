@@ -4131,10 +4131,37 @@ app.post('/api/assignment-submissions', async (req, res) => {
       });
     }
     
+    // CRITICAL FIX: Convert assignment_id to integer if it's a string
+    // This handles cases where frontend sends "assignment_34" or "34"
+    let assignmentIdInt = assignment_id;
+    if (typeof assignment_id === 'string') {
+      // Extract numeric part if string contains prefix like "assignment_34"
+      const numericMatch = assignment_id.match(/\d+/);
+      if (numericMatch) {
+        assignmentIdInt = parseInt(numericMatch[0]);
+        console.log(`✅ Converted assignment_id from "${assignment_id}" to ${assignmentIdInt}`);
+      } else {
+        console.error('❌ Invalid assignment_id format:', assignment_id);
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Invalid assignment ID format' 
+        });
+      }
+    }
+    
+    // Validate that we have a valid integer
+    if (isNaN(assignmentIdInt) || assignmentIdInt <= 0) {
+      console.error('❌ Invalid assignment_id after conversion:', assignmentIdInt);
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid assignment ID' 
+      });
+    }
+    
     // Check if assignment exists
     const assignmentCheck = await pool.query(
       'SELECT id FROM assignments WHERE id = $1',
-      [assignment_id]
+      [assignmentIdInt]
     );
     
     if (assignmentCheck.rows.length === 0) {
@@ -4152,7 +4179,7 @@ app.post('/api/assignment-submissions', async (req, res) => {
         assignment_id, student_id, student_name, student_registration,
         student_program, submission_type, text_content, file_path, file_name
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
-    `, [assignment_id, student_id, student_name, student_registration, student_program, submission_type, text_content, file_path, file_name]);
+    `, [assignmentIdInt, student_id, student_name, student_registration, student_program, submission_type, text_content, file_path, file_name]);
 
     console.log('✅ Submission saved successfully:', result.rows[0]);
     res.json({ success: true, data: result.rows[0], message: 'Assignment submitted successfully' });
