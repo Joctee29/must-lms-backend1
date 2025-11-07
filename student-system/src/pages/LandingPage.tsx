@@ -39,7 +39,7 @@ const LandingPage = ({ onShowLogin }: LandingPageProps) => {
   const [expandedCollege, setExpandedCollege] = useState<number | null>(null);
   
   const stats = [
-    { icon: Building, label: "Colleges", value: "7", color: "text-blue-600" },
+    { icon: Building, label: "Colleges", value: "8", color: "text-blue-600" },
     { icon: BookOpen, label: "Departments", value: "32", color: "text-green-600" },
     { icon: GraduationCap, label: "Programs", value: "128+", color: "text-purple-600" },
     { icon: Users, label: "Students", value: "12,000+", color: "text-orange-600" }
@@ -138,6 +138,16 @@ const LandingPage = ({ onShowLogin }: LandingPageProps) => {
       programs: 8,
       icon: MapPin,
       color: "bg-orange-100 text-orange-700"
+    },
+    {
+      name: "MUST Mtwara Campus College of Technical Education",
+      shortName: "MMCCTE",
+      departments: [
+        "Departments coming soon..."
+      ],
+      programs: 0,
+      icon: GraduationCap,
+      color: "bg-teal-100 text-teal-700"
     }
   ];
 
