@@ -1994,14 +1994,42 @@ app.get('/api/content', async (req, res) => {
     
     console.log('Student Info:', studentInfo);
     
-    // Get student's programs
+    // Get student's regular programs
     const programsResult = await pool.query(
       'SELECT name FROM programs WHERE course_id = $1',
       [studentInfo.course_id]
     );
-    const studentPrograms = programsResult.rows.map(p => p.name);
+    let studentPrograms = programsResult.rows.map(p => p.name);
     
-    console.log('Student Programs:', studentPrograms);
+    console.log('Student Regular Programs:', studentPrograms);
+    
+    // CRITICAL: Add short-term programs that student is eligible for
+    try {
+      const shortTermResult = await pool.query(
+        'SELECT * FROM short_term_programs WHERE end_date > NOW()'
+      );
+      
+      const eligibleShortTermPrograms = shortTermResult.rows.filter(program => {
+        // Check targeting for short-term programs
+        if (program.target_type === 'all') return true;
+        if (program.target_type === 'college' && program.target_value === studentInfo.college_name) return true;
+        if (program.target_type === 'department' && program.target_value === studentInfo.department_name) return true;
+        if (program.target_type === 'course' && program.target_value === studentInfo.course_name) return true;
+        if (program.target_type === 'year' && program.target_value === studentInfo.year_of_study) return true;
+        if (program.target_type === 'program' && studentPrograms.includes(program.target_value)) return true;
+        return false;
+      });
+      
+      // Add short-term program titles to student programs list
+      const shortTermProgramNames = eligibleShortTermPrograms.map(p => p.title);
+      studentPrograms = [...studentPrograms, ...shortTermProgramNames];
+      console.log('✅ Added short-term programs to content filtering:', shortTermProgramNames);
+      console.log('   Total programs (Regular + Short-Term):', studentPrograms.length);
+    } catch (error) {
+      console.log('⚠️ No short-term programs or error:', error.message);
+    }
+    
+    console.log('Student All Programs for Content:', studentPrograms);
     
     // Fetch all content
     const contentResult = await pool.query('SELECT * FROM content ORDER BY upload_date DESC');
@@ -2601,14 +2629,42 @@ app.get('/api/assessments', async (req, res) => {
       if (studentInfo) {
         console.log('Student Info:', studentInfo);
         
-        // Get student's programs
+        // Get student's regular programs
         const programsResult = await pool.query(
           'SELECT name FROM programs WHERE course_id = $1',
           [studentInfo.course_id]
         );
-        const studentPrograms = programsResult.rows.map(p => p.name);
+        let studentPrograms = programsResult.rows.map(p => p.name);
         
-        console.log('Student Programs:', studentPrograms);
+        console.log('Student Regular Programs:', studentPrograms);
+        
+        // CRITICAL: Add short-term programs that student is eligible for
+        try {
+          const shortTermResult = await pool.query(
+            'SELECT * FROM short_term_programs WHERE end_date > NOW()'
+          );
+          
+          const eligibleShortTermPrograms = shortTermResult.rows.filter(program => {
+            // Check targeting for short-term programs
+            if (program.target_type === 'all') return true;
+            if (program.target_type === 'college' && program.target_value === studentInfo.college_name) return true;
+            if (program.target_type === 'department' && program.target_value === studentInfo.department_name) return true;
+            if (program.target_type === 'course' && program.target_value === studentInfo.course_name) return true;
+            if (program.target_type === 'year' && program.target_value === studentInfo.year_of_study) return true;
+            if (program.target_type === 'program' && studentPrograms.includes(program.target_value)) return true;
+            return false;
+          });
+          
+          // Add short-term program titles to student programs list
+          const shortTermProgramNames = eligibleShortTermPrograms.map(p => p.title);
+          studentPrograms = [...studentPrograms, ...shortTermProgramNames];
+          console.log('✅ Added short-term programs:', shortTermProgramNames);
+          console.log('   Total programs (Regular + Short-Term):', studentPrograms.length);
+        } catch (error) {
+          console.log('⚠️ No short-term programs or error:', error.message);
+        }
+        
+        console.log('Student All Programs:', studentPrograms);
         
         // Filter assessments based on student's programs - EXACT MATCH ONLY
         filteredAssessments = result.rows.filter(assessment => {
@@ -2884,14 +2940,56 @@ app.get('/api/student-assessments', async (req, res) => {
       return res.json({ success: true, data: [] });
     }
     
-    // Get all programs for student's course
+    const studentInfo = studentResult.rows[0];
+    
+    // Get all regular programs for student's course
     const programsResult = await pool.query(
       'SELECT name FROM programs WHERE course_id = $1',
-      [studentResult.rows[0].course_id]
+      [studentInfo.course_id]
     );
     
-    const programNames = programsResult.rows.map(p => p.name);
-    console.log('Student Programs:', programNames);
+    let programNames = programsResult.rows.map(p => p.name);
+    console.log('Student Regular Programs:', programNames);
+    
+    // CRITICAL: Add short-term programs that student is eligible for
+    try {
+      // Get full student info for targeting
+      const fullStudentResult = await pool.query(`
+        SELECT s.*, c.name as course_name
+        FROM students s
+        LEFT JOIN courses c ON s.course_id = c.id
+        WHERE s.id = $1
+      `, [student_id]);
+      
+      if (fullStudentResult.rows.length > 0) {
+        const fullStudentInfo = fullStudentResult.rows[0];
+        
+        const shortTermResult = await pool.query(
+          'SELECT * FROM short_term_programs WHERE end_date > NOW()'
+        );
+        
+        const eligibleShortTermPrograms = shortTermResult.rows.filter(program => {
+          // Check targeting for short-term programs
+          if (program.target_type === 'all') return true;
+          if (program.target_type === 'college' && program.target_value === fullStudentInfo.college_name) return true;
+          if (program.target_type === 'department' && program.target_value === fullStudentInfo.department_name) return true;
+          if (program.target_type === 'course' && program.target_value === fullStudentInfo.course_name) return true;
+          if (program.target_type === 'year' && program.target_value === fullStudentInfo.year_of_study) return true;
+          if (program.target_type === 'program' && programNames.includes(program.target_value)) return true;
+          return false;
+        });
+        
+        // Add short-term program titles to student programs list
+        const shortTermProgramNames = eligibleShortTermPrograms.map(p => p.title);
+        programNames = [...programNames, ...shortTermProgramNames];
+        console.log('✅ Added short-term programs to assessments:', shortTermProgramNames);
+        console.log('   Total programs (Regular + Short-Term):', programNames.length);
+      }
+    } catch (error) {
+      console.log('⚠️ No short-term programs or error:', error.message);
+    }
+    
+    console.log('Student All Programs for Assessments:', programNames);
 
     // Get published assessments for student's programs only
     let query = `
