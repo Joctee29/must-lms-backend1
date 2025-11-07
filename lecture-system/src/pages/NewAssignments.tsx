@@ -168,18 +168,43 @@ export const Assignments = () => {
   // Create new assignment
   const handleCreateAssignment = async () => {
     try {
+      // Validate required fields
+      if (!newAssignment.title || !newAssignment.program || !newAssignment.deadline) {
+        alert('Please fill in all required fields: Title, Program, and Deadline');
+        return;
+      }
+
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       
+      console.log('=== CREATE ASSIGNMENT DEBUG ===');
+      console.log('Current User:', currentUser);
+      console.log('New Assignment:', newAssignment);
+      
+      // Validate user information
+      if (!currentUser.id) {
+        alert('Error: User ID not found. Please log out and log in again.');
+        console.error('Missing user ID in localStorage');
+        return;
+      }
+      
+      if (!currentUser.username && !currentUser.name) {
+        alert('Error: User information not found. Please log out and log in again.');
+        console.error('Missing username/name in localStorage');
+        return;
+      }
+      
       const assignmentData = {
-        title: newAssignment.title,
-        description: newAssignment.description,
+        title: newAssignment.title.trim(),
+        description: newAssignment.description?.trim() || '',
         program_name: newAssignment.program,
         deadline: newAssignment.deadline,
-        submission_type: newAssignment.submissionType,
-        max_points: newAssignment.maxPoints,
-        lecturer_id: currentUser.id,
-        lecturer_name: currentUser.username
+        submission_type: newAssignment.submissionType || 'text',
+        max_points: parseInt(newAssignment.maxPoints) || 100,
+        lecturer_id: parseInt(currentUser.id),
+        lecturer_name: currentUser.username || currentUser.name
       };
+
+      console.log('Assignment Data to Send:', assignmentData);
 
       const response = await fetch('https://must-lms-backend.onrender.com/api/assignments', {
         method: 'POST',
@@ -187,25 +212,47 @@ export const Assignments = () => {
         body: JSON.stringify(assignmentData)
       });
 
+      console.log('Response Status:', response.status);
+      
+      const responseText = await response.text();
+      console.log('Response Text:', responseText);
+
       if (response.ok) {
-        const result = await response.json();
-        setAssignments(prev => [...prev, result.data]);
-        setNewAssignment({
-          title: "",
-          description: "",
-          program: "",
-          deadline: "",
-          submissionType: "text",
-          maxPoints: 100
-        });
-        setViewMode('list');
-        alert('Assignment created successfully!');
+        const result = JSON.parse(responseText);
+        console.log('Assignment Created:', result);
+        
+        if (result.success && result.data) {
+          setAssignments(prev => [...prev, result.data]);
+          setNewAssignment({
+            title: "",
+            description: "",
+            program: "",
+            deadline: "",
+            submissionType: "text",
+            maxPoints: 100
+          });
+          setViewMode('list');
+          alert('Assignment created and sent to students successfully!');
+        } else {
+          console.error('Backend returned success=false:', result);
+          alert(`Failed to create assignment: ${result.error || 'Unknown error'}`);
+        }
       } else {
-        alert('Failed to create assignment. Please try again.');
+        let errorMessage = 'Failed to create assignment. Please try again.';
+        try {
+          const errorData = JSON.parse(responseText);
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (e) {
+          errorMessage = responseText || errorMessage;
+        }
+        console.error('Error Response:', errorMessage);
+        alert(errorMessage);
       }
     } catch (error) {
       console.error('Error creating assignment:', error);
-      alert('Error creating assignment. Please try again.');
+      alert(`Error creating assignment: ${error.message}`);
     }
   };
 
