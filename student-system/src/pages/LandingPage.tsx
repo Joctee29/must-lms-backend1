@@ -40,8 +40,8 @@ const LandingPage = ({ onShowLogin }: LandingPageProps) => {
   
   const stats = [
     { icon: Building, label: "Colleges", value: "7", color: "text-blue-600" },
-    { icon: BookOpen, label: "Departments", value: "30", color: "text-green-600" },
-    { icon: GraduationCap, label: "Programs", value: "120+", color: "text-purple-600" },
+    { icon: BookOpen, label: "Departments", value: "32", color: "text-green-600" },
+    { icon: GraduationCap, label: "Programs", value: "128+", color: "text-purple-600" },
     { icon: Users, label: "Students", value: "12,000+", color: "text-orange-600" }
   ];
 
