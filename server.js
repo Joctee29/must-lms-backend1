@@ -3635,6 +3635,25 @@ app.post('/api/assessment-submissions', async (req, res) => {
 
 // ==================== ASSIGNMENT ENDPOINTS ====================
 
+// Add missing program_id column without deleting data
+app.post('/api/assignments/add-program-id', async (req, res) => {
+  try {
+    console.log('Adding program_id column to assignments table...');
+    
+    // Add program_id column if it doesn't exist
+    await pool.query(`
+      ALTER TABLE assignments 
+      ADD COLUMN IF NOT EXISTS program_id INTEGER
+    `);
+    
+    console.log('✅ program_id column added successfully');
+    res.json({ success: true, message: 'program_id column added to assignments table' });
+  } catch (error) {
+    console.error('Error adding program_id column:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Fix assignment table
 app.post('/api/assignments/fix', async (req, res) => {
   try {
