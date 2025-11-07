@@ -2234,11 +2234,16 @@ app.get('/api/assignments', async (req, res) => {
     }
     
     if (!studentInfo) {
-      console.log('Student not found, returning empty array');
+      console.log('❌ Student not found, returning empty array');
       return res.json({ success: true, data: [] });
     }
     
-    console.log('Student Info:', studentInfo);
+    console.log('✅ Student Info Found:', {
+      id: studentInfo.id,
+      name: studentInfo.name,
+      course_id: studentInfo.course_id,
+      course_name: studentInfo.course_name
+    });
     
     // Get student's programs with IDs
     const programsResult = await pool.query(
@@ -2249,30 +2254,45 @@ app.get('/api/assignments', async (req, res) => {
     const studentProgramIds = studentPrograms.map(p => p.id);
     const studentProgramNames = studentPrograms.map(p => p.name);
     
-    console.log('Student Programs:', studentProgramNames);
-    console.log('Student Program IDs:', studentProgramIds);
+    console.log('✅ Student Programs Found:', studentPrograms.length);
+    console.log('   Program Names:', studentProgramNames);
+    console.log('   Program IDs:', studentProgramIds);
+    
+    if (studentPrograms.length === 0) {
+      console.warn('⚠️ WARNING: Student has NO programs assigned to their course!');
+      console.warn('   Student course_id:', studentInfo.course_id);
+      console.warn('   This will result in NO assignments being visible.');
+      return res.json({ success: true, data: [] });
+    }
     
     // Fetch all assignments
     const assignmentsResult = await pool.query('SELECT * FROM assignments ORDER BY created_at DESC');
+    console.log(`📋 Total assignments in database: ${assignmentsResult.rows.length}`);
     
     // Filter assignments based on student's programs - PRECISE MATCHING
     const filteredAssignments = assignmentsResult.rows.filter(assignment => {
+      console.log(`\n🔍 Checking assignment: "${assignment.title}"`);
+      console.log(`   Assignment program_id: ${assignment.program_id}`);
+      console.log(`   Assignment program_name: ${assignment.program_name}`);
+      
       // PRIORITY 1: Check program_id match (most precise)
       if (assignment.program_id && studentProgramIds.includes(assignment.program_id)) {
-        console.log(`✅ Assignment "${assignment.title}" - EXACT program_id match: ${assignment.program_id}`);
+        console.log(`   ✅ MATCH via program_id: ${assignment.program_id}`);
         return true;
       }
       
-      // PRIORITY 2: Check if assignment program_name matches any of student's programs (exact match only)
+      // PRIORITY 2: Check if assignment program_name matches any of student's programs
       const programMatch = studentProgramNames.some(program => {
         if (!program || !assignment.program_name) return false;
         
         const programLower = program.toLowerCase().trim();
         const assignmentProgramLower = assignment.program_name.toLowerCase().trim();
         
+        console.log(`   Comparing: "${programLower}" vs "${assignmentProgramLower}"`);
+        
         // ONLY exact match - no partial matching to prevent cross-program leakage
         if (programLower === assignmentProgramLower) {
-          console.log(`✅ Assignment "${assignment.title}" - Exact program name match: ${assignment.program_name}`);
+          console.log(`   ✅ MATCH via exact program name`);
           return true;
         }
         
@@ -2280,16 +2300,31 @@ app.get('/api/assignments', async (req, res) => {
       });
       
       if (!programMatch) {
-        console.log(`❌ Assignment "${assignment.title}" - No program match (program_id: ${assignment.program_id}, program_name: ${assignment.program_name})`);
+        console.log(`   ❌ NO MATCH - Assignment not visible to this student`);
       }
       
       return programMatch;
     });
     
-    console.log(`Filtered ${filteredAssignments.length} assignments for student (out of ${assignmentsResult.rows.length} total)`);
+    console.log('\n=== FILTERING RESULTS ===');
+    console.log(`✅ Filtered ${filteredAssignments.length} assignments for student (out of ${assignmentsResult.rows.length} total)`);
+    
+    if (filteredAssignments.length === 0) {
+      console.warn('⚠️ WARNING: NO ASSIGNMENTS MATCHED!');
+      console.warn('   Possible reasons:');
+      console.warn('   1. Assignment program_name does not exactly match any student program name');
+      console.warn('   2. Assignment program_id is null or does not match student program IDs');
+      console.warn('   3. No assignments exist for this student\'s programs');
+    } else {
+      console.log('✅ Matched assignments:');
+      filteredAssignments.forEach(a => {
+        console.log(`   - "${a.title}" (program: ${a.program_name}, program_id: ${a.program_id})`);
+      });
+    }
+    
     res.json({ success: true, data: filteredAssignments });
   } catch (error) {
-    console.error('Error fetching assignments:', error);
+    console.error('❌ Error fetching assignments:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
