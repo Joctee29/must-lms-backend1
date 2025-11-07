@@ -2231,48 +2231,39 @@ app.get('/api/assignments', async (req, res) => {
     
     console.log('Student Info:', studentInfo);
     
-    // Get student's programs
+    // Get student's programs with IDs
     const programsResult = await pool.query(
-      'SELECT name FROM programs WHERE course_id = $1',
+      'SELECT id, name FROM programs WHERE course_id = $1',
       [studentInfo.course_id]
     );
-    const studentPrograms = programsResult.rows.map(p => p.name);
+    const studentPrograms = programsResult.rows;
+    const studentProgramIds = studentPrograms.map(p => p.id);
+    const studentProgramNames = studentPrograms.map(p => p.name);
     
-    console.log('Student Programs:', studentPrograms);
+    console.log('Student Programs:', studentProgramNames);
+    console.log('Student Program IDs:', studentProgramIds);
     
     // Fetch all assignments
     const assignmentsResult = await pool.query('SELECT * FROM assignments ORDER BY created_at DESC');
     
-    // Filter assignments based on student's programs
+    // Filter assignments based on student's programs - PRECISE MATCHING
     const filteredAssignments = assignmentsResult.rows.filter(assignment => {
-      // Check if assignment program matches any of student's programs
-      const programMatch = studentPrograms.some(program => {
+      // PRIORITY 1: Check program_id match (most precise)
+      if (assignment.program_id && studentProgramIds.includes(assignment.program_id)) {
+        console.log(`✅ Assignment "${assignment.title}" - EXACT program_id match: ${assignment.program_id}`);
+        return true;
+      }
+      
+      // PRIORITY 2: Check if assignment program_name matches any of student's programs (exact match only)
+      const programMatch = studentProgramNames.some(program => {
         if (!program || !assignment.program_name) return false;
         
         const programLower = program.toLowerCase().trim();
         const assignmentProgramLower = assignment.program_name.toLowerCase().trim();
         
-        // Exact match
+        // ONLY exact match - no partial matching to prevent cross-program leakage
         if (programLower === assignmentProgramLower) {
-          console.log(`✅ Assignment "${assignment.title}" - Exact program match: ${assignment.program_name}`);
-          return true;
-        }
-        
-        // Contains match
-        if (programLower.includes(assignmentProgramLower) || assignmentProgramLower.includes(programLower)) {
-          console.log(`✅ Assignment "${assignment.title}" - Partial program match: ${assignment.program_name}`);
-          return true;
-        }
-        
-        // Word-based matching
-        const programWords = programLower.split(/\s+/);
-        const assignmentWords = assignmentProgramLower.split(/\s+/);
-        const commonWords = programWords.filter(word => 
-          word.length > 3 && assignmentWords.includes(word)
-        );
-        
-        if (commonWords.length >= 2) {
-          console.log(`✅ Assignment "${assignment.title}" - Word match: ${assignment.program_name}`);
+          console.log(`✅ Assignment "${assignment.title}" - Exact program name match: ${assignment.program_name}`);
           return true;
         }
         
@@ -2280,13 +2271,13 @@ app.get('/api/assignments', async (req, res) => {
       });
       
       if (!programMatch) {
-        console.log(`❌ Assignment "${assignment.title}" - No program match: ${assignment.program_name}`);
+        console.log(`❌ Assignment "${assignment.title}" - No program match (program_id: ${assignment.program_id}, program_name: ${assignment.program_name})`);
       }
       
       return programMatch;
     });
     
-    console.log(`Filtered ${filteredAssignments.length} assignments for student`);
+    console.log(`Filtered ${filteredAssignments.length} assignments for student (out of ${assignmentsResult.rows.length} total)`);
     res.json({ success: true, data: filteredAssignments });
   } catch (error) {
     console.error('Error fetching assignments:', error);
@@ -3656,6 +3647,7 @@ app.post('/api/assignments/fix', async (req, res) => {
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         description TEXT,
+        program_id INTEGER,
         program_name VARCHAR(255) NOT NULL,
         deadline TIMESTAMP NOT NULL,
         submission_type VARCHAR(20) DEFAULT 'text',
@@ -3702,6 +3694,7 @@ app.post('/api/assignments/init', async (req, res) => {
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         description TEXT,
+        program_id INTEGER,
         program_name VARCHAR(255) NOT NULL,
         deadline TIMESTAMP NOT NULL,
         submission_type VARCHAR(20) DEFAULT 'text',
@@ -3786,17 +3779,35 @@ app.post('/api/assignments', async (req, res) => {
       });
     }
 
-    console.log('✅ All validations passed. Inserting into database...');
+    console.log('✅ All validations passed. Looking up program_id...');
     console.log('Converted Lecturer ID:', lecturerIdInt);
+
+    // Get program_id from program_name for precise targeting
+    let programId = null;
+    try {
+      const programResult = await pool.query(
+        'SELECT id FROM programs WHERE name = $1 LIMIT 1',
+        [program_name]
+      );
+      if (programResult.rows.length > 0) {
+        programId = programResult.rows[0].id;
+        console.log('✅ Found program_id:', programId, 'for program:', program_name);
+      } else {
+        console.log('⚠️ No program_id found for program:', program_name, '- assignment will use name-based matching');
+      }
+    } catch (err) {
+      console.log('⚠️ Error looking up program_id:', err.message);
+    }
 
     const result = await pool.query(`
       INSERT INTO assignments (
-        title, description, program_name, deadline, submission_type, 
+        title, description, program_id, program_name, deadline, submission_type, 
         max_points, lecturer_id, lecturer_name, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *
     `, [
       title, 
       description || '', 
+      programId,
       program_name, 
       deadline, 
       submission_type || 'text', 
@@ -3965,7 +3976,40 @@ app.post('/api/assignment-submissions', async (req, res) => {
     } = req.body;
 
     console.log('=== ASSIGNMENT SUBMISSION DEBUG ===');
-    console.log('Submission data:', req.body);
+    console.log('Submission data:', JSON.stringify(req.body, null, 2));
+    
+    // Validate required fields
+    if (!assignment_id) {
+      console.error('❌ Missing assignment_id');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Assignment ID is required' 
+      });
+    }
+    
+    if (!student_id) {
+      console.error('❌ Missing student_id');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Student ID is required' 
+      });
+    }
+    
+    // Check if assignment exists
+    const assignmentCheck = await pool.query(
+      'SELECT id FROM assignments WHERE id = $1',
+      [assignment_id]
+    );
+    
+    if (assignmentCheck.rows.length === 0) {
+      console.error('❌ Assignment not found:', assignment_id);
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Assignment not found' 
+      });
+    }
+    
+    console.log('✅ Assignment exists, proceeding with submission...');
 
     const result = await pool.query(`
       INSERT INTO assignment_submissions (
@@ -3974,10 +4018,12 @@ app.post('/api/assignment-submissions', async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
     `, [assignment_id, student_id, student_name, student_registration, student_program, submission_type, text_content, file_path, file_name]);
 
-    console.log('Submission saved:', result.rows[0]);
-    res.json({ success: true, data: result.rows[0] });
+    console.log('✅ Submission saved successfully:', result.rows[0]);
+    res.json({ success: true, data: result.rows[0], message: 'Assignment submitted successfully' });
   } catch (error) {
-    console.error('Error submitting assignment:', error);
+    console.error('❌ Error submitting assignment:', error);
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ success: false, error: error.message });
   }
 });
