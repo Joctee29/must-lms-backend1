@@ -587,6 +587,7 @@ const initializeDatabase = async () => {
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         description TEXT,
+        program_id INTEGER,
         program_name VARCHAR(255) NOT NULL,
         deadline TIMESTAMP NOT NULL,
         submission_type VARCHAR(20) DEFAULT 'text',
@@ -597,6 +598,14 @@ const initializeDatabase = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Add program_id column to existing assignments table if it doesn't exist
+    try {
+      await pool.query(`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS program_id INTEGER`);
+      console.log('✅ Ensured program_id column exists in assignments table');
+    } catch (error) {
+      console.log('Assignment table migration completed or not needed');
+    }
 
     // Create assignment_submissions table
     await pool.query(`
