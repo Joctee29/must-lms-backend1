@@ -2250,16 +2250,42 @@ app.get('/api/assignments', async (req, res) => {
       'SELECT id, name FROM programs WHERE course_id = $1',
       [studentInfo.course_id]
     );
-    const studentPrograms = programsResult.rows;
-    const studentProgramIds = studentPrograms.map(p => p.id);
-    const studentProgramNames = studentPrograms.map(p => p.name);
+    let studentPrograms = programsResult.rows;
+    let studentProgramIds = studentPrograms.map(p => p.id);
+    let studentProgramNames = studentPrograms.map(p => p.name);
     
-    console.log('✅ Student Programs Found:', studentPrograms.length);
+    console.log('✅ Student Regular Programs Found:', studentPrograms.length);
     console.log('   Program Names:', studentProgramNames);
     console.log('   Program IDs:', studentProgramIds);
     
-    if (studentPrograms.length === 0) {
-      console.warn('⚠️ WARNING: Student has NO programs assigned to their course!');
+    // CRITICAL: Add short-term programs that student is eligible for
+    try {
+      const shortTermResult = await pool.query(
+        'SELECT * FROM short_term_programs WHERE end_date > NOW()'
+      );
+      
+      const eligibleShortTermPrograms = shortTermResult.rows.filter(program => {
+        // Check targeting for short-term programs
+        if (program.target_type === 'all') return true;
+        if (program.target_type === 'college' && program.target_value === studentInfo.college_name) return true;
+        if (program.target_type === 'department' && program.target_value === studentInfo.department_name) return true;
+        if (program.target_type === 'course' && program.target_value === studentInfo.course_name) return true;
+        if (program.target_type === 'year' && program.target_value === studentInfo.year_of_study) return true;
+        if (program.target_type === 'program' && studentProgramNames.includes(program.target_value)) return true;
+        return false;
+      });
+      
+      // Add short-term program titles to student programs list
+      const shortTermProgramNames = eligibleShortTermPrograms.map(p => p.title);
+      studentProgramNames = [...studentProgramNames, ...shortTermProgramNames];
+      console.log('✅ Added short-term programs:', shortTermProgramNames);
+      console.log('   Total programs (Regular + Short-Term):', studentProgramNames.length);
+    } catch (error) {
+      console.log('⚠️ No short-term programs table or error:', error.message);
+    }
+    
+    if (studentProgramNames.length === 0) {
+      console.warn('⚠️ WARNING: Student has NO programs assigned!');
       console.warn('   Student course_id:', studentInfo.course_id);
       console.warn('   This will result in NO assignments being visible.');
       return res.json({ success: true, data: [] });
@@ -4024,7 +4050,7 @@ app.get('/api/student-assignments', async (req, res) => {
         if (studentResult.rows.length > 0) {
           const studentInfo = studentResult.rows[0];
           
-          // Get student's programs
+          // Get student's regular programs
           const programsResult = await pool.query(
             'SELECT id, name FROM programs WHERE course_id = $1',
             [studentInfo.course_id]
@@ -4033,7 +4059,33 @@ app.get('/api/student-assignments', async (req, res) => {
           studentProgramIds = programsResult.rows.map(p => p.id);
           studentProgramNames = programsResult.rows.map(p => p.name);
           
-          console.log('✅ Found student programs:', studentProgramNames);
+          console.log('✅ Found student regular programs:', studentProgramNames);
+          
+          // Add short-term programs that student is eligible for
+          try {
+            const shortTermResult = await pool.query(
+              'SELECT * FROM short_term_programs WHERE end_date > NOW()'
+            );
+            
+            const eligibleShortTermPrograms = shortTermResult.rows.filter(program => {
+              // Check targeting for short-term programs
+              if (program.target_type === 'all') return true;
+              if (program.target_type === 'college' && program.target_value === studentInfo.college_name) return true;
+              if (program.target_type === 'department' && program.target_value === studentInfo.department_name) return true;
+              if (program.target_type === 'course' && program.target_value === studentInfo.course_name) return true;
+              if (program.target_type === 'year' && program.target_value === studentInfo.year_of_study) return true;
+              if (program.target_type === 'program' && studentProgramNames.includes(program.target_value)) return true;
+              return false;
+            });
+            
+            // Add short-term program titles to student programs list
+            const shortTermProgramNames = eligibleShortTermPrograms.map(p => p.title);
+            studentProgramNames = [...studentProgramNames, ...shortTermProgramNames];
+            console.log('✅ Added short-term programs:', shortTermProgramNames);
+            console.log('   Total programs:', studentProgramNames.length);
+          } catch (error) {
+            console.log('⚠️ No short-term programs or error:', error.message);
+          }
         }
       } catch (err) {
         console.error('Error fetching student programs:', err);
