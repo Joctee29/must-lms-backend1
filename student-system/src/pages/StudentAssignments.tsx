@@ -103,7 +103,7 @@ export const StudentAssignments = () => {
             deadline: assessment.end_date || assessment.scheduled_date || new Date().toISOString(),
             submission_type: 'text' as const,
             max_points: assessment.total_points || 100,
-            lecturer_name: assessment.lecturer_name || 'Lecturer',
+            lecturer_name: '', // Hidden from student view
             status: assessment.status === 'active' || assessment.status === 'published' ? 'active' as const : 'expired' as const,
             created_at: assessment.created_at
           }));
@@ -144,7 +144,7 @@ export const StudentAssignments = () => {
             deadline: assignment.deadline,
             submission_type: assignment.submission_type || 'text' as const,
             max_points: assignment.max_points || 100,
-            lecturer_name: assignment.lecturer_name || 'Lecturer',
+            lecturer_name: '', // Hidden from student view
             status: 'active' as const,
             created_at: assignment.created_at
           }));
@@ -216,7 +216,7 @@ export const StudentAssignments = () => {
       const studentProgram = currentUser.program || currentUser.course || currentUser.course_name || 'Computer Science';
       
       const submissionData = {
-        assignment_id: selectedAssignment.id,
+        assignment_id: selectedAssignment.original_id || selectedAssignment.id,
         student_id: currentUser.id || 1,
         student_name: currentUser.username || 'Student',
         student_registration: currentUser.registration || currentUser.username || 'STU001/2024',
@@ -248,11 +248,13 @@ export const StudentAssignments = () => {
         // Refresh assignments to remove submitted one
         fetchAssignments();
       } else {
-        alert('Failed to submit assignment. Please try again.');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Submission failed:', errorData);
+        alert(`Failed to submit assignment: ${errorData.error || 'Please try again.'}`);
       }
     } catch (error) {
       console.error('Error submitting assignment:', error);
-      alert('Error submitting assignment. Please try again.');
+      alert(`Error submitting assignment: ${error instanceof Error ? error.message : 'Please try again.'}`);
     } finally {
       setSubmitting(false);
     }
@@ -323,10 +325,6 @@ export const StudentAssignments = () => {
               <div>
                 <Label className="text-sm font-medium text-gray-600">Program</Label>
                 <p>{selectedAssignment.program_name}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Lecturer</Label>
-                <p>{selectedAssignment.lecturer_name}</p>
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-600">Deadline</Label>
@@ -527,10 +525,6 @@ export const StudentAssignments = () => {
                             <div className="flex items-center gap-1">
                               <BookOpen className="h-4 w-4" />
                               {assignment.program_name}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <User className="h-4 w-4" />
-                              {assignment.lecturer_name}
                             </div>
                             <div className="flex items-center gap-1">
                               <Calendar className="h-4 w-4" />
