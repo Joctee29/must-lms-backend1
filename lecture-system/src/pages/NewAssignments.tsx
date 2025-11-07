@@ -617,10 +617,21 @@ export const Assignments = () => {
                               size="sm" 
                               variant="outline"
                               onClick={() => {
-                                // Open PDF in new tab
-                                const pdfUrl = submission.file_path.startsWith('http') 
-                                  ? submission.file_path 
-                                  : `https://must-lms-backend.onrender.com${submission.file_path}`;
+                                // Open PDF in new tab - handle various file path formats
+                                let pdfUrl = submission.file_path;
+                                
+                                // If it's already a full URL, use it as is
+                                if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
+                                  // Already a complete URL
+                                } else if (pdfUrl.startsWith('/')) {
+                                  // Starts with /, prepend backend URL
+                                  pdfUrl = `https://must-lms-backend.onrender.com${pdfUrl}`;
+                                } else {
+                                  // Doesn't start with /, add both / and backend URL
+                                  pdfUrl = `https://must-lms-backend.onrender.com/${pdfUrl}`;
+                                }
+                                
+                                console.log('Opening PDF:', pdfUrl);
                                 window.open(pdfUrl, '_blank');
                               }}
                             >
@@ -630,17 +641,43 @@ export const Assignments = () => {
                             <Button 
                               size="sm" 
                               variant="outline"
-                              onClick={() => {
-                                // Download PDF
-                                const pdfUrl = submission.file_path.startsWith('http') 
-                                  ? submission.file_path 
-                                  : `https://must-lms-backend.onrender.com${submission.file_path}`;
-                                const link = document.createElement('a');
-                                link.href = pdfUrl;
-                                link.download = submission.file_name || 'submission.pdf';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
+                              onClick={async () => {
+                                try {
+                                  // Download PDF - handle various file path formats
+                                  let pdfUrl = submission.file_path;
+                                  
+                                  // If it's already a full URL, use it as is
+                                  if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
+                                    // Already a complete URL
+                                  } else if (pdfUrl.startsWith('/')) {
+                                    // Starts with /, prepend backend URL
+                                    pdfUrl = `https://must-lms-backend.onrender.com${pdfUrl}`;
+                                  } else {
+                                    // Doesn't start with /, add both / and backend URL
+                                    pdfUrl = `https://must-lms-backend.onrender.com/${pdfUrl}`;
+                                  }
+                                  
+                                  console.log('Downloading PDF from:', pdfUrl);
+                                  
+                                  // Fetch the file and download it
+                                  const response = await fetch(pdfUrl);
+                                  if (!response.ok) {
+                                    throw new Error('Failed to download file');
+                                  }
+                                  
+                                  const blob = await response.blob();
+                                  const url = window.URL.createObjectURL(blob);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = submission.file_name || `submission_${submission.student_registration}.pdf`;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  window.URL.revokeObjectURL(url);
+                                } catch (error) {
+                                  console.error('Error downloading PDF:', error);
+                                  alert('Failed to download PDF. Please try again or contact support.');
+                                }
                               }}
                             >
                               <Download className="h-4 w-4 mr-1" />

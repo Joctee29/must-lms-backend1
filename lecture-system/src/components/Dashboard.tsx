@@ -120,7 +120,15 @@ export const Dashboard = () => {
           console.log('Short-Term Programs Response:', shortTermResult);
           if (shortTermResult.success) {
             const shortTermCount = shortTermResult.data.length;
-            allPrograms = [...allPrograms, ...shortTermResult.data];
+            // Format short-term programs to match regular program structure
+            const formattedShortTermPrograms = shortTermResult.data.map(program => ({
+              ...program,
+              name: program.title, // Map title to name for consistent display
+              isShortTerm: true, // Flag to identify short-term programs
+              start_date: program.start_date,
+              end_date: program.end_date
+            }));
+            allPrograms = [...allPrograms, ...formattedShortTermPrograms];
             console.log('✅ Added Short-Term Programs:', shortTermCount);
             console.log('Total Programs (Regular + Short-Term):', allPrograms.length);
             if (shortTermCount === 0) {
@@ -160,24 +168,23 @@ export const Dashboard = () => {
           }
         }
 
-        // Fetch students - use lecturer_id parameter for backend filtering
-        // Use lecturerData which was already fetched above
-        if (lecturerData && lecturerData.id) {
-          const lecturerId = lecturerData.id;
-          console.log('Lecturer ID for students query:', lecturerId);
+        // Fetch students - FIXED: Use lecturer variable instead of lecturerData state
+        if (lecturer && lecturer.id) {
+          const lecturerId = lecturer.id;
+          console.log('✅ Fetching students for Lecturer ID:', lecturerId);
           
           // Fetch students with lecturer_id and user_type parameters
           const studentsResponse = await fetch(`${API_BASE_URL}/students?lecturer_id=${lecturerId}&user_type=lecturer`);
           if (studentsResponse.ok) {
             const studentsResult = await studentsResponse.json();
-            console.log('Students from backend:', studentsResult.data?.length || 0);
+            console.log('✅ Students from backend:', studentsResult.data?.length || 0);
             setStudents(studentsResult.data || []);
           } else {
-            console.error('Failed to fetch students');
+            console.error('❌ Failed to fetch students');
             setStudents([]);
           }
         } else {
-          console.error('No lecturer data available for students query');
+          console.error('❌ No lecturer data available for students query');
           setStudents([]);
         }
         
@@ -342,12 +349,22 @@ export const Dashboard = () => {
                   <div key={program?.id || index} className="flex items-center space-x-4 rounded-lg border p-4">
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-semibold">{program?.name || 'Unknown Program'}</h3>
-                        <Badge variant="default">Active</Badge>
+                        <h3 className="font-semibold">{program?.name || program?.title || 'Unknown Program'}</h3>
+                        <Badge variant="default" className={program?.isShortTerm ? 'bg-purple-100 text-purple-800' : ''}>
+                          {program?.isShortTerm ? 'Short-Term' : 'Active'}
+                        </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">{program?.description || 'No description'}</p>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Semesters: {program?.total_semesters || program?.totalSemesters || 'N/A'}</span>
+                        {program?.isShortTerm ? (
+                          <span className="text-muted-foreground">
+                            Duration: {new Date(program?.start_date).toLocaleDateString()} - {new Date(program?.end_date).toLocaleDateString()}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            Semesters: {program?.total_semesters || program?.totalSemesters || 'N/A'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
