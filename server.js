@@ -2265,61 +2265,57 @@ app.get('/api/assignments', async (req, res) => {
       return res.json({ success: true, data: [] });
     }
     
-    // Fetch all assignments
-    const assignmentsResult = await pool.query('SELECT * FROM assignments ORDER BY created_at DESC');
-    console.log(`📋 Total assignments in database: ${assignmentsResult.rows.length}`);
+    // IMPROVED: Use SQL query with JOIN for better performance and accuracy
+    // This ensures ONLY assignments for student's programs are returned
+    let filteredAssignments = [];
     
-    // Filter assignments based on student's programs - PRECISE MATCHING
-    const filteredAssignments = assignmentsResult.rows.filter(assignment => {
-      console.log(`\n🔍 Checking assignment: "${assignment.title}"`);
-      console.log(`   Assignment program_id: ${assignment.program_id}`);
-      console.log(`   Assignment program_name: ${assignment.program_name}`);
+    if (studentProgramIds.length > 0) {
+      // Use program_id matching (most accurate)
+      const assignmentsResult = await pool.query(`
+        SELECT a.* 
+        FROM assignments a
+        WHERE a.program_id = ANY($1)
+        ORDER BY a.created_at DESC
+      `, [studentProgramIds]);
       
-      // PRIORITY 1: Check program_id match (most precise)
-      if (assignment.program_id && studentProgramIds.includes(assignment.program_id)) {
-        console.log(`   ✅ MATCH via program_id: ${assignment.program_id}`);
-        return true;
-      }
-      
-      // PRIORITY 2: Check if assignment program_name matches any of student's programs
-      const programMatch = studentProgramNames.some(program => {
-        if (!program || !assignment.program_name) return false;
-        
-        const programLower = program.toLowerCase().trim();
-        const assignmentProgramLower = assignment.program_name.toLowerCase().trim();
-        
-        console.log(`   Comparing: "${programLower}" vs "${assignmentProgramLower}"`);
-        
-        // ONLY exact match - no partial matching to prevent cross-program leakage
-        if (programLower === assignmentProgramLower) {
-          console.log(`   ✅ MATCH via exact program name`);
-          return true;
-        }
-        
-        return false;
-      });
-      
-      if (!programMatch) {
-        console.log(`   ❌ NO MATCH - Assignment not visible to this student`);
-      }
-      
-      return programMatch;
-    });
+      filteredAssignments = assignmentsResult.rows;
+      console.log(`📋 Found ${filteredAssignments.length} assignments via program_id matching`);
+    }
     
-    console.log('\n=== FILTERING RESULTS ===');
-    console.log(`✅ Filtered ${filteredAssignments.length} assignments for student (out of ${assignmentsResult.rows.length} total)`);
+    // FALLBACK: If no assignments found via program_id, try name-based matching
+    // This handles legacy assignments that might not have program_id set
+    if (filteredAssignments.length === 0 && studentProgramNames.length > 0) {
+      console.log('⚠️ No assignments found via program_id, trying name-based matching...');
+      
+      const assignmentsResult = await pool.query(`
+        SELECT a.* 
+        FROM assignments a
+        WHERE LOWER(a.program_name) = ANY($1)
+        ORDER BY a.created_at DESC
+      `, [studentProgramNames.map(name => name.toLowerCase())]);
+      
+      filteredAssignments = assignmentsResult.rows;
+      console.log(`📋 Found ${filteredAssignments.length} assignments via program_name matching`);
+    }
     
-    if (filteredAssignments.length === 0) {
-      console.warn('⚠️ WARNING: NO ASSIGNMENTS MATCHED!');
-      console.warn('   Possible reasons:');
-      console.warn('   1. Assignment program_name does not exactly match any student program name');
-      console.warn('   2. Assignment program_id is null or does not match student program IDs');
-      console.warn('   3. No assignments exist for this student\'s programs');
-    } else {
-      console.log('✅ Matched assignments:');
+    console.log('\n=== ASSIGNMENT FILTERING DEBUG ===');
+    console.log(`Student Programs (IDs): [${studentProgramIds.join(', ')}]`);
+    console.log(`Student Programs (Names): [${studentProgramNames.join(', ')}]`);
+    console.log(`Total Assignments Found: ${filteredAssignments.length}`);
+    
+    if (filteredAssignments.length > 0) {
+      console.log('\n✅ Matched Assignments:');
       filteredAssignments.forEach(a => {
         console.log(`   - "${a.title}" (program: ${a.program_name}, program_id: ${a.program_id})`);
       });
+    }
+    
+    if (filteredAssignments.length === 0) {
+      console.warn('\n⚠️ WARNING: NO ASSIGNMENTS MATCHED!');
+      console.warn('   Possible reasons:');
+      console.warn('   1. No assignments created for student\'s programs');
+      console.warn('   2. Assignment program_id does not match student program IDs');
+      console.warn('   3. Assignment program_name does not match student program names');
     }
     
     res.json({ success: true, data: filteredAssignments });
@@ -2588,7 +2584,7 @@ app.get('/api/assessments', async (req, res) => {
         
         console.log('Student Programs:', studentPrograms);
         
-        // Filter assessments based on student's programs
+        // Filter assessments based on student's programs - EXACT MATCH ONLY
         filteredAssessments = result.rows.filter(assessment => {
           // Check if assessment program matches any of student's programs
           const programMatch = studentPrograms.some(program => {
@@ -2597,27 +2593,9 @@ app.get('/api/assessments', async (req, res) => {
             const programLower = program.toLowerCase().trim();
             const assessmentProgramLower = assessment.program_name.toLowerCase().trim();
             
-            // Exact match
+            // ONLY exact match - prevents cross-program leakage
             if (programLower === assessmentProgramLower) {
               console.log(`✅ Assessment "${assessment.title}" - Exact program match: ${assessment.program_name}`);
-              return true;
-            }
-            
-            // Contains match
-            if (programLower.includes(assessmentProgramLower) || assessmentProgramLower.includes(programLower)) {
-              console.log(`✅ Assessment "${assessment.title}" - Partial program match: ${assessment.program_name}`);
-              return true;
-            }
-            
-            // Word-based matching
-            const programWords = programLower.split(/\s+/);
-            const assessmentWords = assessmentProgramLower.split(/\s+/);
-            const commonWords = programWords.filter(word => 
-              word.length > 3 && assessmentWords.includes(word)
-            );
-            
-            if (commonWords.length >= 2) {
-              console.log(`✅ Assessment "${assessment.title}" - Word match: ${assessment.program_name}`);
               return true;
             }
             
@@ -3846,20 +3824,61 @@ app.post('/api/assignments', async (req, res) => {
     console.log('Converted Lecturer ID:', lecturerIdInt);
 
     // Get program_id from program_name for precise targeting
+    // CRITICAL: This ensures assignments are sent to the correct program ONLY
     let programId = null;
     try {
+      // First, try to find program by exact name match
       const programResult = await pool.query(
-        'SELECT id FROM programs WHERE name = $1 LIMIT 1',
+        'SELECT id, name, lecturer_id FROM programs WHERE name = $1 LIMIT 1',
         [program_name]
       );
+      
       if (programResult.rows.length > 0) {
         programId = programResult.rows[0].id;
         console.log('✅ Found program_id:', programId, 'for program:', program_name);
+        
+        // VALIDATION: Check if lecturer is assigned to this program
+        const programLecturerId = programResult.rows[0].lecturer_id;
+        if (programLecturerId && programLecturerId !== lecturerIdInt) {
+          console.warn('⚠️ WARNING: Lecturer', lecturerIdInt, 'is creating assignment for program', program_name, 'but program is assigned to lecturer', programLecturerId);
+          // Allow it but log warning - lecturer might be teaching multiple sections
+        }
       } else {
-        console.log('⚠️ No program_id found for program:', program_name, '- assignment will use name-based matching');
+        // If no exact match, try case-insensitive search
+        const programResultCaseInsensitive = await pool.query(
+          'SELECT id, name FROM programs WHERE LOWER(name) = LOWER($1) LIMIT 1',
+          [program_name]
+        );
+        
+        if (programResultCaseInsensitive.rows.length > 0) {
+          programId = programResultCaseInsensitive.rows[0].id;
+          console.log('✅ Found program_id (case-insensitive):', programId, 'for program:', program_name);
+        } else {
+          console.error('❌ CRITICAL: No program found with name:', program_name);
+          console.error('   This assignment will NOT be visible to students!');
+          console.error('   Available programs should be fetched from /api/lecturer-programs');
+          
+          return res.status(400).json({ 
+            success: false, 
+            error: `Program "${program_name}" not found in database. Please select a valid program from the dropdown.` 
+          });
+        }
       }
     } catch (err) {
-      console.log('⚠️ Error looking up program_id:', err.message);
+      console.error('❌ Error looking up program_id:', err.message);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to validate program. Please try again.' 
+      });
+    }
+    
+    // Final validation: Ensure we have a program_id
+    if (!programId) {
+      console.error('❌ CRITICAL: program_id is null after lookup!');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Failed to identify program. Please contact administrator.' 
+      });
     }
 
     const result = await pool.query(`
@@ -3966,10 +3985,12 @@ app.get('/api/lecturer-programs', async (req, res) => {
 // Get assignments for students
 app.get('/api/student-assignments', async (req, res) => {
   try {
-    const { student_program } = req.query;
+    const { student_program, student_id, student_username } = req.query;
     
     console.log('=== STUDENT ASSIGNMENTS API DEBUG ===');
     console.log('Student program requested:', student_program);
+    console.log('Student ID:', student_id);
+    console.log('Student username:', student_username);
     
     // First, auto-delete expired assignments
     await pool.query(`
@@ -3980,21 +4001,73 @@ app.get('/api/student-assignments', async (req, res) => {
     
     console.log('Auto-updated expired assignments');
     
-    // Multiple matching strategies for program names
-    const result = await pool.query(`
-      SELECT a.* FROM assignments a
-      WHERE (
-        a.program_name = $1 OR
-        a.program_name ILIKE '%' || $1 || '%' OR
-        $1 ILIKE '%' || a.program_name || '%' OR
-        (a.program_name ILIKE '%computer%' AND $1 ILIKE '%computer%') OR
-        (a.program_name ILIKE '%information%' AND $1 ILIKE '%information%') OR
-        (a.program_name ILIKE '%engineering%' AND $1 ILIKE '%engineering%')
-      ) 
-      AND a.status = 'active' 
-      AND a.deadline > NOW()
-      ORDER BY a.deadline ASC
-    `, [student_program]);
+    // IMPROVED: Get student's actual programs from database
+    let studentProgramIds = [];
+    let studentProgramNames = [];
+    
+    if (student_id || student_username) {
+      try {
+        // Get student info
+        let studentQuery = '';
+        let studentParams = [];
+        
+        if (student_id) {
+          studentQuery = 'SELECT s.*, c.name as course_name FROM students s LEFT JOIN courses c ON s.course_id = c.id WHERE s.id = $1';
+          studentParams = [student_id];
+        } else {
+          studentQuery = 'SELECT s.*, c.name as course_name FROM students s LEFT JOIN courses c ON s.course_id = c.id WHERE s.registration_number = $1 OR s.email = $1 OR s.name = $1';
+          studentParams = [student_username];
+        }
+        
+        const studentResult = await pool.query(studentQuery, studentParams);
+        
+        if (studentResult.rows.length > 0) {
+          const studentInfo = studentResult.rows[0];
+          
+          // Get student's programs
+          const programsResult = await pool.query(
+            'SELECT id, name FROM programs WHERE course_id = $1',
+            [studentInfo.course_id]
+          );
+          
+          studentProgramIds = programsResult.rows.map(p => p.id);
+          studentProgramNames = programsResult.rows.map(p => p.name);
+          
+          console.log('✅ Found student programs:', studentProgramNames);
+        }
+      } catch (err) {
+        console.error('Error fetching student programs:', err);
+      }
+    }
+    
+    // Query assignments based on program_id (most accurate)
+    let result;
+    
+    if (studentProgramIds.length > 0) {
+      result = await pool.query(`
+        SELECT a.* FROM assignments a
+        WHERE a.program_id = ANY($1)
+        AND a.status = 'active' 
+        AND a.deadline > NOW()
+        ORDER BY a.deadline ASC
+      `, [studentProgramIds]);
+      
+      console.log(`Found ${result.rows.length} assignments via program_id matching`);
+    } else if (student_program) {
+      // Fallback to exact name matching only (no fuzzy matching to prevent cross-program leakage)
+      result = await pool.query(`
+        SELECT a.* FROM assignments a
+        WHERE LOWER(a.program_name) = LOWER($1)
+        AND a.status = 'active' 
+        AND a.deadline > NOW()
+        ORDER BY a.deadline ASC
+      `, [student_program]);
+      
+      console.log(`Found ${result.rows.length} assignments via program_name matching`);
+    } else {
+      result = { rows: [] };
+      console.log('No student program information provided, returning empty array');
+    }
 
     console.log('Assignments found for student:', result.rows);
     res.json({ success: true, data: result.rows });
@@ -6085,7 +6158,7 @@ app.get('/api/assignments/lecturer', async (req, res) => {
       SELECT a.*, p.name as program_name
       FROM assignments a
       LEFT JOIN programs p ON a.program_id = p.id
-      WHERE a.created_by = $1
+      WHERE a.lecturer_id = $1
       ORDER BY a.created_at DESC
     `, [lecturer_id]);
     
