@@ -57,16 +57,42 @@ export const Assignments = () => {
           return;
         }
         
-        // Fetch lecturer programs
-        console.log('Fetching programs for lecturer ID:', currentUser.id);
-        const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/lecturer-programs?lecturer_id=${currentUser.id}`);
-        if (programsResponse.ok) {
-          const programsResult = await programsResponse.json();
-          console.log('Programs fetched:', programsResult.data);
-          setLecturerPrograms(programsResult.data || []);
+        // Fetch lecturer programs (regular + short-term)
+        console.log('Fetching programs for lecturer username:', currentUser.username);
+        
+        let allPrograms = [];
+        
+        // Fetch regular programs
+        const regularProgramsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
+        if (regularProgramsResponse.ok) {
+          const regularResult = await regularProgramsResponse.json();
+          console.log('Regular Programs fetched:', regularResult.data?.length || 0);
+          allPrograms = regularResult.data || [];
         } else {
-          console.error('Failed to fetch programs:', programsResponse.status);
+          console.error('Failed to fetch regular programs:', regularProgramsResponse.status);
         }
+        
+        // Fetch short-term programs
+        const shortTermResponse = await fetch(`https://must-lms-backend.onrender.com/api/short-term-programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
+        if (shortTermResponse.ok) {
+          const shortTermResult = await shortTermResponse.json();
+          console.log('Short-term Programs fetched:', shortTermResult.data?.length || 0);
+          
+          // Format short-term programs to match regular programs structure
+          const formattedShortTerm = (shortTermResult.data || []).map(p => ({
+            id: `short-${p.id}`,
+            name: p.title,
+            type: 'short-term',
+            lecturer_name: p.lecturer_name
+          }));
+          
+          allPrograms = [...allPrograms, ...formattedShortTerm];
+        } else {
+          console.error('Failed to fetch short-term programs');
+        }
+        
+        console.log('Total Programs (Regular + Short-term):', allPrograms.length);
+        setLecturerPrograms(allPrograms);
         
         // Fetch assignments
         console.log('Fetching assignments for lecturer ID:', currentUser.id);
@@ -261,19 +287,31 @@ export const Assignments = () => {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Program</label>
-                <select
-                  value={newAssignment.program}
-                  onChange={(e) => setNewAssignment({...newAssignment, program: e.target.value})}
-                  className="w-full border rounded px-3 py-2"
+                <label className="text-sm font-medium mb-2 block">Program</label>
+                <Select 
+                  value={newAssignment.program} 
+                  onValueChange={(value) => setNewAssignment({...newAssignment, program: value})}
                 >
-                  <option value="">Select Program</option>
-                  {lecturerPrograms.map((program) => (
-                    <option key={program.id} value={program.name}>
-                      {program.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Program" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lecturerPrograms.length === 0 ? (
+                      <SelectItem value="no-programs" disabled>
+                        No programs available
+                      </SelectItem>
+                    ) : (
+                      lecturerPrograms.map((program) => (
+                        <SelectItem key={program.id} value={program.name}>
+                          {program.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {lecturerPrograms.length} program(s) available
+                </p>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -44,38 +44,38 @@ export const Announcements = () => {
         // Get current lecturer info
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         console.log('Current Lecturer:', currentUser);
+        
+        if (!currentUser.username) {
+          console.error('No username found for lecturer');
+          return;
+        }
 
-        // Fetch lecturer's regular programs
-        const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
         let allPrograms = [];
+        
+        // Fetch lecturer's regular programs (with lecturer_username filter)
+        const programsResponse = await fetch(
+          `https://must-lms-backend.onrender.com/api/programs?lecturer_username=${encodeURIComponent(currentUser.username)}`
+        );
         
         if (programsResponse.ok) {
           const programsResult = await programsResponse.json();
-          const regularPrograms = programsResult.data || [];
-          
-          // Filter regular programs for current lecturer
-          const lecturerRegularPrograms = regularPrograms.filter(program => 
-            program.lecturer_name === currentUser.username || 
-            program.lecturer_id === currentUser.id
-          );
-          
-          allPrograms = [...lecturerRegularPrograms];
+          console.log('Regular Programs Response:', programsResult.data?.length || 0);
+          allPrograms = programsResult.data || [];
+        } else {
+          console.error('Failed to fetch regular programs');
         }
         
-        // Fetch lecturer's short-term programs
-        const shortTermResponse = await fetch('https://must-lms-backend.onrender.com/api/short-term-programs');
+        // Fetch lecturer's short-term programs (with lecturer_username filter)
+        const shortTermResponse = await fetch(
+          `https://must-lms-backend.onrender.com/api/short-term-programs?lecturer_username=${encodeURIComponent(currentUser.username)}`
+        );
+        
         if (shortTermResponse.ok) {
           const shortTermResult = await shortTermResponse.json();
-          const shortTermPrograms = shortTermResult.data || [];
-          
-          // Filter short-term programs for current lecturer
-          const lecturerShortTermPrograms = shortTermPrograms.filter(program => 
-            program.lecturer_name === currentUser.username || 
-            program.lecturer_id === currentUser.id
-          );
+          console.log('Short-Term Programs Response:', shortTermResult.data?.length || 0);
           
           // Convert short-term programs to same format as regular programs
-          const formattedShortTermPrograms = lecturerShortTermPrograms.map(program => ({
+          const formattedShortTermPrograms = (shortTermResult.data || []).map(program => ({
             id: `short-${program.id}`,
             name: program.title,
             lecturer_name: program.lecturer_name,
@@ -84,9 +84,11 @@ export const Announcements = () => {
           }));
           
           allPrograms = [...allPrograms, ...formattedShortTermPrograms];
+        } else {
+          console.error('Failed to fetch short-term programs');
         }
         
-        console.log('All Lecturer Programs (Regular + Short-Term):', allPrograms);
+        console.log('All Lecturer Programs (Regular + Short-Term):', allPrograms.length);
         setLecturerPrograms(allPrograms);
 
         // Fetch announcements created by this lecturer

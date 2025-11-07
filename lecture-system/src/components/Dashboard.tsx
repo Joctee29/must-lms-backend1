@@ -160,22 +160,25 @@ export const Dashboard = () => {
           }
         }
 
-        // Fetch students - only those in lecturer's programs
-        const studentsResponse = await fetch(`${API_BASE_URL}/students`);
-        if (studentsResponse.ok) {
-          const studentsResult = await studentsResponse.json();
-          if (studentsResult.success) {
-            // Get course IDs from lecturer's programs
-            const courseIds = allPrograms.map(p => p.course_id).filter(Boolean);
-            console.log('Course IDs for filtering students:', courseIds);
-            
-            // Filter students by course IDs
-            const lecturerStudents = studentsResult.data.filter((s: any) => 
-              courseIds.includes(s.course_id)
-            );
-            console.log('Filtered Students:', lecturerStudents.length);
-            setStudents(lecturerStudents);
+        // Fetch students - use lecturer_id parameter for backend filtering
+        // Use lecturerData which was already fetched above
+        if (lecturerData && lecturerData.id) {
+          const lecturerId = lecturerData.id;
+          console.log('Lecturer ID for students query:', lecturerId);
+          
+          // Fetch students with lecturer_id and user_type parameters
+          const studentsResponse = await fetch(`${API_BASE_URL}/students?lecturer_id=${lecturerId}&user_type=lecturer`);
+          if (studentsResponse.ok) {
+            const studentsResult = await studentsResponse.json();
+            console.log('Students from backend:', studentsResult.data?.length || 0);
+            setStudents(studentsResult.data || []);
+          } else {
+            console.error('Failed to fetch students');
+            setStudents([]);
           }
+        } else {
+          console.error('No lecturer data available for students query');
+          setStudents([]);
         }
         
       } catch (error) {

@@ -260,10 +260,25 @@ export const ContentManager = () => {
   };
 
   const handleUploadContent = async () => {
-    if (!newContent.title || !newContent.file || !newContent.program) return;
+    if (!newContent.title || !newContent.file || !newContent.program) {
+      alert('Please fill in all required fields and select a file');
+      return;
+    }
+    
+    // File size validation (50MB limit for Render free tier)
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    if (newContent.file.size > MAX_FILE_SIZE) {
+      alert(`File too large! Maximum size: 50MB\nYour file: ${(newContent.file.size / (1024 * 1024)).toFixed(1)}MB\n\nPlease compress or choose a smaller file.`);
+      return;
+    }
     
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      
+      console.log('=== STARTING CONTENT UPLOAD ===');
+      console.log('File name:', newContent.file.name);
+      console.log('File size:', `${(newContent.file.size / (1024 * 1024)).toFixed(1)} MB`);
+      console.log('File type:', newContent.file.type);
       
       // Upload actual file to backend
       const formData = new FormData();
@@ -276,16 +291,20 @@ export const ContentManager = () => {
       formData.append('file_size', `${(newContent.file.size / (1024 * 1024)).toFixed(1)} MB`);
       formData.append('file', newContent.file); // ACTUAL FILE
       
+      setIsUploading(true);
+      setUploadProgress(10);
+      
       const response = await fetch('https://must-lms-backend.onrender.com/api/content/upload', {
         method: 'POST',
         body: formData // Send FormData with actual file
       });
       
+      setUploadProgress(90);
+      
       if (response.ok) {
         const result = await response.json();
         
-        console.log('=== CONTENT UPLOAD DEBUG ===');
-        console.log('FormData Sent with actual file');
+        console.log('=== CONTENT UPLOAD SUCCESS ===');
         console.log('Backend Response:', result);
         console.log('Program Name Saved:', result.data.program_name);
         console.log('File URL:', result.data.file_url);
@@ -306,13 +325,24 @@ export const ContentManager = () => {
         };
         
         setContent([newItem, ...content]);
-        alert('Content uploaded successfully to database!');
+        setUploadProgress(100);
+        alert('✅ Content uploaded successfully!\n\nNote: Files are stored temporarily on Render free tier. For permanent storage, consider upgrading or using cloud storage (Cloudinary, AWS S3).');
       } else {
-        throw new Error('Upload failed');
+        const errorText = await response.text();
+        console.error('Upload failed:', errorText);
+        throw new Error(`Upload failed: ${response.status} - ${errorText}`);
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Failed to upload content. Please check server connection.');
+      setIsUploading(false);
+      setUploadProgress(0);
+      
+      // More detailed error message
+      if (error.message.includes('Failed to fetch')) {
+        alert('❌ Failed to upload content.\n\nPossible causes:\n1. Server connection issue\n2. File too large (max 50MB)\n3. Network timeout\n\nPlease try:\n- Check internet connection\n- Use smaller file\n- Try again in a moment');
+      } else {
+        alert(`❌ Failed to upload content.\n\nError: ${error.message}\n\nPlease check server connection and try again.`);
+      }
       return; // Don't add to local state if server fails
     }
     

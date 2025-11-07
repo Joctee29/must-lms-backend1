@@ -30,7 +30,7 @@ export const Profile = () => {
     }
   }, []);
 
-  // Fetch ONLY lecturer's own data - kama ulivyoeleza
+  // Fetch ONLY lecturer's own data using efficient endpoints
   useEffect(() => {
     const fetchLecturerData = async () => {
       if (!currentUser?.username) return;
@@ -38,43 +38,48 @@ export const Profile = () => {
       try {
         setLoading(true);
         
-        // Fetch lecturer data, programs, courses, and short-term programs
-        const [lecturerResponse, programsResponse, coursesResponse, shortTermResponse] = await Promise.all([
-          fetch(`${API_BASE_URL}/lecturers`),
-          fetch(`${API_BASE_URL}/programs`),
-          fetch(`${API_BASE_URL}/courses`),
-          fetch(`${API_BASE_URL}/short-term-programs`)
-        ]);
+        console.log('=== PROFILE DATA FETCH ===');
+        console.log('Current User:', currentUser);
         
-        const [lecturerResult, programsResult, coursesResult, shortTermResult] = await Promise.all([
-          lecturerResponse.json(),
-          programsResponse.json(),
-          coursesResponse.json(),
-          shortTermResponse.json()
-        ]);
+        // Fetch lecturer info using efficient endpoint
+        const lecturerResponse = await fetch(`${API_BASE_URL}/lecturers?username=${encodeURIComponent(currentUser.username)}`);
+        const lecturerResult = await lecturerResponse.json();
+        console.log('Lecturer Response:', lecturerResult);
         
-        if (lecturerResult.success) {
-          const lecturer = lecturerResult.data.find((l: any) => 
-            l.employee_id === currentUser.username || l.name === currentUser.username
-          );
-          
-          if (lecturer) {
-            setLecturerData(lecturer);
-            setEditForm({
-              name: lecturer.name || "",
-              email: lecturer.email || "",
-              phone: lecturer.phone || "",
-              specialization: lecturer.specialization || ""
-            });
-          }
+        let lecturer = null;
+        if (lecturerResult.success && lecturerResult.data.length > 0) {
+          lecturer = lecturerResult.data[0];
+          console.log('Found Lecturer:', lecturer);
+          setLecturerData(lecturer);
+          setEditForm({
+            name: lecturer.name || "",
+            email: lecturer.email || "",
+            phone: lecturer.phone || "",
+            specialization: lecturer.specialization || ""
+          });
         }
         
-        // Combine regular programs and short-term programs
-        let allPrograms = [];
+        if (!lecturer) {
+          console.log('Lecturer not found in database');
+          setLoading(false);
+          return;
+        }
         
+        // Fetch only THIS lecturer's programs using efficient endpoint
+        const programsResponse = await fetch(`${API_BASE_URL}/programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
+        const programsResult = await programsResponse.json();
+        console.log('Programs Response:', programsResult);
+        
+        let allPrograms = [];
         if (programsResult.success) {
           allPrograms = [...programsResult.data];
+          console.log('Lecturer Regular Programs:', allPrograms.length);
         }
+        
+        // Fetch only THIS lecturer's short-term programs using efficient endpoint
+        const shortTermResponse = await fetch(`${API_BASE_URL}/short-term-programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
+        const shortTermResult = await shortTermResponse.json();
+        console.log('Short-Term Programs Response:', shortTermResult);
         
         if (shortTermResult.success) {
           // Convert short-term programs to same format as regular programs
@@ -88,9 +93,14 @@ export const Profile = () => {
           }));
           
           allPrograms = [...allPrograms, ...formattedShortTermPrograms];
+          console.log('Total Programs (Regular + Short-Term):', allPrograms.length);
         }
         
         setPrograms(allPrograms);
+        
+        // Fetch courses
+        const coursesResponse = await fetch(`${API_BASE_URL}/courses`);
+        const coursesResult = await coursesResponse.json();
         
         if (coursesResult.success) {
           setCourses(coursesResult.data);

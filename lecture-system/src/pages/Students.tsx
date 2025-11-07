@@ -123,8 +123,8 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
           return;
         }
         
-        // 3. Get students enrolled in lecturer's programs
-        const studentsResponse = await fetch(`${API_BASE_URL}/students`);
+        // 3. Get students enrolled in lecturer's programs (with proper authorization)
+        const studentsResponse = await fetch(`${API_BASE_URL}/students?lecturer_id=${lecturerData.id}&user_type=lecturer`);
         if (!studentsResponse.ok) {
           throw new Error('Failed to fetch students');
         }
@@ -133,16 +133,8 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
         
         let lecturerStudents = [];
         if (studentsResult.success) {
-          console.log('All Students:', studentsResult.data);
-          // Get course IDs from lecturer's programs
-          const courseIds = lecturerPrograms.map(p => p.course_id);
-          console.log('Course IDs for lecturer programs:', courseIds);
-          
-          // Filter students by course IDs
-          lecturerStudents = studentsResult.data.filter((student: any) => 
-            courseIds.includes(student.course_id)
-          );
-          console.log('Filtered Students by Course IDs:', lecturerStudents);
+          lecturerStudents = studentsResult.data || [];
+          console.log('Students from backend (filtered by lecturer):', lecturerStudents.length);
         }
         
         console.log('Final Students in lecturer courses:', lecturerStudents);
@@ -207,10 +199,19 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
       matchesProgram = true; // Show ALL students
     } else {
       // Filter by specific program
-      matchesProgram = programs.some(program => 
-        program.id.toString() === selectedProgramFilter && 
-        program.course_id === student.course_id
-      );
+      const selectedProgram = programs.find(p => p.id.toString() === selectedProgramFilter);
+      
+      if (selectedProgram) {
+        // For short-term programs (course_id is null or type is 'short-term'), show all students
+        if (selectedProgram.type === 'short-term' || !selectedProgram.course_id) {
+          matchesProgram = true; // Short-term programs apply to all students
+        } else {
+          // For regular programs, match by course_id
+          matchesProgram = selectedProgram.course_id === student.course_id;
+        }
+      } else {
+        matchesProgram = false;
+      }
     }
     
     return matchesSearch && matchesProgram;

@@ -59,35 +59,37 @@ export const LiveClassroom = () => {
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       
-      // Get lecturer's regular programs
-      const programsResponse = await fetch('https://must-lms-backend.onrender.com/api/programs');
+      if (!currentUser.username) {
+        console.error('No username found for lecturer');
+        return;
+      }
+      
       let allPrograms = [];
+      
+      // Get lecturer's regular programs (with lecturer_username filter)
+      const programsResponse = await fetch(
+        `https://must-lms-backend.onrender.com/api/programs?lecturer_username=${encodeURIComponent(currentUser.username)}`
+      );
       
       if (programsResponse.ok) {
         const programsResult = await programsResponse.json();
-        
-        // Filter regular programs for current lecturer
-        const lecturerPrograms = programsResult.data?.filter(program => 
-          program.lecturer_name === currentUser.username ||
-          program.lecturer_id === currentUser.id
-        ) || [];
-        
-        allPrograms = [...lecturerPrograms];
+        console.log('Regular Programs for Live Classroom:', programsResult.data?.length || 0);
+        allPrograms = programsResult.data || [];
+      } else {
+        console.error('Failed to fetch regular programs');
       }
       
-      // Get lecturer's short-term programs
-      const shortTermResponse = await fetch('https://must-lms-backend.onrender.com/api/short-term-programs');
+      // Get lecturer's short-term programs (with lecturer_username filter)
+      const shortTermResponse = await fetch(
+        `https://must-lms-backend.onrender.com/api/short-term-programs?lecturer_username=${encodeURIComponent(currentUser.username)}`
+      );
+      
       if (shortTermResponse.ok) {
         const shortTermResult = await shortTermResponse.json();
-        
-        // Filter short-term programs for current lecturer
-        const lecturerShortTermPrograms = shortTermResult.data?.filter(program => 
-          program.lecturer_name === currentUser.username ||
-          program.lecturer_id === currentUser.id
-        ) || [];
+        console.log('Short-Term Programs for Live Classroom:', shortTermResult.data?.length || 0);
         
         // Convert short-term programs to same format as regular programs
-        const formattedShortTermPrograms = lecturerShortTermPrograms.map(program => ({
+        const formattedShortTermPrograms = (shortTermResult.data || []).map(program => ({
           id: `short-${program.id}`,
           name: program.title,
           lecturer_name: program.lecturer_name,
@@ -96,8 +98,11 @@ export const LiveClassroom = () => {
         }));
         
         allPrograms = [...allPrograms, ...formattedShortTermPrograms];
+      } else {
+        console.error('Failed to fetch short-term programs');
       }
       
+      console.log('Total Programs for Live Classroom:', allPrograms.length);
       setLecturerPrograms(allPrograms);
     } catch (error) {
       console.error('Error loading lecturer programs:', error);
