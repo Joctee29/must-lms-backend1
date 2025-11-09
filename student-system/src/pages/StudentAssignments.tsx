@@ -215,6 +215,52 @@ export const StudentAssignments = () => {
       // Use course name as program for submission matching
       const studentProgram = currentUser.program || currentUser.course || currentUser.course_name || 'Computer Science';
       
+      let filePath = null;
+      let fileName = null;
+      
+      // If PDF submission, upload the file first
+      if (selectedAssignment.submission_type === 'pdf' && pdfFile) {
+        console.log('📤 Uploading PDF file to server...');
+        console.log('📄 File details:', {
+          name: pdfFile.name,
+          size: pdfFile.size,
+          type: pdfFile.type
+        });
+        
+        // Check file size (max 100MB)
+        const maxSize = 100 * 1024 * 1024; // 100MB
+        if (pdfFile.size > maxSize) {
+          throw new Error('File size too large. Maximum allowed size is 100MB.');
+        }
+        
+        const formData = new FormData();
+        formData.append('file', pdfFile);
+        
+        console.log('🌐 Sending upload request...');
+        const uploadResponse = await fetch('https://must-lms-backend.onrender.com/api/assignment-submissions/upload', {
+          method: 'POST',
+          body: formData
+        });
+        
+        console.log('📡 Upload response status:', uploadResponse.status);
+        
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          console.error('❌ Upload failed:', errorText);
+          throw new Error(`Failed to upload PDF file: ${uploadResponse.status} ${uploadResponse.statusText}`);
+        }
+        
+        const uploadResult = await uploadResponse.json();
+        console.log('✅ File uploaded successfully:', uploadResult);
+        
+        if (!uploadResult.success || !uploadResult.file_path) {
+          throw new Error('Upload succeeded but no file path returned');
+        }
+        
+        filePath = uploadResult.file_path;
+        fileName = uploadResult.file_name;
+      }
+      
       const submissionData = {
         assignment_id: selectedAssignment.original_id || selectedAssignment.id,
         student_id: currentUser.id || 1,
@@ -223,8 +269,8 @@ export const StudentAssignments = () => {
         student_program: studentProgram,
         submission_type: selectedAssignment.submission_type,
         text_content: selectedAssignment.submission_type === 'text' ? textSubmission : null,
-        file_path: selectedAssignment.submission_type === 'pdf' && pdfFile ? `/uploads/${pdfFile.name}` : null,
-        file_name: selectedAssignment.submission_type === 'pdf' && pdfFile ? pdfFile.name : null
+        file_path: filePath,
+        file_name: fileName
       };
 
       console.log('Submission Data to Send:', submissionData);
@@ -240,7 +286,7 @@ export const StudentAssignments = () => {
       if (response.ok) {
         const result = await response.json();
         console.log('Submission Success:', result);
-        alert('Assignment submitted successfully!');
+        alert('✅ Assignment submitted successfully!\n\nYour PDF has been uploaded and your lecturer can now view and download it.');
         setViewMode('list');
         setSelectedAssignment(null);
         setTextSubmission('');
@@ -299,19 +345,19 @@ export const StudentAssignments = () => {
   // SUBMIT ASSIGNMENT VIEW
   if (viewMode === 'submit' && selectedAssignment) {
     return (
-      <div className="flex-1 space-y-6 p-6">
-        <div className="flex items-center gap-4">
+      <div className="flex-1 space-y-6 p-3 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <Button variant="outline" onClick={() => setViewMode('list')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Assignments
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Submit Assignment</h1>
-            <p className="text-muted-foreground">{selectedAssignment.title}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Submit Assignment</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">{selectedAssignment.title}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Assignment Details */}
           <Card className="lg:col-span-1">
             <CardHeader>
@@ -419,7 +465,7 @@ export const StudentAssignments = () => {
                 </div>
               )}
 
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                 <Button 
                   onClick={handleSubmitAssignment}
                   disabled={
@@ -427,12 +473,12 @@ export const StudentAssignments = () => {
                     (selectedAssignment.submission_type === 'text' && !textSubmission.trim()) ||
                     (selectedAssignment.submission_type === 'pdf' && !pdfFile)
                   }
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
                 >
                   <Send className="h-4 w-4 mr-2" />
                   {submitting ? 'Submitting...' : 'Submit Assignment'}
                 </Button>
-                <Button variant="outline" onClick={() => setViewMode('list')}>
+                <Button variant="outline" onClick={() => setViewMode('list')} className="w-full sm:w-auto">
                   Cancel
                 </Button>
               </div>
@@ -445,19 +491,19 @@ export const StudentAssignments = () => {
 
   // MAIN ASSIGNMENTS LIST VIEW
   return (
-    <div className="flex-1 space-y-6 p-6">
-      <div className="flex items-center justify-between">
+    <div className="flex-1 space-y-6 p-3 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Assignments</h1>
-          <p className="text-muted-foreground">View and submit your course assignments</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Assignments</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">View and submit your course assignments</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
+      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-full sm:w-fit overflow-x-auto">
         <button
           onClick={() => setActiveTab('available')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
             activeTab === 'available'
               ? 'bg-white text-blue-600 shadow-sm'
               : 'text-gray-600 hover:text-gray-900'
@@ -467,7 +513,7 @@ export const StudentAssignments = () => {
         </button>
         <button
           onClick={() => setActiveTab('submitted')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
             activeTab === 'submitted'
               ? 'bg-white text-blue-600 shadow-sm'
               : 'text-gray-600 hover:text-gray-900'
@@ -499,29 +545,31 @@ export const StudentAssignments = () => {
               ) : (
                 assignments.map((assignment) => (
                   <Card key={assignment.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                         <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-xl font-semibold">{assignment.title}</h3>
-                            <Badge className={getStatusColor(assignment.deadline)}>
-                              <Clock className="h-3 w-3 mr-1" />
-                              {getTimeRemaining(assignment.deadline)}
-                            </Badge>
-                            {assignment.submission_type === 'text' ? (
-                              <Badge variant="outline">
-                                <Type className="h-3 w-3 mr-1" />
-                                Text
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                            <h3 className="text-lg sm:text-xl font-semibold">{assignment.title}</h3>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge className={getStatusColor(assignment.deadline)}>
+                                <Clock className="h-3 w-3 mr-1" />
+                                {getTimeRemaining(assignment.deadline)}
                               </Badge>
-                            ) : (
-                              <Badge variant="outline">
-                                <Upload className="h-3 w-3 mr-1" />
-                                PDF
-                              </Badge>
-                            )}
+                              {assignment.submission_type === 'text' ? (
+                                <Badge variant="outline">
+                                  <Type className="h-3 w-3 mr-1" />
+                                  Text
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">
+                                  <Upload className="h-3 w-3 mr-1" />
+                                  PDF
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-gray-600 mb-3 line-clamp-2">{assignment.description}</p>
-                          <div className="flex items-center gap-4 text-sm text-gray-500">
+                          <p className="text-sm sm:text-base text-gray-600 mb-3 line-clamp-2">{assignment.description}</p>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
                             <div className="flex items-center gap-1">
                               <BookOpen className="h-4 w-4" />
                               {assignment.program_name}
@@ -536,17 +584,18 @@ export const StudentAssignments = () => {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
                           <Button 
                             onClick={() => {
                               setSelectedAssignment(assignment);
                               setViewMode('submit');
                             }}
-                            className="bg-blue-600 hover:bg-blue-700"
+                            className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto text-sm"
                             disabled={new Date(assignment.deadline) <= new Date()}
                           >
                             <Send className="h-4 w-4 mr-2" />
-                            Submit Assignment
+                            <span className="hidden sm:inline">Submit Assignment</span>
+                            <span className="sm:hidden">Submit</span>
                           </Button>
                         </div>
                       </div>

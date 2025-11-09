@@ -830,31 +830,33 @@ export const Assignments = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => handleViewSubmissions(assignment)}
+                      className="w-full sm:w-auto text-xs sm:text-sm"
                     >
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Submissions ({assignment.submission_count || 0})
+                      <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">View Submissions ({assignment.submission_count || 0})</span>
+                      <span className="sm:hidden">View ({assignment.submission_count || 0})</span>
                     </Button>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => handleEditAssignment(assignment)}
-                      className="text-green-600 border-green-200 hover:bg-green-50"
+                      className="text-green-600 border-green-200 hover:bg-green-50 w-full sm:w-auto text-xs sm:text-sm"
                     >
-                      <Edit className="h-4 w-4 mr-2" />
+                      <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                       Edit
                     </Button>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => handleDeleteAssignment(assignment)}
-                      className="text-red-600 border-red-200 hover:bg-red-50"
+                      className="text-red-600 border-red-200 hover:bg-red-50 w-full sm:w-auto text-xs sm:text-sm"
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
+                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                       Delete
                     </Button>
                   </div>

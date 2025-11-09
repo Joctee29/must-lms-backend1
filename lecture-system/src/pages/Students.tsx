@@ -135,19 +135,19 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
         
         console.log('Lecturer Course IDs:', lecturerCourseIds);
         
-        // Fetch ALL students
-        const studentsResponse = await fetch(`${API_BASE_URL}/students`);
+        // Fetch students using lecturer_id parameter for backend filtering
+        const studentsResponse = await fetch(`${API_BASE_URL}/students?lecturer_id=${currentLecturer.id}&user_type=lecturer`);
         if (!studentsResponse.ok) {
           throw new Error('Failed to fetch students');
         }
         const studentsResult = await studentsResponse.json();
-        console.log('All Students API Response:', studentsResult);
+        console.log('Lecturer Students API Response:', studentsResult);
         
         let lecturerStudents = [];
         if (studentsResult.success && studentsResult.data) {
-          // Filter students who are enrolled in lecturer's program courses
-          lecturerStudents = studentsResult.data.filter((student: any) => 
-            lecturerCourseIds.includes(student.course_id)
+          // Students are already filtered by backend
+          lecturerStudents = studentsResult.data;
+          console.log('✅ Students already filtered by backend:', lecturerStudents.length
           );
           console.log(`Filtered ${lecturerStudents.length} students from ${studentsResult.data.length} total students`);
           console.log('Students in lecturer courses:', lecturerStudents);
@@ -245,12 +245,12 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
     return program ? program.name : "No Program";
   };
   return (
-    <div className="flex-1 space-y-6 p-6">
+    <div className="flex-1 space-y-4 sm:space-y-6 p-3 sm:p-6">
       
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Students</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Students</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Manage and view students in your programs
           </p>
         </div>
@@ -268,26 +268,29 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
             URL.revokeObjectURL(url);
             alert('Student list exported successfully!');
           }}
+          className="w-full sm:w-auto text-xs sm:text-sm"
+          size="sm"
         >
-          <Users className="mr-2 h-4 w-4" />
-          Export Student List
+          <Users className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+          <span className="hidden sm:inline">Export Student List</span>
+          <span className="sm:hidden">Export</span>
         </Button>
       </div>
 
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
         <div className="flex-1">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search students by name, registration number, or course..."
+              placeholder="Search students..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 text-sm"
             />
           </div>
         </div>
         <Select value={selectedProgramFilter} onValueChange={setSelectedProgramFilter}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full sm:w-[200px] text-sm">
             <SelectValue placeholder="Filter by program" />
           </SelectTrigger>
           <SelectContent>
@@ -338,44 +341,44 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
         ) : (
           filteredStudents.map((student) => (
             <Card key={student.id}>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-4">
-                  <Avatar className="h-12 w-12">
+              <CardContent className="p-3 sm:p-6">
+                <div className="flex items-center space-x-3 sm:space-x-4">
+                  <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
                     <AvatarImage src="" alt={student.name} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xs sm:text-base">
                       {student.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'ST'}
                     </AvatarFallback>
                   </Avatar>
                   
                   <div className="flex-1 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold">{student.name || 'Unknown Student'}</h3>
-                      <Badge variant="outline" className="bg-green-100 text-green-800">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
+                      <h3 className="text-base sm:text-lg font-semibold">{student.name || 'Unknown Student'}</h3>
+                      <Badge variant="outline" className="bg-green-100 text-green-800 text-xs w-fit">
                         Active
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">Reg: {student.registration_number || 'No Reg Number'}</p>
-                    <p className="text-sm text-muted-foreground">Course: {student.course_name || 'Unknown Course'}</p>
-                    <p className="text-sm font-medium text-green-600">Program: {getStudentProgram(student.course_id)}</p>
-                    <p className="text-sm text-muted-foreground">Email: {student.email || 'No Email'}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Reg: {student.registration_number || 'No Reg Number'}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">Course: {student.course_name || 'Unknown Course'}</p>
+                    <p className="text-xs sm:text-sm font-medium text-green-600 line-clamp-1">Program: {getStudentProgram(student.course_id)}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">Email: {student.email || 'No Email'}</p>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div className="hidden md:grid grid-cols-3 gap-4 text-sm">
                     <div className="text-center">
-                      <p className="font-medium">Academic Year</p>
+                      <p className="font-medium text-xs">Academic Year</p>
                       <p className="text-sm font-bold text-green-600">{student.academic_year || '2024/2025'}</p>
                     </div>
                     <div className="text-center">
-                      <p className="font-medium">Semester</p>
+                      <p className="font-medium text-xs">Semester</p>
                       <p className="text-sm font-bold text-green-600">Sem {student.current_semester || 1}</p>
                     </div>
                     <div className="text-center">
-                      <p className="font-medium">Status</p>
-                      <Badge variant="default">Active</Badge>
+                      <p className="font-medium text-xs">Status</p>
+                      <Badge variant="default" className="text-xs">Active</Badge>
                     </div>
                   </div>
 
-                  <div className="flex space-x-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button 
                       variant="outline" 
                       size="sm"
@@ -383,17 +386,21 @@ export const Students = ({ selectedProgramId, selectedProgramName }: StudentsPro
                         window.open(`mailto:${student.email}?subject=MUST LMS - Message from Instructor&body=Dear ${student.name},%0D%0A%0D%0A`, '_blank');
                         alert(`Opening email to ${student.name}...`);
                       }}
+                      className="text-xs sm:text-sm w-full sm:w-auto"
                     >
-                      <Mail className="mr-2 h-4 w-4" />
-                      Email
+                      <Mail className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">Email</span>
+                      <span className="sm:hidden">📧</span>
                     </Button>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => alert(`Viewing progress for ${student.name}:\n\nStatus: Active\nEnrolled: Yes`)}
+                      className="text-xs sm:text-sm w-full sm:w-auto"
                     >
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Progress
+                      <BarChart3 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">Progress</span>
+                      <span className="sm:hidden">📊</span>
                     </Button>
                   </div>
                 </div>

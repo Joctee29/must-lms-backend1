@@ -516,17 +516,25 @@ export const Discussions = () => {
         />
       </div>
 
-      {/* Category Tabs */}
-      <div className="flex space-x-2 overflow-x-auto">
+      {/* Category Tabs - Mobile Responsive */}
+      <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
         {categories.map((category) => (
           <Button
             key={category.id}
             variant={activeTab === category.id ? "default" : "outline"}
             onClick={() => setActiveTab(category.id)}
-            className="whitespace-nowrap"
+            className="whitespace-nowrap flex-shrink-0 text-xs sm:text-sm px-2 sm:px-4 py-1 sm:py-2"
+            size="sm"
           >
-            {category.label}
-            <Badge variant="secondary" className="ml-2">
+            <span className="hidden sm:inline">{category.label}</span>
+            <span className="sm:hidden">
+              {category.id === "all" ? "All" : 
+               category.id === "help" ? "Help" :
+               category.id === "study-group" ? "Groups" :
+               category.id === "resources" ? "Resources" :
+               "General"}
+            </span>
+            <Badge variant="secondary" className="ml-1 sm:ml-2 text-xs px-1 sm:px-2">
               {category.count}
             </Badge>
           </Button>

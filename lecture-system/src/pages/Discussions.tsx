@@ -99,20 +99,18 @@ export const Discussions = () => {
         setLecturerPrograms(allPrograms);
         console.log('All Lecturer Courses (Regular + Short-Term):', allCourses);
         
-        // Filter discussions for lecturer's programs only
-        const discussionsResponse = await fetch('https://must-lms-backend.onrender.com/api/discussions');
+        // Filter discussions for lecturer's programs only - Backend handles filtering now
+        const discussionsResponse = await fetch(
+          `https://must-lms-backend.onrender.com/api/discussions?lecturer_id=${currentUser.id}&lecturer_username=${encodeURIComponent(currentUser.username)}`
+        );
         if (discussionsResponse.ok) {
           const discussionsResult = await discussionsResponse.json();
           console.log('Discussions Response:', discussionsResult);
           
-          const allDiscussions = discussionsResult.data || [];
-          
-          const lecturerDiscussions = allDiscussions.filter(discussion => 
-            allPrograms.some(program => program.name === discussion.program)
-          );
+          const lecturerDiscussions = discussionsResult.data || [];
           
           setDiscussions(lecturerDiscussions);
-          console.log('Lecturer Discussions:', lecturerDiscussions);
+          console.log('Lecturer Discussions (Backend Filtered):', lecturerDiscussions);
         }
         
         setLoading(false);
@@ -304,12 +302,12 @@ export const Discussions = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Course Discussions</h1>
-          <p className="text-muted-foreground">View and manage student discussions</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Course Discussions</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">View and manage student discussions</p>
         </div>
       </div>
 
@@ -324,17 +322,25 @@ export const Discussions = () => {
         />
       </div>
 
-      {/* Category Tabs */}
-      <div className="flex space-x-2 overflow-x-auto">
+      {/* Category Tabs - Mobile Optimized */}
+      <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
         {categories.map((category) => (
           <Button
             key={category.id}
             variant={activeTab === category.id ? "default" : "outline"}
             onClick={() => setActiveTab(category.id)}
-            className="whitespace-nowrap"
+            className="whitespace-nowrap flex-shrink-0 text-xs sm:text-sm px-2 sm:px-4 py-1 sm:py-2"
+            size="sm"
           >
-            {category.label}
-            <Badge variant="secondary" className="ml-2">
+            <span className="hidden sm:inline">{category.label}</span>
+            <span className="sm:hidden">
+              {category.id === "all" ? "All" : 
+               category.id === "help" ? "Help" :
+               category.id === "study-group" ? "Groups" :
+               category.id === "resources" ? "Resources" :
+               "General"}
+            </span>
+            <Badge variant="secondary" className="ml-1 sm:ml-2 text-xs px-1 sm:px-2">
               {category.count}
             </Badge>
           </Button>
@@ -384,34 +390,34 @@ export const Discussions = () => {
       )}
 
       {/* Discussions List */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {filteredDiscussions.map((discussion) => (
           <Card 
             key={discussion.id} 
             className="hover:shadow-md transition-shadow cursor-pointer"
             onClick={() => handleViewReplies(discussion)}
           >
-            <CardContent className="p-6">
-              <div className="flex items-start space-x-4">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-start space-y-3 sm:space-y-0 sm:space-x-4">
                 {/* Avatar */}
-                <Avatar>
+                <Avatar className="hidden sm:block">
                   <AvatarFallback className="bg-gradient-to-r from-primary to-secondary text-white">
                     {discussion.authorInitials}
                   </AvatarFallback>
                 </Avatar>
 
                 {/* Content */}
-                <div className="flex-1 space-y-3">
+                <div className="flex-1 space-y-2 sm:space-y-3">
                   {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center space-x-2 flex-wrap">
                         {discussion.isPinned && (
                           <Pin className="h-4 w-4 text-yellow-500" />
                         )}
-                        <h3 className="font-semibold text-lg">{discussion.title}</h3>
+                        <h3 className="font-semibold text-base sm:text-lg">{discussion.title}</h3>
                       </div>
-                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
                         <span>{discussion.author}</span>
                         <span>•</span>
                         <span>{discussion.course}</span>
@@ -432,7 +438,7 @@ export const Discussions = () => {
                   </div>
 
                   {/* Content */}
-                  <p className="text-muted-foreground">{discussion.content}</p>
+                  <p className="text-sm sm:text-base text-muted-foreground line-clamp-2 sm:line-clamp-none">{discussion.content}</p>
 
                   {/* Study Group Info */}
                   {discussion.category === 'study-group' && discussion.groupName && (
@@ -449,8 +455,8 @@ export const Discussions = () => {
                   )}
 
                   {/* Stats and Actions */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                       <div className="flex items-center space-x-1">
                         <MessageSquare className="h-4 w-4" />
                         <span>{discussion.replies} replies</span>
@@ -474,18 +480,20 @@ export const Discussions = () => {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedDiscussion(discussion);
                             setShowReplyForm(true);
                           }}
+                          className="text-xs sm:text-sm"
                         >
-                          <Reply className="h-4 w-4 mr-1" />
-                          Reply
+                          <Reply className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                          <span className="hidden sm:inline">Reply</span>
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm">
-                        <Pin className="h-4 w-4 mr-1" />
-                        {discussion.isPinned ? 'Unpin' : 'Pin'}
+                      <Button variant="ghost" size="sm" className="text-xs sm:text-sm" onClick={(e) => e.stopPropagation()}>
+                        <Pin className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        <span className="hidden sm:inline">{discussion.isPinned ? 'Unpin' : 'Pin'}</span>
                       </Button>
                     </div>
                   </div>
@@ -509,10 +517,10 @@ export const Discussions = () => {
 
       {/* Detailed Discussion View Modal */}
       {showReplies && selectedDiscussion && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold">Discussion Details</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
+              <h3 className="text-lg sm:text-xl font-semibold">Discussion Details</h3>
               <div className="flex items-center gap-2">
                 <Button 
                   variant="destructive"
@@ -568,7 +576,7 @@ export const Discussions = () => {
             </div>
 
             {/* Statistics Cards */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                 <div className="flex items-center gap-2 mb-2">
                   <MessageSquare className="h-5 w-5 text-green-600" />
@@ -639,27 +647,28 @@ export const Discussions = () => {
             </div>
 
             {/* Lecturer Reply Section */}
-            <div className="border-t pt-6">
-              <h4 className="font-semibold text-lg mb-4">Reply as Lecturer</h4>
-              <div className="space-y-4">
+            <div className="border-t pt-4 sm:pt-6">
+              <h4 className="font-semibold text-base sm:text-lg mb-3 sm:mb-4">Reply as Lecturer</h4>
+              <div className="space-y-3 sm:space-y-4">
                 <textarea
                   value={replyContent}
                   onChange={(e) => setReplyContent(e.target.value)}
                   placeholder="Write your response to students..."
-                  className="w-full p-4 border rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full p-3 sm:p-4 border rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm sm:text-base"
                   rows={4}
                 />
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-col sm:flex-row justify-end gap-2">
                   <Button 
                     variant="outline"
                     onClick={() => setShowReplies(false)}
+                    className="w-full sm:w-auto"
                   >
                     Close
                   </Button>
                   <Button 
                     onClick={handleReplyToDiscussion}
                     disabled={!replyContent.trim()}
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
                   >
                     <Send className="h-4 w-4 mr-2" />
                     Send Reply
