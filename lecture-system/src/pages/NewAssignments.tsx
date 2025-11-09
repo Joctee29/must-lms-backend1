@@ -421,17 +421,17 @@ export const Assignments = () => {
   // CREATE ASSIGNMENT VIEW
   if (viewMode === 'create' || viewMode === 'edit') {
     return (
-      <div className="flex-1 space-y-6 p-6">
-        <div className="flex items-center gap-4">
+      <div className="flex-1 space-y-6 p-3 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <Button variant="outline" onClick={() => setViewMode('list')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Assignments
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
               {viewMode === 'edit' ? 'Edit Assignment' : 'Create Assignment'}
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground">
               {viewMode === 'edit' ? 'Update assignment details' : 'Create a new assignment for your students'}
             </p>
           </div>
@@ -540,16 +540,16 @@ export const Assignments = () => {
               />
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
               <Button 
                 onClick={viewMode === 'edit' ? handleUpdateAssignment : handleCreateAssignment} 
                 disabled={!newAssignment.title || !newAssignment.program || !newAssignment.deadline}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
               >
                 <Send className="h-4 w-4 mr-2" />
                 {viewMode === 'edit' ? 'Update Assignment' : 'Send Assignment to Students'}
               </Button>
-              <Button variant="outline" onClick={() => setViewMode('list')}>
+              <Button variant="outline" onClick={() => setViewMode('list')} className="w-full sm:w-auto">
                 Cancel
               </Button>
             </div>
@@ -562,15 +562,15 @@ export const Assignments = () => {
   // VIEW SUBMISSIONS VIEW
   if (viewMode === 'view-submissions' && selectedAssignment) {
     return (
-      <div className="flex-1 space-y-6 p-6">
-        <div className="flex items-center gap-4">
+      <div className="flex-1 space-y-6 p-3 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <Button variant="outline" onClick={() => setViewMode('list')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Assignments
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Assignment Submissions</h1>
-            <p className="text-muted-foreground">{selectedAssignment.title}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Assignment Submissions</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">{selectedAssignment.title}</p>
           </div>
         </div>
 
@@ -592,14 +592,14 @@ export const Assignments = () => {
             ) : (
               <div className="space-y-4">
                 {selectedAssignment.submissions.map((submission) => (
-                  <div key={submission.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
+                  <div key={submission.id} className="border rounded-lg p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
                         <h4 className="font-semibold">{submission.student_name}</h4>
                         <p className="text-sm text-gray-500">{submission.student_registration}</p>
                         <p className="text-sm text-gray-500">Submitted: {new Date(submission.submitted_at).toLocaleString()}</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {submission.submission_type === 'text' ? (
                           <Badge className="bg-blue-100 text-blue-800">
                             <Type className="h-3 w-3 mr-1" />
@@ -620,23 +620,41 @@ export const Assignments = () => {
                                 // Open PDF in new tab - handle various file path formats
                                 let pdfUrl = submission.file_path;
                                 
+                                console.log('Original file_path:', pdfUrl);
+                                
                                 // If it's already a full URL, use it as is
                                 if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
                                   // Already a complete URL
+                                  console.log('Using full URL:', pdfUrl);
+                                } else if (pdfUrl.startsWith('/content/')) {
+                                  // Extract filename from /content/ path
+                                  const filename = pdfUrl.replace('/content/', '');
+                                  pdfUrl = `https://must-lms-backend.onrender.com/api/files/${encodeURIComponent(filename)}`;
+                                  console.log('Using /content/ path with API endpoint:', pdfUrl);
+                                } else if (pdfUrl.startsWith('/uploads/')) {
+                                  // Extract filename from /uploads/ path
+                                  const filename = pdfUrl.replace('/uploads/', '');
+                                  pdfUrl = `https://must-lms-backend.onrender.com/api/files/${encodeURIComponent(filename)}`;
+                                  console.log('Using /uploads/ path with API endpoint:', pdfUrl);
                                 } else if (pdfUrl.startsWith('/')) {
-                                  // Starts with /, prepend backend URL
-                                  pdfUrl = `https://must-lms-backend.onrender.com${pdfUrl}`;
+                                  // Starts with /, extract filename
+                                  const filename = pdfUrl.substring(1);
+                                  pdfUrl = `https://must-lms-backend.onrender.com/api/files/${encodeURIComponent(filename)}`;
+                                  console.log('Using / path with API endpoint:', pdfUrl);
                                 } else {
-                                  // Doesn't start with /, add both / and backend URL
-                                  pdfUrl = `https://must-lms-backend.onrender.com/${pdfUrl}`;
+                                  // Doesn't start with /, assume it's just filename
+                                  pdfUrl = `https://must-lms-backend.onrender.com/api/files/${encodeURIComponent(pdfUrl)}`;
+                                  console.log('Using filename with API endpoint:', pdfUrl);
                                 }
                                 
-                                console.log('Opening PDF:', pdfUrl);
+                                console.log('Final PDF URL:', pdfUrl);
                                 window.open(pdfUrl, '_blank');
                               }}
+                              className="text-xs sm:text-sm"
                             >
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
+                              <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                              <span className="hidden sm:inline">View</span>
+                              <span className="sm:hidden">👁</span>
                             </Button>
                             <Button 
                               size="sm" 
@@ -646,23 +664,39 @@ export const Assignments = () => {
                                   // Download PDF - handle various file path formats
                                   let pdfUrl = submission.file_path;
                                   
+                                  console.log('Original file_path for download:', pdfUrl);
+                                  
                                   // If it's already a full URL, use it as is
                                   if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
                                     // Already a complete URL
+                                    console.log('Using full URL:', pdfUrl);
+                                  } else if (pdfUrl.startsWith('/content/')) {
+                                    // Extract filename from /content/ path
+                                    const filename = pdfUrl.replace('/content/', '');
+                                    pdfUrl = `https://must-lms-backend.onrender.com/api/files/${encodeURIComponent(filename)}`;
+                                    console.log('Using /content/ path with API endpoint:', pdfUrl);
+                                  } else if (pdfUrl.startsWith('/uploads/')) {
+                                    // Extract filename from /uploads/ path
+                                    const filename = pdfUrl.replace('/uploads/', '');
+                                    pdfUrl = `https://must-lms-backend.onrender.com/api/files/${encodeURIComponent(filename)}`;
+                                    console.log('Using /uploads/ path with API endpoint:', pdfUrl);
                                   } else if (pdfUrl.startsWith('/')) {
-                                    // Starts with /, prepend backend URL
-                                    pdfUrl = `https://must-lms-backend.onrender.com${pdfUrl}`;
+                                    // Starts with /, extract filename
+                                    const filename = pdfUrl.substring(1);
+                                    pdfUrl = `https://must-lms-backend.onrender.com/api/files/${encodeURIComponent(filename)}`;
+                                    console.log('Using / path with API endpoint:', pdfUrl);
                                   } else {
-                                    // Doesn't start with /, add both / and backend URL
-                                    pdfUrl = `https://must-lms-backend.onrender.com/${pdfUrl}`;
+                                    // Doesn't start with /, assume it's just filename
+                                    pdfUrl = `https://must-lms-backend.onrender.com/api/files/${encodeURIComponent(pdfUrl)}`;
+                                    console.log('Using filename with API endpoint:', pdfUrl);
                                   }
                                   
-                                  console.log('Downloading PDF from:', pdfUrl);
+                                  console.log('Final download URL:', pdfUrl);
                                   
                                   // Fetch the file and download it
                                   const response = await fetch(pdfUrl);
                                   if (!response.ok) {
-                                    throw new Error('Failed to download file');
+                                    throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
                                   }
                                   
                                   const blob = await response.blob();
@@ -679,9 +713,11 @@ export const Assignments = () => {
                                   alert('Failed to download PDF. Please try again or contact support.');
                                 }
                               }}
+                              className="text-xs sm:text-sm"
                             >
-                              <Download className="h-4 w-4 mr-1" />
-                              Download
+                              <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                              <span className="hidden sm:inline">Download</span>
+                              <span className="sm:hidden">⬇</span>
                             </Button>
                           </>
                         ) : submission.submission_type === 'text' ? (
@@ -716,15 +752,15 @@ export const Assignments = () => {
 
   // MAIN ASSIGNMENTS LIST VIEW
   return (
-    <div className="flex-1 space-y-6 p-6">
-      <div className="flex items-center justify-between">
+    <div className="flex-1 space-y-6 p-3 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Assignments</h1>
-          <p className="text-muted-foreground">Create and manage course assignments</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Assignments</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Create and manage course assignments</p>
         </div>
         <Button 
           onClick={() => setViewMode('create')}
-          className="bg-gradient-to-r from-primary to-secondary text-white"
+          className="bg-gradient-to-r from-primary to-secondary text-white w-full sm:w-auto"
         >
           <Plus className="mr-2 h-4 w-4" />
           Create Assignment
@@ -758,11 +794,11 @@ export const Assignments = () => {
         ) : (
           filteredAssignments.map((assignment) => (
             <Card key={assignment.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-semibold">{assignment.title}</h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                      <h3 className="text-lg sm:text-xl font-semibold">{assignment.title}</h3>
                       <Badge className={getStatusColor(assignment.status)}>
                         {assignment.status.toUpperCase()}
                       </Badge>
@@ -778,8 +814,8 @@ export const Assignments = () => {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-gray-600 mb-3">{assignment.description}</p>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <p className="text-sm sm:text-base text-gray-600 mb-3 line-clamp-2">{assignment.description}</p>
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
                       <div className="flex items-center gap-1">
                         <Users className="h-4 w-4" />
                         {assignment.program_name}
