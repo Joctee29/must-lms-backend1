@@ -34,6 +34,7 @@ interface Course {
   departmentId: string;
   duration: number;
   academicLevel: 'certificate' | 'diploma' | 'bachelor' | 'masters' | 'phd';
+  yearOfStudy: number;
   description: string;
 }
 
@@ -70,7 +71,7 @@ export const CourseManagement = () => {
     name: "", collegeId: "", description: "", headOfDepartment: ""
   });
   const [courseForm, setCourseForm] = useState({
-    name: "", code: "", departmentId: "", duration: 0, academicLevel: "bachelor" as 'certificate' | 'diploma' | 'bachelor' | 'masters' | 'phd', description: ""
+    name: "", code: "", departmentId: "", duration: 0, academicLevel: "bachelor" as 'certificate' | 'diploma' | 'bachelor' | 'masters' | 'phd', yearOfStudy: 1, description: ""
   });
   const [programForm, setProgramForm] = useState({
     name: "", courseId: "", credits: 0, totalSemesters: 0, lecturerName: "", description: ""
@@ -365,6 +366,7 @@ export const CourseManagement = () => {
         departmentId: parseInt(courseForm.departmentId),
         duration: courseForm.duration,
         academicLevel: courseForm.academicLevel,
+        yearOfStudy: courseForm.yearOfStudy,
         description: courseForm.description
       };
       
@@ -377,7 +379,7 @@ export const CourseManagement = () => {
       await loadData();
       
       // Reset form
-      setCourseForm({ name: "", code: "", departmentId: "", duration: 0, academicLevel: "bachelor" as const, description: "" });
+      setCourseForm({ name: "", code: "", departmentId: "", duration: 0, academicLevel: "bachelor" as const, yearOfStudy: 1, description: "" });
       toast.success("Course added successfully!");
       
       console.log('Updated Courses:', courses);
@@ -470,11 +472,12 @@ export const CourseManagement = () => {
         departmentId: parseInt(courseForm.departmentId),
         duration: courseForm.duration,
         academicLevel: courseForm.academicLevel,
+        yearOfStudy: courseForm.yearOfStudy,
         description: courseForm.description
       });
       await loadData();
       setEditingCourse(null);
-      setCourseForm({ name: "", code: "", departmentId: "", duration: 0, academicLevel: "bachelor" as const, description: "" });
+      setCourseForm({ name: "", code: "", departmentId: "", duration: 0, academicLevel: "bachelor" as const, yearOfStudy: 1, description: "" });
       toast.success("Course updated successfully!");
     } catch (error) {
       console.error('Error updating course:', error);
@@ -955,6 +958,22 @@ export const CourseManagement = () => {
                   </Select>
                 </div>
                 <div>
+                  <Label htmlFor="course-year">Year of Study</Label>
+                  <Select value={courseForm.yearOfStudy.toString()} onValueChange={(value) => setCourseForm({...courseForm, yearOfStudy: parseInt(value)})}>
+                    <SelectTrigger id="course-year" name="courseYear">
+                      <SelectValue placeholder="Select year of study" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Year 1</SelectItem>
+                      <SelectItem value="2">Year 2</SelectItem>
+                      <SelectItem value="3">Year 3</SelectItem>
+                      <SelectItem value="4">Year 4</SelectItem>
+                      <SelectItem value="5">Year 5</SelectItem>
+                      <SelectItem value="6">Year 6</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label htmlFor="course-description">Description</Label>
                   <Textarea
                     id="course-description"
@@ -974,7 +993,7 @@ export const CourseManagement = () => {
                       variant="outline" 
                       onClick={() => {
                         setEditingCourse(null);
-                        setCourseForm({ name: "", code: "", departmentId: "", duration: 0, academicLevel: "bachelor" as const, description: "" });
+                        setCourseForm({ name: "", code: "", departmentId: "", duration: 0, academicLevel: "bachelor" as const, yearOfStudy: 1, description: "" });
                       }}
                     >
                       Cancel
@@ -1075,6 +1094,7 @@ export const CourseManagement = () => {
                                     departmentId: course.departmentId?.toString() || "",
                                     duration: course.duration || 0,
                                     academicLevel: course.academic_level || course.academicLevel || "bachelor",
+                                    yearOfStudy: course.yearOfStudy || course.year_of_study || 1,
                                     description: course.description || ""
                                   });
                                 }}
