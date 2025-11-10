@@ -1355,6 +1355,90 @@ app.get('/api/lecturers/me', async (req, res) => {
   }
 });
 
+// Update lecturer
+app.put('/api/lecturers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, employeeId, specialization, email, phone, password } = req.body;
+    
+    console.log('=== UPDATING LECTURER ===');
+    console.log('Lecturer ID:', id);
+    console.log('Update Data:', { name, employeeId, specialization, email, phone, hasPassword: !!password });
+    
+    // Build update query dynamically based on provided fields
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+    
+    if (name) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+    if (employeeId) {
+      updates.push(`employee_id = $${paramCount++}`);
+      values.push(employeeId);
+    }
+    if (specialization) {
+      updates.push(`specialization = $${paramCount++}`);
+      values.push(specialization);
+    }
+    if (email) {
+      updates.push(`email = $${paramCount++}`);
+      values.push(email);
+    }
+    if (phone) {
+      updates.push(`phone = $${paramCount++}`);
+      values.push(phone);
+    }
+    if (password) {
+      updates.push(`password = $${paramCount++}`);
+      values.push(password);
+    }
+    
+    // Always update the updated_at timestamp
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    
+    // Add the ID as the last parameter
+    values.push(id);
+    
+    if (updates.length === 1) { // Only updated_at
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+    
+    const query = `UPDATE lecturers SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    
+    console.log('Update Query:', query);
+    console.log('Update Values:', values);
+    
+    const result = await pool.query(query, values);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Lecturer not found' });
+    }
+    
+    // Update password records if password was changed
+    if (password) {
+      try {
+        await pool.query(
+          `INSERT INTO password_records (user_type, user_id, username, password_hash) 
+           VALUES ('lecturer', $1, $2, $3)
+           ON CONFLICT (user_type, user_id) 
+           DO UPDATE SET password_hash = $3, updated_at = CURRENT_TIMESTAMP`,
+          [id, employeeId || result.rows[0].employee_id, password]
+        );
+      } catch (pwdError) {
+        console.warn('⚠️ Password record update failed (non-critical):', pwdError.message);
+      }
+    }
+    
+    console.log('✅ Lecturer updated successfully:', result.rows[0].name);
+    res.json({ success: true, message: 'Lecturer updated successfully', data: result.rows[0] });
+  } catch (error) {
+    console.error('❌ Error updating lecturer:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Delete lecturer
 app.delete('/api/lecturers/:id', async (req, res) => {
   try {
@@ -1604,6 +1688,114 @@ app.get('/api/students/:id/programs', async (req, res) => {
     res.json({ success: true, data: programsResult.rows });
   } catch (error) {
     console.error('Error fetching student programs:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update student
+app.put('/api/students/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, registration_number, registrationNumber, academic_year, academicYear, course_id, courseId, current_semester, currentSemester, email, phone, password, year_of_study, yearOfStudy, academic_level, academicLevel } = req.body;
+    
+    console.log('=== UPDATING STUDENT ===');
+    console.log('Student ID:', id);
+    console.log('Update Data:', req.body);
+    
+    // Handle both camelCase and snake_case field names
+    const regNumber = registration_number || registrationNumber;
+    const acadYear = academic_year || academicYear;
+    const courseIdValue = course_id || courseId;
+    const semester = current_semester || currentSemester;
+    const yearStudy = year_of_study || yearOfStudy;
+    const acadLevel = academic_level || academicLevel;
+    
+    // Build update query dynamically based on provided fields
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+    
+    if (name) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+    if (regNumber) {
+      updates.push(`registration_number = $${paramCount++}`);
+      values.push(regNumber);
+    }
+    if (acadYear) {
+      updates.push(`academic_year = $${paramCount++}`);
+      values.push(acadYear);
+    }
+    if (courseIdValue) {
+      updates.push(`course_id = $${paramCount++}`);
+      values.push(courseIdValue);
+    }
+    if (semester) {
+      updates.push(`current_semester = $${paramCount++}`);
+      values.push(semester);
+    }
+    if (email) {
+      updates.push(`email = $${paramCount++}`);
+      values.push(email);
+    }
+    if (phone) {
+      updates.push(`phone = $${paramCount++}`);
+      values.push(phone);
+    }
+    if (password) {
+      updates.push(`password = $${paramCount++}`);
+      values.push(password);
+    }
+    if (yearStudy) {
+      updates.push(`year_of_study = $${paramCount++}`);
+      values.push(yearStudy);
+    }
+    if (acadLevel) {
+      updates.push(`academic_level = $${paramCount++}`);
+      values.push(acadLevel);
+    }
+    
+    // Always update the updated_at timestamp
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    
+    // Add the ID as the last parameter
+    values.push(id);
+    
+    if (updates.length === 1) { // Only updated_at
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+    
+    const query = `UPDATE students SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    
+    console.log('Update Query:', query);
+    console.log('Update Values:', values);
+    
+    const result = await pool.query(query, values);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+    
+    // Update password records if password was changed
+    if (password) {
+      try {
+        await pool.query(
+          `INSERT INTO password_records (user_type, user_id, username, password_hash) 
+           VALUES ('student', $1, $2, $3)
+           ON CONFLICT (user_type, user_id) 
+           DO UPDATE SET password_hash = $3, updated_at = CURRENT_TIMESTAMP`,
+          [id, regNumber || result.rows[0].registration_number, password]
+        );
+      } catch (pwdError) {
+        console.warn('⚠️ Password record update failed (non-critical):', pwdError.message);
+      }
+    }
+    
+    console.log('✅ Student updated successfully:', result.rows[0].name);
+    res.json({ success: true, message: 'Student updated successfully', data: result.rows[0] });
+  } catch (error) {
+    console.error('❌ Error updating student:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
