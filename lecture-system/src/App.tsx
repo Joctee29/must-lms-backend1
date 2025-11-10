@@ -3,12 +3,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
+import LecturerRegisterPage from "./pages/LecturerRegisterPage";
 import NotFound from "./pages/NotFound";
-import { Assessment } from './pages/Assessment';
-import { AssessmentResults } from './pages/AssessmentResults';
-import { ContentManager } from './pages/ContentManager';
-import { Students } from './pages/Students';
-import { MyPrograms } from './pages/MyPrograms';
 
 const queryClient = new QueryClient();
 
@@ -19,6 +15,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/register" element={<LecturerRegisterPage onBack={() => window.location.href = '/'} onRegisterSuccess={() => window.location.href = '/'} />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
