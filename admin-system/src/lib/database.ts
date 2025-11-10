@@ -94,6 +94,21 @@ export const lecturerOperations = {
     return await apiCall(`/lecturers/employee/${employeeId}`);
   },
 
+  // Update lecturer
+  update: async (id: string | number, lecturerData: {
+    name?: string;
+    employeeId?: string;
+    specialization?: string;
+    email?: string;
+    phone?: string;
+    password?: string;
+  }) => {
+    return await apiCall(`/lecturers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(lecturerData),
+    });
+  },
+
   // Delete lecturer
   delete: async (id: number) => {
     return await apiCall(`/lecturers/${id}`, { method: 'DELETE' });

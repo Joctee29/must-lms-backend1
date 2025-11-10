@@ -67,9 +67,8 @@ export const StudentInformation = () => {
   const [selectedCourse, setSelectedCourse] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
 
-  // Load students and filtering data from database
-  useEffect(() => {
-    const loadData = async () => {
+  // Function to load students and filtering data from database
+  const loadData = async () => {
       try {
         setLoading(true);
         setError(null);
@@ -275,9 +274,24 @@ export const StudentInformation = () => {
       } finally {
         setLoading(false);
       }
-    };
+  };
 
+  // Load students on component mount and set up auto-refresh polling
+  useEffect(() => {
+    // Initial load
     loadData();
+
+    // Set up polling to refresh data every 60 seconds (1 minute)
+    // This ensures admin portal shows updated status when students register
+    const pollInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing student data...');
+      loadData();
+    }, 60000); // 60 seconds
+
+    // Cleanup interval on component unmount
+    return () => {
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -885,23 +899,25 @@ export const StudentInformation = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {studentPrograms[selectedStudent.id]?.filter((program: any) => program.semester === 1).map((program: any, index: number) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded border">
-                            <div className="flex items-center gap-3">
-                              <BookOpen className="h-5 w-5 text-blue-600" />
-                              <div>
-                                <p className="font-medium text-blue-900">{program.name}</p>
-                                <p className="text-sm text-blue-700">Lecturer: {program.lecturer_name}</p>
+                        {studentPrograms[selectedStudent.id]?.filter((program: any) => program.semester === 1).length > 0 ? (
+                          studentPrograms[selectedStudent.id]?.filter((program: any) => program.semester === 1).map((program: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded border">
+                              <div className="flex items-center gap-3">
+                                <BookOpen className="h-5 w-5 text-blue-600" />
+                                <div>
+                                  <p className="font-medium text-blue-900">{program.name}</p>
+                                  <p className="text-sm text-blue-700">Lecturer: {program.lecturer_name}</p>
+                                </div>
                               </div>
+                              <Badge variant="secondary">Semester 1</Badge>
                             </div>
-                            <Badge variant="secondary">Semester 1</Badge>
-                          </div>
-                        )) || (
-                          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded border">
-                            <BookOpen className="h-5 w-5 text-gray-600" />
+                          ))
+                        ) : (
+                          <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded border border-yellow-200">
+                            <BookOpen className="h-5 w-5 text-yellow-600" />
                             <div>
-                              <p className="font-medium text-gray-900">{selectedStudent.course} - Semester 1</p>
-                              <p className="text-sm text-gray-700">Lecturer: Dr. John Mwalimu</p>
+                              <p className="font-medium text-yellow-900">No Programs Assigned</p>
+                              <p className="text-sm text-yellow-700">No programs have been assigned for Semester 1 yet.</p>
                             </div>
                           </div>
                         )}
@@ -916,23 +932,25 @@ export const StudentInformation = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {studentPrograms[selectedStudent.id]?.filter((program: any) => program.semester === 2).map((program: any, index: number) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-green-50 rounded border">
-                            <div className="flex items-center gap-3">
-                              <BookOpen className="h-5 w-5 text-green-600" />
-                              <div>
-                                <p className="font-medium text-green-900">{program.name}</p>
-                                <p className="text-sm text-green-700">Lecturer: {program.lecturer_name}</p>
+                        {studentPrograms[selectedStudent.id]?.filter((program: any) => program.semester === 2).length > 0 ? (
+                          studentPrograms[selectedStudent.id]?.filter((program: any) => program.semester === 2).map((program: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-green-50 rounded border">
+                              <div className="flex items-center gap-3">
+                                <BookOpen className="h-5 w-5 text-green-600" />
+                                <div>
+                                  <p className="font-medium text-green-900">{program.name}</p>
+                                  <p className="text-sm text-green-700">Lecturer: {program.lecturer_name}</p>
+                                </div>
                               </div>
+                              <Badge variant="secondary">Semester 2</Badge>
                             </div>
-                            <Badge variant="secondary">Semester 2</Badge>
-                          </div>
-                        )) || (
-                          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded border">
-                            <BookOpen className="h-5 w-5 text-gray-600" />
+                          ))
+                        ) : (
+                          <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded border border-yellow-200">
+                            <BookOpen className="h-5 w-5 text-yellow-600" />
                             <div>
-                              <p className="font-medium text-gray-900">{selectedStudent.course} - Semester 2</p>
-                              <p className="text-sm text-gray-700">Lecturer: Dr. Grace Kimaro</p>
+                              <p className="font-medium text-yellow-900">No Programs Assigned</p>
+                              <p className="text-sm text-yellow-700">No programs have been assigned for Semester 2 yet.</p>
                             </div>
                           </div>
                         )}

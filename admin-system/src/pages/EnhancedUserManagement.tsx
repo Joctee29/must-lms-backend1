@@ -394,15 +394,23 @@ export const EnhancedUserManagement = () => {
     
     try {
       setLoading(true);
-      await studentOperations.update(selectedStudent.id, {
+      
+      // Use correct field names that backend expects (snake_case)
+      await studentOperations.update(parseInt(selectedStudent.id), {
         name: studentForm.name,
-        registrationNumber: studentForm.registrationNumber,
-        academicYear: studentForm.academicYear,
-        course: studentForm.courseId,
-        currentSemester: studentForm.currentSemester,
+        registration_number: studentForm.registrationNumber,
+        academic_year: studentForm.academicYear,
+        course_id: parseInt(studentForm.courseId),
+        current_semester: studentForm.currentSemester,
         email: studentForm.email,
-        phone: studentForm.phone
+        phone: studentForm.phone,
+        course_name: "",
+        department_name: "",
+        college_name: "",
+        academic_level: studentForm.academicLevel,
+        status: "active"
       });
+      
       await loadStudents();
       setShowStudentDetails(false);
       setIsEditing(false);

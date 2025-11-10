@@ -37,8 +37,8 @@ export const LecturerInformation = () => {
   const [loading, setLoading] = useState(true);
   const [selectedLecturer, setSelectedLecturer] = useState<LecturerInfo | null>(null);
 
-  useEffect(() => {
-    const loadLecturers = async () => {
+  // Function to load lecturers data
+  const loadLecturers = async () => {
       try {
         setLoading(true);
         await initializeDatabase();
@@ -251,9 +251,24 @@ export const LecturerInformation = () => {
       } finally {
         setLoading(false);
       }
-    };
+  };
 
+  // Load lecturers on component mount and set up auto-refresh polling
+  useEffect(() => {
+    // Initial load
     loadLecturers();
+
+    // Set up polling to refresh data every 60 seconds (1 minute)
+    // This ensures admin portal shows updated status when lecturers/students register
+    const pollInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing lecturer data...');
+      loadLecturers();
+    }, 60000); // 60 seconds
+
+    // Cleanup interval on component unmount
+    return () => {
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const [searchTerm, setSearchTerm] = useState("");
