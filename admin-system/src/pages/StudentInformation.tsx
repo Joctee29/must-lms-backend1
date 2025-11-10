@@ -184,7 +184,8 @@ export const StudentInformation = () => {
             college: collegeInfo?.name || student.college_name || "Unknown College",
             department: departmentInfo?.name || student.department_name || "Unknown Department",
             academicLevel: academicLevel,
-            status: 'Active' as const,
+            // Use real activation status from database
+            status: (student.is_active === true ? 'Active' : 'Inactive') as 'Active' | 'Inactive',
             enrollmentDate: student.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
             // Remove fake data fields - keep minimal real data only
             gpa: 0.0,

@@ -119,6 +119,21 @@ export const LecturerInformation = () => {
           try {
             console.log(`=== FETCHING ASSIGNMENTS FOR LECTURER ${lecturer.name} (ID: ${lecturer.id}) ===`);
             
+            // Fetch ALL students ONCE for efficiency (outside the loop)
+            let allStudents: any[] = [];
+            try {
+              const studentsResponse = await fetch(`https://must-lms-backend.onrender.com/api/students`);
+              if (studentsResponse.ok) {
+                const studentsResult = await studentsResponse.json();
+                if (studentsResult.success && studentsResult.data) {
+                  allStudents = studentsResult.data;
+                  console.log(`Fetched ${allStudents.length} students for counting`);
+                }
+              }
+            } catch (err) {
+              console.error('Error fetching all students:', err);
+            }
+            
             // Use efficient endpoint to fetch ONLY this lecturer's programs
             const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs?lecturer_username=${encodeURIComponent(lecturer.employee_id)}`);
             if (programsResponse.ok) {
@@ -136,6 +151,9 @@ export const LecturerInformation = () => {
                     let courseInfo = null;
                     let actualStudentCount = 0;
                     
+                    console.log(`📊 Processing program:`, program);
+                    console.log(`📊 Program course_id:`, program.course_id);
+                    
                     // Fetch course details if course_id exists
                     if (program.course_id) {
                       try {
@@ -147,25 +165,19 @@ export const LecturerInformation = () => {
                       } catch (err) {
                         console.error('Error fetching course info:', err);
                       }
-                    }
-                    
-                    // Get real student count from students table based on course_id
-                    if (program.course_id) {
-                      try {
-                        const studentsResponse = await fetch(`https://must-lms-backend.onrender.com/api/students`);
-                        if (studentsResponse.ok) {
-                          const studentsResult = await studentsResponse.json();
-                          if (studentsResult.success && studentsResult.data) {
-                            // Count students enrolled in this course
-                            actualStudentCount = studentsResult.data.filter((student: any) => 
-                              student.course_id === program.course_id
-                            ).length;
-                            console.log(`Real student count for course ${program.course_id}: ${actualStudentCount}`);
-                          }
-                        }
-                      } catch (err) {
-                        console.error('Error fetching students count:', err);
-                      }
+                      
+                      // Count students enrolled in this course from pre-fetched students
+                      // Students have course_id that matches the course_id in the program
+                      const matchingStudents = allStudents.filter((student: any) => 
+                        student.course_id === program.course_id && student.is_active === true
+                      );
+                      actualStudentCount = matchingStudents.length;
+                      
+                      console.log(`📊 Students with course_id ${program.course_id}:`, matchingStudents.length);
+                      console.log(`📊 Active students:`, matchingStudents.filter((s: any) => s.is_active).length);
+                      console.log(`✅ Real student count for course ${program.course_id} (${courseInfo?.name || program.name}): ${actualStudentCount} active students`);
+                    } else {
+                      console.warn(`⚠️ Program ${program.name || program.id} has no course_id!`);
                     }
                     
                     // Create entries for EACH semester in the program
@@ -188,6 +200,7 @@ export const LecturerInformation = () => {
                   
                   const allSemesterEntries = await Promise.all(assignedCoursesPromises);
                   assignedCourses = allSemesterEntries.flat();
+                  console.log(`✅ Total assigned courses for ${lecturer.name}: ${assignedCourses.length} entries`);
                 } else {
                   // No programs found for this lecturer - keep empty array
                   console.log(`No programs assigned to lecturer ${lecturer.name}`);
@@ -219,7 +232,8 @@ export const LecturerInformation = () => {
             qualification: lecturer.qualification || "Master's Degree",
             experience: lecturer.experience || 3,
             joinDate: lecturer.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-            status: "active" as const,
+            // Use real activation status from database
+            status: (lecturer.is_active === true ? "active" : "inactive") as "active" | "inactive",
             assignedCourses: assignedCourses,
             officeLocation: lecturer.office_location || `${departmentInfo?.name || 'Department'} Office`,
             officeHours: lecturer.office_hours || "Mon-Fri 10:00-12:00 PM"
