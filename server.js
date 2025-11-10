@@ -650,9 +650,23 @@ const initializeDatabase = async () => {
         username VARCHAR(100) NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_type, user_id)
       )
     `);
+    
+    // Add UNIQUE constraint if it doesn't exist (for existing databases)
+    try {
+      await pool.query(`
+        ALTER TABLE password_records 
+        ADD CONSTRAINT password_records_user_type_user_id_key 
+        UNIQUE (user_type, user_id)
+      `);
+      console.log('✅ UNIQUE constraint added to password_records table');
+    } catch (error) {
+      // Constraint may already exist
+      console.log('UNIQUE constraint may already exist on password_records:', error.message);
+    }
 
     // Create content table for file uploads
     await pool.query(`
@@ -1010,14 +1024,18 @@ app.post('/api/auth/student-register', async (req, res) => {
       [email, password, courseId, courseLevel, yearOfStudy, registrationNumber]
     );
 
-    // Update password records
-    await pool.query(
-      `INSERT INTO password_records (user_type, user_id, username, password_hash) 
-       VALUES ('student', $1, $2, $3)
-       ON CONFLICT (user_type, user_id) 
-       DO UPDATE SET password_hash = $3, updated_at = CURRENT_TIMESTAMP`,
-      [updateResult.rows[0].id, registrationNumber, password]
-    );
+    // Try to update password records (non-critical - don't fail if it errors)
+    try {
+      await pool.query(
+        `INSERT INTO password_records (user_type, user_id, username, password_hash) 
+         VALUES ('student', $1, $2, $3)
+         ON CONFLICT (user_type, user_id) 
+         DO UPDATE SET password_hash = $3, updated_at = CURRENT_TIMESTAMP`,
+        [updateResult.rows[0].id, registrationNumber, password]
+      );
+    } catch (pwdRecordError) {
+      console.warn('⚠️ Password record update failed (non-critical):', pwdRecordError.message);
+    }
 
     console.log('✅ Student self-registration successful:', updateResult.rows[0].name);
 
@@ -1112,14 +1130,18 @@ app.post('/api/auth/lecturer-register', async (req, res) => {
       [password, employeeId]
     );
 
-    // Update password records
-    await pool.query(
-      `INSERT INTO password_records (user_type, user_id, username, password_hash) 
-       VALUES ('lecturer', $1, $2, $3)
-       ON CONFLICT (user_type, user_id) 
-       DO UPDATE SET password_hash = $3, updated_at = CURRENT_TIMESTAMP`,
-      [updateResult.rows[0].id, employeeId, password]
-    );
+    // Try to update password records (non-critical - don't fail if it errors)
+    try {
+      await pool.query(
+        `INSERT INTO password_records (user_type, user_id, username, password_hash) 
+         VALUES ('lecturer', $1, $2, $3)
+         ON CONFLICT (user_type, user_id) 
+         DO UPDATE SET password_hash = $3, updated_at = CURRENT_TIMESTAMP`,
+        [updateResult.rows[0].id, employeeId, password]
+      );
+    } catch (pwdRecordError) {
+      console.warn('⚠️ Password record update failed (non-critical):', pwdRecordError.message);
+    }
 
     console.log('✅ Lecturer self-registration successful:', updateResult.rows[0].name);
 
