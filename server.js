@@ -469,6 +469,17 @@ const initializeDatabase = async () => {
       )
     `);
 
+    // Add is_active column for lecturers (must self-register to activate)
+    try {
+      await pool.query(`
+        ALTER TABLE lecturers 
+        ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false
+      `);
+      console.log('is_active column added/verified in lecturers table');
+    } catch (error) {
+      console.log('is_active column may already exist:', error.message);
+    }
+
     // Create colleges table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS colleges (
@@ -617,6 +628,17 @@ const initializeDatabase = async () => {
       console.log('academic_level column added/verified in students table');
     } catch (error) {
       console.log('academic_level column may already exist:', error.message);
+    }
+
+    // Add is_active column for account activation (students must self-register to activate)
+    try {
+      await pool.query(`
+        ALTER TABLE students 
+        ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false
+      `);
+      console.log('is_active column added/verified in students table');
+    } catch (error) {
+      console.log('is_active column may already exist:', error.message);
     }
 
     // Create passwords table for password management
@@ -801,6 +823,15 @@ app.post('/api/auth/login', async (req, res) => {
       if (result.rows.length > 0) {
         const student = result.rows[0];
         
+        // Check if account is active
+        if (student.is_active === false) {
+          return res.status(403).json({ 
+            success: false, 
+            error: 'Account not activated. Please complete self-registration first.',
+            needsActivation: true
+          });
+        }
+        
         // Verify password
         if (student.password === password) {
           user = {
@@ -836,6 +867,15 @@ app.post('/api/auth/login', async (req, res) => {
       
       if (result.rows.length > 0) {
         const lecturer = result.rows[0];
+        
+        // Check if account is active
+        if (lecturer.is_active === false) {
+          return res.status(403).json({ 
+            success: false, 
+            error: 'Account not activated. Please complete self-registration first.',
+            needsActivation: true
+          });
+        }
         
         // Verify password
         if (lecturer.password === password) {
@@ -881,6 +921,224 @@ app.post('/api/auth/login', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Server error during login. Please try again.' 
+    });
+  }
+});
+
+// ==================== SELF-REGISTRATION ENDPOINTS ====================
+
+// Student self-registration endpoint
+app.post('/api/auth/student-register', async (req, res) => {
+  try {
+    const { 
+      registrationNumber, 
+      courseLevel, 
+      yearOfStudy, 
+      courseId, 
+      password, 
+      confirmPassword, 
+      email 
+    } = req.body;
+
+    console.log('=== STUDENT SELF-REGISTRATION ===');
+    console.log('Registration Number:', registrationNumber);
+    console.log('Course Level:', courseLevel);
+    console.log('Year of Study:', yearOfStudy);
+    console.log('Course ID:', courseId);
+    console.log('Email:', email);
+
+    // Validate required fields
+    if (!registrationNumber || !courseLevel || !yearOfStudy || !courseId || !password || !confirmPassword || !email) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'All fields are required' 
+      });
+    }
+
+    // Validate password match
+    if (password !== confirmPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Passwords do not match' 
+      });
+    }
+
+    // Validate password strength (minimum 8 characters, at least 1 uppercase, 1 lowercase, 1 number)
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number' 
+      });
+    }
+
+    // Check if registration number exists in database (pre-registered by admin)
+    const existingStudent = await pool.query(
+      'SELECT * FROM students WHERE registration_number = $1',
+      [registrationNumber]
+    );
+
+    if (existingStudent.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Registration number not found. Please contact admin to register you first.' 
+      });
+    }
+
+    const student = existingStudent.rows[0];
+
+    // Check if already activated
+    if (student.is_active === true) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'This account has already been activated. Please login instead.' 
+      });
+    }
+
+    // Update student record with new information and activate account
+    const updateResult = await pool.query(
+      `UPDATE students 
+       SET email = $1, 
+           password = $2, 
+           course_id = $3, 
+           academic_level = $4, 
+           year_of_study = $5, 
+           is_active = true, 
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE registration_number = $6 
+       RETURNING *`,
+      [email, password, courseId, courseLevel, yearOfStudy, registrationNumber]
+    );
+
+    // Update password records
+    await pool.query(
+      `INSERT INTO password_records (user_type, user_id, username, password_hash) 
+       VALUES ('student', $1, $2, $3)
+       ON CONFLICT (user_type, user_id) 
+       DO UPDATE SET password_hash = $3, updated_at = CURRENT_TIMESTAMP`,
+      [updateResult.rows[0].id, registrationNumber, password]
+    );
+
+    console.log('✅ Student self-registration successful:', updateResult.rows[0].name);
+
+    res.json({ 
+      success: true, 
+      message: 'Registration successful! You can now login with your credentials.',
+      data: {
+        id: updateResult.rows[0].id,
+        name: updateResult.rows[0].name,
+        registration_number: updateResult.rows[0].registration_number,
+        email: updateResult.rows[0].email
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Student self-registration error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error during registration. Please try again.' 
+    });
+  }
+});
+
+// Lecturer self-registration endpoint
+app.post('/api/auth/lecturer-register', async (req, res) => {
+  try {
+    const { 
+      employeeId, 
+      password, 
+      confirmPassword 
+    } = req.body;
+
+    console.log('=== LECTURER SELF-REGISTRATION ===');
+    console.log('Employee ID:', employeeId);
+
+    // Validate required fields
+    if (!employeeId || !password || !confirmPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'All fields are required' 
+      });
+    }
+
+    // Validate password match
+    if (password !== confirmPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Passwords do not match' 
+      });
+    }
+
+    // Validate password strength
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number' 
+      });
+    }
+
+    // Check if employee ID exists in database (pre-registered by admin)
+    const existingLecturer = await pool.query(
+      'SELECT * FROM lecturers WHERE employee_id = $1',
+      [employeeId]
+    );
+
+    if (existingLecturer.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Employee ID not found. Please contact admin to register you first.' 
+      });
+    }
+
+    const lecturer = existingLecturer.rows[0];
+
+    // Check if already activated
+    if (lecturer.is_active === true) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'This account has already been activated. Please login instead.' 
+      });
+    }
+
+    // Update lecturer record with new password and activate account
+    const updateResult = await pool.query(
+      `UPDATE lecturers 
+       SET password = $1, 
+           is_active = true, 
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE employee_id = $2 
+       RETURNING *`,
+      [password, employeeId]
+    );
+
+    // Update password records
+    await pool.query(
+      `INSERT INTO password_records (user_type, user_id, username, password_hash) 
+       VALUES ('lecturer', $1, $2, $3)
+       ON CONFLICT (user_type, user_id) 
+       DO UPDATE SET password_hash = $3, updated_at = CURRENT_TIMESTAMP`,
+      [updateResult.rows[0].id, employeeId, password]
+    );
+
+    console.log('✅ Lecturer self-registration successful:', updateResult.rows[0].name);
+
+    res.json({ 
+      success: true, 
+      message: 'Registration successful! You can now login with your credentials.',
+      data: {
+        id: updateResult.rows[0].id,
+        name: updateResult.rows[0].name,
+        employee_id: updateResult.rows[0].employee_id,
+        email: updateResult.rows[0].email
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Lecturer self-registration error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error during registration. Please try again.' 
     });
   }
 });
@@ -1451,7 +1709,31 @@ app.post('/api/courses', async (req, res) => {
 
 app.get('/api/courses', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM courses ORDER BY created_at DESC');
+    const { academic_level, year_of_study } = req.query;
+    
+    let query = 'SELECT * FROM courses';
+    let params = [];
+    let conditions = [];
+    
+    // Add filters if provided
+    if (academic_level) {
+      conditions.push(`academic_level = $${params.length + 1}`);
+      params.push(academic_level);
+    }
+    
+    if (year_of_study) {
+      conditions.push(`year_of_study = $${params.length + 1}`);
+      params.push(parseInt(year_of_study));
+    }
+    
+    // Build final query
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    
+    const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching courses:', error);
