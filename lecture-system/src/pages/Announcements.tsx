@@ -227,21 +227,22 @@ export const Announcements = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Megaphone className="h-8 w-8 text-blue-600" />
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+            <Megaphone className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
             Announcements
           </h1>
-          <p className="text-muted-foreground mt-2">
-            Create and send announcements to students in your programs
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
+            Create and send announcements to students
           </p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2">
+        <Button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2 w-full sm:w-auto">
           <Plus className="h-4 w-4" />
-          Create Announcement
+          <span className="hidden sm:inline">Create Announcement</span>
+          <span className="sm:hidden">New</span>
         </Button>
       </div>
 
@@ -346,43 +347,46 @@ export const Announcements = () => {
         ) : (
           filteredAnnouncements.map((announcement) => (
             <Card key={announcement.id}>
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-lg">{announcement.title}</h3>
-                      <Badge variant="outline" className="flex items-center gap-1">
-                        <BookOpen className="h-4 w-4" />
-                        Program: {announcement.target_value}
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col gap-3">
+                  {/* Header with Title and Badge */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base sm:text-lg mb-2 break-words">{announcement.title}</h3>
+                      <Badge variant="outline" className="flex items-center gap-1 text-xs w-fit">
+                        <BookOpen className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate max-w-[150px] sm:max-w-none">{announcement.target_value}</span>
                       </Badge>
                     </div>
                     
-                    <p className="text-muted-foreground mb-3">{announcement.content}</p>
-                    
-                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                      <div className="flex items-center space-x-1">
-                        <Clock className="h-4 w-4" />
-                        <span>Sent {formatTimeAgo(announcement.created_at)}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Eye className="h-4 w-4" />
-                        <span>{announcement.views || 0} views</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Users className="h-4 w-4" />
-                        <span>To students in {announcement.target_value}</span>
-                      </div>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteAnnouncement(announcement.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0 h-8 w-8 p-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                   
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteAnnouncement(announcement.id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {/* Content */}
+                  <p className="text-sm sm:text-base text-muted-foreground break-words">{announcement.content}</p>
+                  
+                  {/* Stats - Mobile Optimized Grid */}
+                  <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span className="whitespace-nowrap">Sent {formatTimeAgo(announcement.created_at)}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Eye className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span>{announcement.views || 0} views</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span className="truncate">To students in {announcement.target_value}</span>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

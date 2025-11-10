@@ -111,12 +111,21 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
           setCourses(coursesResult.data);
         }
 
-        // Fetch students
-        const studentsResponse = await fetch(`${API_BASE_URL}/students`);
-        const studentsResult = await studentsResponse.json();
-        
-        if (studentsResult.success) {
-          setStudents(studentsResult.data);
+        // Fetch students - FIXED: Use lecturer_id parameter for backend filtering
+        if (lecturer && lecturer.id) {
+          const studentsResponse = await fetch(`${API_BASE_URL}/students?lecturer_id=${lecturer.id}&user_type=lecturer`);
+          const studentsResult = await studentsResponse.json();
+          
+          if (studentsResult.success) {
+            console.log('✅ Students fetched for lecturer:', studentsResult.data.length);
+            setStudents(studentsResult.data);
+          } else {
+            console.log('⚠️ No students found');
+            setStudents([]);
+          }
+        } else {
+          console.log('⚠️ No lecturer ID available for students query');
+          setStudents([]);
         }
 
         // Fetch departments

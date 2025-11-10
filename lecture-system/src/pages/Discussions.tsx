@@ -409,30 +409,34 @@ export const Discussions = () => {
                 {/* Content */}
                 <div className="flex-1 space-y-2 sm:space-y-3">
                   {/* Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                  <div className="flex flex-col gap-2">
                     <div className="space-y-1 flex-1">
-                      <div className="flex items-center space-x-2 flex-wrap">
+                      <div className="flex items-start gap-2">
                         {discussion.isPinned && (
-                          <Pin className="h-4 w-4 text-yellow-500" />
+                          <Pin className="h-4 w-4 text-yellow-500 flex-shrink-0 mt-1" />
                         )}
-                        <h3 className="font-semibold text-base sm:text-lg">{discussion.title}</h3>
+                        <h3 className="font-semibold text-base sm:text-lg break-words">{discussion.title}</h3>
                       </div>
                       <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
-                        <span>{discussion.author}</span>
-                        <span>•</span>
-                        <span>{discussion.course}</span>
-                        <span>•</span>
-                        <Clock className="h-3 w-3" />
-                        <span>{formatTimeAgo(discussion.createdAt)}</span>
+                        <span className="truncate max-w-[120px] sm:max-w-none">{discussion.author}</span>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="truncate max-w-[150px] sm:max-w-none">{discussion.course}</span>
+                        <span className="hidden sm:inline">•</span>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3 flex-shrink-0" />
+                          <span className="whitespace-nowrap">{formatTimeAgo(discussion.createdAt)}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge className={getCategoryColor(discussion.category)}>
-                        {getCategoryIcon(discussion.category)}
-                        <span className="ml-1">{discussion.category}</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge className={`${getCategoryColor(discussion.category)} text-xs`}>
+                        <span className="flex items-center gap-1">
+                          {getCategoryIcon(discussion.category)}
+                          <span className="hidden sm:inline">{discussion.category}</span>
+                        </span>
                       </Badge>
                       {discussion.priority === 'high' && (
-                        <Badge variant="destructive">High Priority</Badge>
+                        <Badge variant="destructive" className="text-xs">High</Badge>
                       )}
                     </div>
                   </div>
@@ -455,27 +459,31 @@ export const Discussions = () => {
                   )}
 
                   {/* Stats and Actions */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                      <div className="flex items-center space-x-1">
-                        <MessageSquare className="h-4 w-4" />
-                        <span>{discussion.replies} replies</span>
+                  <div className="flex flex-col gap-3">
+                    {/* Stats - Mobile Optimized Grid */}
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <MessageSquare className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="whitespace-nowrap">{discussion.replies}</span>
+                        <span className="hidden sm:inline">replies</span>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <ThumbsUp className="h-4 w-4" />
+                      <div className="flex items-center gap-1">
+                        <ThumbsUp className="h-3.5 w-3.5 flex-shrink-0" />
                         <span>{discussion.likes}</span>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <Eye className="h-4 w-4" />
-                        <span>{discussion.views} views</span>
+                      <div className="flex items-center gap-1">
+                        <Eye className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="whitespace-nowrap">{discussion.views}</span>
+                        <span className="hidden sm:inline">views</span>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <Clock className="h-4 w-4" />
-                        <span>Last activity {formatTimeAgo(discussion.lastActivity)}</span>
+                      <div className="flex items-center gap-1 col-span-2 sm:col-span-1">
+                        <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="truncate">Last {formatTimeAgo(discussion.lastActivity)}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    {/* Actions - Full Width on Mobile */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
                       {discussion.category === 'help' && (
                         <Button 
                           variant="ghost" 
@@ -485,15 +493,20 @@ export const Discussions = () => {
                             setSelectedDiscussion(discussion);
                             setShowReplyForm(true);
                           }}
-                          className="text-xs sm:text-sm"
+                          className="text-xs flex-1 sm:flex-none h-8"
                         >
-                          <Reply className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                          <span className="hidden sm:inline">Reply</span>
+                          <Reply className="h-3.5 w-3.5 mr-1" />
+                          Reply
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm" className="text-xs sm:text-sm" onClick={(e) => e.stopPropagation()}>
-                        <Pin className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                        <span className="hidden sm:inline">{discussion.isPinned ? 'Unpin' : 'Pin'}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs flex-1 sm:flex-none h-8" 
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Pin className="h-3.5 w-3.5 mr-1" />
+                        {discussion.isPinned ? 'Unpin' : 'Pin'}
                       </Button>
                     </div>
                   </div>
