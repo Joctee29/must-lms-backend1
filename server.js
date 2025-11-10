@@ -512,7 +512,8 @@ const initializeDatabase = async () => {
       await pool.query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS credits INTEGER DEFAULT 0`);
       await pool.query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 4`);
       await pool.query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS academic_level VARCHAR(20) DEFAULT 'bachelor'`);
-      console.log('✅ Courses table updated with duration and academic_level columns');
+      await pool.query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS year_of_study INTEGER DEFAULT 1`);
+      console.log('✅ Courses table updated with duration, academic_level, and year_of_study columns');
     } catch (error) {
       console.log('Table alteration completed or not needed');
     }
@@ -1430,14 +1431,14 @@ app.get('/api/departments', async (req, res) => {
 
 app.post('/api/courses', async (req, res) => {
   try {
-    const { name, code, departmentId, duration, academicLevel, description } = req.body;
+    const { name, code, departmentId, duration, academicLevel, yearOfStudy, description } = req.body;
     console.log('=== BACKEND COURSE CREATION ===');
     console.log('Received data:', req.body);
     
     const result = await pool.query(
-      `INSERT INTO courses (name, code, department_id, duration, academic_level, description) 
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [name, code, departmentId, duration || 4, academicLevel || 'bachelor', description]
+      `INSERT INTO courses (name, code, department_id, duration, academic_level, year_of_study, description) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [name, code, departmentId, duration || 4, academicLevel || 'bachelor', yearOfStudy || 1, description]
     );
     
     console.log('Created course:', result.rows[0]);
@@ -1959,14 +1960,14 @@ app.put('/api/departments/:id', async (req, res) => {
 app.put('/api/courses/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, departmentId, duration, academicLevel, description } = req.body;
+    const { name, code, departmentId, duration, academicLevel, yearOfStudy, description } = req.body;
     console.log('=== BACKEND COURSE UPDATE ===');
     console.log('Updating course ID:', id);
     console.log('Update data:', req.body);
     
     const result = await pool.query(
-      'UPDATE courses SET name = $1, code = $2, department_id = $3, duration = $4, academic_level = $5, description = $6 WHERE id = $7 RETURNING *',
-      [name, code, departmentId, duration, academicLevel, description, id]
+      'UPDATE courses SET name = $1, code = $2, department_id = $3, duration = $4, academic_level = $5, year_of_study = $6, description = $7 WHERE id = $8 RETURNING *',
+      [name, code, departmentId, duration, academicLevel, yearOfStudy || 1, description, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Course not found' });
