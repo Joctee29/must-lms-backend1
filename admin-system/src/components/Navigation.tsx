@@ -14,6 +14,7 @@ import {
   Megaphone,
   Clock,
   UserPlus,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ export const Navigation = ({ activeSection, onSectionChange }: NavigationProps) 
   const navigationItems = [
     { id: "dashboard", label: "Dashboard", icon: Home },
     { id: "users", label: "User Management", icon: Users },
+    { id: "bulk-upload", label: "Bulk Upload", icon: Upload },
     { id: "courses", label: "Course Management", icon: BookOpen },
     { id: "database", label: "Lecturer Information", icon: Database },
     { id: "students", label: "Student Information", icon: GraduationCap },

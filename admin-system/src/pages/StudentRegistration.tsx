@@ -56,7 +56,8 @@ export const StudentRegistration = () => {
     collegeId: "",
     departmentId: "",
     courseId: "",
-    academicLevel: "bachelor" as 'certificate' | 'diploma' | 'bachelor' | 'masters' | 'phd'
+    academicLevel: "bachelor" as 'certificate' | 'diploma' | 'bachelor' | 'masters' | 'phd',
+    yearOfStudy: 1
   });
 
   // Search states
@@ -158,6 +159,7 @@ export const StudentRegistration = () => {
         department_name: selectedDepartment?.name || "",
         college_name: selectedCollege?.name || "",
         academic_level: studentForm.academicLevel,
+        year_of_study: studentForm.yearOfStudy,
         current_semester: 1,
         status: 'active'
       };
@@ -176,7 +178,8 @@ export const StudentRegistration = () => {
         collegeId: "",
         departmentId: "",
         courseId: "",
-        academicLevel: "bachelor"
+        academicLevel: "bachelor",
+        yearOfStudy: 1
       });
       
     } catch (error) {
@@ -268,6 +271,22 @@ export const StudentRegistration = () => {
                     <SelectItem value="2025">2025</SelectItem>
                     <SelectItem value="2026">2026</SelectItem>
                     <SelectItem value="2027">2027</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="year-of-study">Year of Study *</Label>
+                <Select value={studentForm.yearOfStudy.toString()} onValueChange={(value) => setStudentForm({...studentForm, yearOfStudy: parseInt(value)})}>
+                  <SelectTrigger id="year-of-study">
+                    <SelectValue placeholder="Select year of study" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">First Year</SelectItem>
+                    <SelectItem value="2">Second Year</SelectItem>
+                    <SelectItem value="3">Third Year</SelectItem>
+                    <SelectItem value="4">Fourth Year</SelectItem>
+                    <SelectItem value="5">Fifth Year</SelectItem>
+                    <SelectItem value="6">Sixth Year</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

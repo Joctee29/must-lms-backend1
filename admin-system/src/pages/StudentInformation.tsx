@@ -37,6 +37,7 @@ interface StudentInfo {
   college: string;
   department: string;
   academicLevel: 'certificate' | 'diploma' | 'bachelor' | 'masters' | 'phd';
+  yearOfStudy: number;
   gpa: number;
   status: 'Active' | 'Inactive' | 'Graduated' | 'Suspended';
   enrollmentDate: string;
@@ -53,6 +54,7 @@ export const StudentInformation = () => {
   const [students, setStudents] = useState<StudentInfo[]>([]);
   const [studentPrograms, setStudentPrograms] = useState<any>({});
   const [selectedLevel, setSelectedLevel] = useState<string>("all");
+  const [selectedYear, setSelectedYear] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -334,6 +336,8 @@ export const StudentInformation = () => {
     
     const matchesLevel = selectedLevel === "all" || student.academicLevel === selectedLevel;
     
+    const matchesYear = selectedYear === "all" || student.yearOfStudy?.toString() === selectedYear;
+    
     // Advanced filtering by college, department, and course
     const matchesCollege = selectedCollege === "all" || student.college.toLowerCase().includes(
       colleges.find(c => c.id.toString() === selectedCollege)?.name?.toLowerCase() || ""
@@ -347,7 +351,7 @@ export const StudentInformation = () => {
       courses.find(c => c.id.toString() === selectedCourse)?.name?.toLowerCase() || ""
     );
     
-    return matchesSearch && matchesStatus && matchesLevel && matchesCollege && matchesDepartment && matchesCourse;
+    return matchesSearch && matchesStatus && matchesLevel && matchesYear && matchesCollege && matchesDepartment && matchesCourse;
   });
 
   const getStatusColor = (status: string) => {
@@ -446,9 +450,9 @@ export const StudentInformation = () => {
           <div className="mt-4 pt-4 border-t">
             <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
               <Filter className="h-4 w-4" />
-              Advanced Filtering
+              Advanced Filtering - Separate Data by Level & Year
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
               {/* Academic Level Filter */}
               <div>
                 <Label className="text-xs text-muted-foreground">Academic Level</Label>
@@ -463,6 +467,25 @@ export const StudentInformation = () => {
                     <SelectItem value="bachelor">Bachelor</SelectItem>
                     <SelectItem value="masters">Masters</SelectItem>
                     <SelectItem value="phd">PhD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Year of Study Filter */}
+              <div>
+                <Label className="text-xs text-muted-foreground">Year of Study</Label>
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="All Years" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Years</SelectItem>
+                    <SelectItem value="1">First Year</SelectItem>
+                    <SelectItem value="2">Second Year</SelectItem>
+                    <SelectItem value="3">Third Year</SelectItem>
+                    <SelectItem value="4">Fourth Year</SelectItem>
+                    <SelectItem value="5">Fifth Year</SelectItem>
+                    <SelectItem value="6">Sixth Year</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -703,6 +726,9 @@ export const StudentInformation = () => {
                             </Badge>
                             <Badge variant="outline">
                               Semester {student.currentSemester}
+                            </Badge>
+                            <Badge variant="default" className="bg-blue-600">
+                              Year {student.yearOfStudy || 1}
                             </Badge>
                             <Badge 
                               variant={

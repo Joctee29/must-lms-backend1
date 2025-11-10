@@ -15,6 +15,7 @@ import { Settings } from "@/pages/Settings";
 import { AnnouncementManagement } from "@/pages/AnnouncementManagement";
 import { ShortTermPrograms } from "@/pages/ShortTermPrograms";
 import TimetableManagement from "@/pages/TimetableManagement";
+import { BulkUpload } from "@/pages/BulkUpload";
 import { JedaNetworksCredit } from "@/components/JedaNetworksCredit";
 
 const Index = () => {
@@ -26,6 +27,8 @@ const Index = () => {
         return <Dashboard />;
       case "users":
         return <EnhancedUserManagement />;
+      case "bulk-upload":
+        return <BulkUpload />;
       case "students":
         return <StudentInformation />;
       case "courses":
