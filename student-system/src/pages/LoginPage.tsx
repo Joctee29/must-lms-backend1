@@ -66,7 +66,14 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
           onLogin();
         } else {
           console.error('Login failed:', result.error);
-          alert(result.error || "Invalid registration number or password");
+          // Check if account needs activation
+          if (result.needsActivation) {
+            if (confirm(result.error + '\n\nWould you like to register now?')) {
+              window.location.href = '/register';
+            }
+          } else {
+            alert(result.error || "Invalid registration number or password");
+          }
         }
       } catch (error) {
         console.error('Login error:', error);
@@ -533,7 +540,7 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
                 </Button>
               </form>
               
-              <div className="mt-6 text-center space-y-2">
+              <div className="mt-6 text-center space-y-3">
                 <p className="text-sm text-gray-600">
                   Forgot your password? 
                   <button 
@@ -543,6 +550,19 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
                     Reset here
                   </button>
                 </p>
+                <div className="border-t pt-3">
+                  <p className="text-sm text-gray-600 mb-2">
+                    First time here? Activate your account
+                  </p>
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    className="w-full h-10 border-2 border-blue-600 text-blue-600 hover:bg-blue-50"
+                    onClick={() => window.location.href = '/register'}
+                  >
+                    Register as Student
+                  </Button>
+                </div>
                 <p className="text-xs text-gray-500">
                   Need help? Contact IT Support: +255 25 295 7544
                 </p>
