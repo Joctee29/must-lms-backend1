@@ -551,12 +551,12 @@ export const TakeAssessment = () => {
   // Assessment selection screen
   if (!currentAssessment) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
+      <div className="min-h-screen bg-gray-50 p-3 sm:p-4">
         <div className="max-w-4xl mx-auto">
-          <Card className="mb-6">
+          <Card className="mb-4 sm:mb-6">
             <CardHeader>
-              <CardTitle className="text-2xl">Available Assessments</CardTitle>
-              <p className="text-muted-foreground">Select an assessment to begin</p>
+              <CardTitle className="text-xl sm:text-2xl">Available Assessments</CardTitle>
+              <p className="text-sm sm:text-base text-muted-foreground">Select an assessment to begin</p>
             </CardHeader>
           </Card>
 
@@ -569,16 +569,16 @@ export const TakeAssessment = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-3 sm:gap-4">
               {availableAssessments.map((assessment) => (
                 <Card key={assessment.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                       <div className="flex-1">
-                        <h3 className="text-xl font-semibold mb-2">{assessment.title}</h3>
-                        <p className="text-muted-foreground mb-3">{assessment.description}</p>
+                        <h3 className="text-lg sm:text-xl font-semibold mb-2">{assessment.title}</h3>
+                        <p className="text-sm sm:text-base text-muted-foreground mb-3">{assessment.description}</p>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
                           <div>
                             <p className="text-sm text-muted-foreground">Program</p>
                             <p className="font-medium">{assessment.program}</p>
@@ -616,11 +616,11 @@ export const TakeAssessment = () => {
                         </div>
                       </div>
 
-                      <div className="ml-4">
+                      <div className="w-full sm:w-auto sm:ml-4">
                         <Button 
                           onClick={() => handleStartAssessment(assessment)}
                           disabled={assessment.status !== 'published'}
-                          className="bg-blue-600 hover:bg-blue-700"
+                          className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
                         >
                           Start Assessment
                         </Button>
@@ -638,20 +638,20 @@ export const TakeAssessment = () => {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-3 sm:p-4">
         <Card className="w-full max-w-2xl">
           <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="h-8 w-8 text-green-600" />
+            <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
             </div>
-            <CardTitle className="text-2xl">Assessment Submitted Successfully</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl">Assessment Submitted Successfully</CardTitle>
           </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <div className="bg-gray-50 rounded-lg p-6">
-              <h3 className="font-semibold text-lg mb-2">{currentAssessment.title}</h3>
-              <p className="text-muted-foreground mb-4">{currentAssessment.program}</p>
+          <CardContent className="text-center space-y-3 sm:space-y-4">
+            <div className="bg-gray-50 rounded-lg p-4 sm:p-6">
+              <h3 className="font-semibold text-base sm:text-lg mb-2">{currentAssessment.title}</h3>
+              <p className="text-sm sm:text-base text-muted-foreground mb-4">{currentAssessment.program}</p>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Questions Answered</p>
                   <p className="text-2xl font-bold text-blue-600">{Object.keys(answers).length}/{currentAssessment.questions.length}</p>
@@ -677,7 +677,7 @@ export const TakeAssessment = () => {
               Thank you for completing the assessment. You can now close this window.
             </p>
             
-            <Button onClick={() => window.location.href = '/grades'} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={() => window.location.href = '/grades'} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
               View All Grades
             </Button>
           </CardContent>
@@ -690,7 +690,7 @@ export const TakeAssessment = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Warning Banner */}
       {(showWarning || !isOnline || hasLeftPage) && (
-        <div className="bg-red-600 text-white p-3 text-center">
+        <div className="bg-red-600 text-white p-2 sm:p-3 text-center">
           <div className="flex items-center justify-center gap-2">
             <AlertTriangle className="h-5 w-5" />
             <span>

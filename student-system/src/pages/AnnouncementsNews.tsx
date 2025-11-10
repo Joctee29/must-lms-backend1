@@ -173,15 +173,15 @@ export const AnnouncementsNews = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Megaphone className="h-8 w-8 text-blue-600" />
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+            <Megaphone className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
             Announcements & News
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-sm sm:text-base text-muted-foreground mt-2">
             Stay updated with important announcements and news from your institution
           </p>
         </div>
@@ -199,7 +199,7 @@ export const AnnouncementsNews = () => {
       </div>
 
       {/* Announcements List */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {filteredAnnouncements.length === 0 ? (
           <div className="text-center py-12">
             <Megaphone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -211,28 +211,28 @@ export const AnnouncementsNews = () => {
         ) : (
           filteredAnnouncements.map((announcement) => (
             <Card key={announcement.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start space-x-4">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start space-y-3 sm:space-y-0 sm:space-x-4">
                   {/* Avatar */}
-                  <Avatar>
+                  <Avatar className="hidden sm:block">
                     <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
                       {announcement.created_by?.charAt(0)?.toUpperCase() || 'A'}
                     </AvatarFallback>
                   </Avatar>
 
                   {/* Content */}
-                  <div className="flex-1 space-y-3">
+                  <div className="flex-1 space-y-2 sm:space-y-3">
                     {/* Header */}
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-lg">{announcement.title}</h3>
-                          <Badge variant="outline" className="flex items-center gap-1">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-base sm:text-lg">{announcement.title}</h3>
+                          <Badge variant="outline" className="flex items-center gap-1 w-fit text-xs">
                             {getTargetIcon(announcement.target_type)}
                             {getTargetLabel(announcement.target_type, announcement.target_value)}
                           </Badge>
                         </div>
-                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <div className="flex items-center space-x-2 text-xs sm:text-sm text-muted-foreground">
                           <Clock className="h-3 w-3" />
                           <span>{formatTimeAgo(announcement.created_at)}</span>
                         </div>
@@ -240,27 +240,27 @@ export const AnnouncementsNews = () => {
                     </div>
 
                     {/* Content */}
-                    <p className="text-muted-foreground">{announcement.content}</p>
+                    <p className="text-sm sm:text-base text-muted-foreground">{announcement.content}</p>
 
                     {/* PDF Download */}
                     {announcement.file_url && (
-                      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-gray-50 rounded-lg">
                         <FileText className="h-5 w-5 text-red-600" />
-                        <span className="text-sm font-medium">PDF Attachment</span>
+                        <span className="text-xs sm:text-sm font-medium flex-1">PDF Attachment</span>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleDownloadPDF(announcement)}
-                          className="ml-auto"
+                          className="w-full sm:w-auto text-xs sm:text-sm"
                         >
-                          <Download className="h-4 w-4 mr-1" />
+                          <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                           Download
                         </Button>
                       </div>
                     )}
 
                     {/* Stats */}
-                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                    <div className="flex items-center space-x-4 text-xs sm:text-sm text-muted-foreground">
                       <div className="flex items-center space-x-1">
                         <Clock className="h-4 w-4" />
                         <span>Posted {formatTimeAgo(announcement.created_at)}</span>

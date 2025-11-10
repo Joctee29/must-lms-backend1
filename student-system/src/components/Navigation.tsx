@@ -20,6 +20,7 @@ import {
   Megaphone,
   Menu,
   X,
+  Video,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -35,7 +36,7 @@ export const Navigation = ({ activeSection, onSectionChange }: NavigationProps) 
   const navigationItems = [
     { id: "dashboard", label: "Dashboard", icon: Home },
     { id: "courses", label: "My Programs", icon: BookOpen },
-    { id: "lectures", label: "Lectures", icon: PlayCircle },
+    { id: "lectures", label: "Live Classes", icon: Video },
     { id: "assessments", label: "Take Assessment", icon: ClipboardCheck },
     { id: "assessment-results", label: "Assessment Results", icon: CheckCircle },
     { id: "assignments", label: "Assignments", icon: FileText },
