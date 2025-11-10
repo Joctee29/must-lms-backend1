@@ -253,6 +253,63 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
+
+// IMPORTANT: Multer file upload routes MUST be defined BEFORE express.json()
+// This is because express.json() will try to parse the body, which conflicts with multipart/form-data
+
+// Define file upload endpoint early (before express.json middleware)
+app.post('/api/assignment-submissions/upload', upload.single('file'), async (req, res) => {
+  try {
+    console.log('=== ASSIGNMENT FILE UPLOAD DEBUG ===');
+    console.log('Request headers:', req.headers);
+    console.log('Request body keys:', Object.keys(req.body));
+    console.log('Request file:', req.file);
+    
+    const uploadedFile = req.file;
+    
+    if (!uploadedFile) {
+      console.error('❌ No file uploaded - req.file is undefined');
+      console.error('This could mean:');
+      console.error('1. File field name mismatch (should be "file")');
+      console.error('2. File size exceeds limit (100MB)');
+      console.error('3. CORS or network issue');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No file uploaded. Please ensure file is less than 100MB and try again.' 
+      });
+    }
+    
+    // Validate file type
+    if (!uploadedFile.mimetype.includes('pdf')) {
+      console.error('❌ Invalid file type:', uploadedFile.mimetype);
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Only PDF files are allowed' 
+      });
+    }
+    
+    // Return the file path that can be used in the submission
+    const fileUrl = `/content/${uploadedFile.filename}`;
+    
+    console.log('✅ Assignment file uploaded successfully:');
+    console.log('   - Original name:', uploadedFile.originalname);
+    console.log('   - Saved as:', uploadedFile.filename);
+    console.log('   - Size:', uploadedFile.size, 'bytes');
+    console.log('   - File URL:', fileUrl);
+    
+    res.json({ 
+      success: true, 
+      file_path: fileUrl,
+      file_name: uploadedFile.originalname,
+      file_size: uploadedFile.size
+    });
+  } catch (error) {
+    console.error('❌ Error uploading assignment file:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Now apply express.json() for other routes
 app.use(express.json());
 
 // Rate Limiting Configuration
@@ -314,8 +371,57 @@ const optionalAuth = (req, res, next) => {
   next();
 };
 
-// Serve static files from uploads directory
-app.use('/content', express.static(uploadsDir));
+// Serve static files from uploads directory with proper headers
+app.use('/content', express.static(uploadsDir, {
+  setHeaders: (res, filePath) => {
+    // Set proper content type for PDFs
+    if (filePath.endsWith('.pdf')) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline');
+    }
+  }
+}));
+app.use('/uploads', express.static(uploadsDir, {
+  setHeaders: (res, filePath) => {
+    // Set proper content type for PDFs
+    if (filePath.endsWith('.pdf')) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline');
+    }
+  }
+})); // Also serve via /uploads for backward compatibility
+
+// File download endpoint with proper URL decoding
+app.get('/api/files/:filename', (req, res) => {
+  try {
+    const filename = decodeURIComponent(req.params.filename);
+    const filePath = path.join(uploadsDir, filename);
+    
+    console.log('=== FILE DOWNLOAD REQUEST ===');
+    console.log('Requested filename:', req.params.filename);
+    console.log('Decoded filename:', filename);
+    console.log('Full path:', filePath);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      console.error('❌ File not found:', filePath);
+      return res.status(404).json({ success: false, error: 'File not found' });
+    }
+    
+    // Set proper headers for PDF viewing
+    const ext = path.extname(filename).toLowerCase();
+    if (ext === '.pdf') {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline');
+    }
+    
+    console.log('✅ Serving file:', filename);
+    res.sendFile(filePath);
+  } catch (error) {
+    console.error('Error serving file:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // PostgreSQL connection - Use environment variables for production
 const poolConfig = process.env.DATABASE_URL 
@@ -489,6 +595,28 @@ const initializeDatabase = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Add year_of_study column if it doesn't exist (for data separation by year)
+    try {
+      await pool.query(`
+        ALTER TABLE students 
+        ADD COLUMN IF NOT EXISTS year_of_study INTEGER DEFAULT 1
+      `);
+      console.log('year_of_study column added/verified in students table');
+    } catch (error) {
+      console.log('year_of_study column may already exist:', error.message);
+    }
+
+    // Add academic_level column if it doesn't exist (for level-based filtering)
+    try {
+      await pool.query(`
+        ALTER TABLE students 
+        ADD COLUMN IF NOT EXISTS academic_level VARCHAR(50) DEFAULT 'bachelor'
+      `);
+      console.log('academic_level column added/verified in students table');
+    } catch (error) {
+      console.log('academic_level column may already exist:', error.message);
+    }
 
     // Create passwords table for password management
     await pool.query(`
@@ -977,12 +1105,12 @@ app.delete('/api/lecturers/:id', async (req, res) => {
 // Student routes
 app.post('/api/students', async (req, res) => {
   try {
-    const { name, registrationNumber, academicYear, courseId, currentSemester, email, phone, password } = req.body;
+    const { name, registrationNumber, academicYear, courseId, currentSemester, email, phone, password, yearOfStudy, academicLevel } = req.body;
     
     const result = await pool.query(
-      `INSERT INTO students (name, registration_number, academic_year, course_id, current_semester, email, phone, password) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [name, registrationNumber, academicYear, courseId, currentSemester, email, phone, password]
+      `INSERT INTO students (name, registration_number, academic_year, course_id, current_semester, email, phone, password, year_of_study, academic_level) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [name, registrationNumber, academicYear, courseId, currentSemester, email, phone, password, yearOfStudy || 1, academicLevel || 'bachelor']
     );
 
     // Also save to password records
@@ -1002,16 +1130,31 @@ app.post('/api/students', async (req, res) => {
 // Get students with proper filtering based on user type
 app.get('/api/students', optionalAuth, async (req, res) => {
   try {
-    const { lecturer_id, user_type } = req.query;
+    const { lecturer_id, user_type, year_of_study, academic_level } = req.query;
     const userFromToken = req.user; // From JWT if provided
     
     console.log('=== FETCHING STUDENTS ===');
-    console.log('Query params:', { lecturer_id, user_type });
+    console.log('Query params:', { lecturer_id, user_type, year_of_study, academic_level });
     console.log('User from token:', userFromToken);
     
     // Determine user type from token or query
     const effectiveUserType = userFromToken?.userType || user_type;
     const effectiveUserId = userFromToken?.userId || lecturer_id;
+    
+    // Build filter conditions for year and level
+    let yearFilter = '';
+    let levelFilter = '';
+    const filterParams = [];
+    
+    if (year_of_study) {
+      yearFilter = ` AND s.year_of_study = $${filterParams.length + 1}`;
+      filterParams.push(parseInt(year_of_study));
+    }
+    
+    if (academic_level) {
+      levelFilter = ` AND s.academic_level = $${filterParams.length + 1}`;
+      filterParams.push(academic_level);
+    }
     
     // For lecturers - only their students (students in their programs)
     if (effectiveUserType === 'lecturer' && effectiveUserId) {
@@ -1030,9 +1173,13 @@ app.get('/api/students', optionalAuth, async (req, res) => {
       console.log('Fetching students for lecturer:', lecturer);
       
       // Get students from programs matching lecturer by ID OR name/employee_id
+      const baseParams = [lecturer.id, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`];
+      const allParams = [...baseParams, ...filterParams];
+      
       const result = await pool.query(`
         SELECT DISTINCT s.id, s.name, s.registration_number, s.academic_year, 
                s.course_id, s.current_semester, s.email, s.phone, s.created_at,
+               s.year_of_study, s.academic_level,
                c.name as course_name
         FROM students s
         LEFT JOIN courses c ON s.course_id = c.id
@@ -1044,23 +1191,35 @@ app.get('/api/students', optionalAuth, async (req, res) => {
              OR lecturer_name ILIKE $4
              OR lecturer_name ILIKE $5
         )
-        ORDER BY s.created_at DESC
-      `, [lecturer.id, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`]);
+        ${yearFilter.replace(/\$\d+/g, (match) => {
+          const num = parseInt(match.substring(1));
+          return `$${baseParams.length + num}`;
+        })}
+        ${levelFilter.replace(/\$\d+/g, (match) => {
+          const num = parseInt(match.substring(1));
+          return `$${baseParams.length + filterParams.length - (academic_level ? 1 : 0) + num}`;
+        })}
+        ORDER BY s.year_of_study ASC, s.created_at DESC
+      `, allParams);
       
       console.log(`Found ${result.rows.length} students for lecturer ${lecturer.name} (ID: ${lecturer.id})`);
       return res.json({ success: true, data: result.rows });
     }
     
-    // For admin - all students
+    // For admin - all students with optional filtering
     if (effectiveUserType === 'admin') {
       const result = await pool.query(`
         SELECT s.id, s.name, s.registration_number, s.academic_year, s.course_id, 
                s.current_semester, s.email, s.phone, s.created_at, s.updated_at,
+               s.year_of_study, s.academic_level,
                c.name as course_name 
         FROM students s 
         LEFT JOIN courses c ON s.course_id = c.id 
-        ORDER BY s.created_at DESC
-      `);
+        WHERE 1=1
+        ${yearFilter}
+        ${levelFilter}
+        ORDER BY s.year_of_study ASC, s.created_at DESC
+      `, filterParams);
       console.log(`Found ${result.rows.length} students (admin view)`);
       return res.json({ success: true, data: result.rows });
     }
@@ -4284,7 +4443,7 @@ app.post('/api/assignments/cleanup', async (req, res) => {
   }
 });
 
-// Submit assignment
+// Submit assignment (upload endpoint moved to top of file before express.json middleware)
 app.post('/api/assignment-submissions', async (req, res) => {
   try {
     const {
@@ -5149,13 +5308,96 @@ app.post('/api/live-classes/test-scheduler', async (req, res) => {
 // Get all discussions with student-specific program filtering
 app.get('/api/discussions', async (req, res) => {
   try {
-    const { student_id, student_username } = req.query;
+    const { student_id, student_username, lecturer_id, lecturer_username } = req.query;
     
     console.log('=== FETCHING DISCUSSIONS ===');
     console.log('Student ID:', student_id);
     console.log('Student Username:', student_username);
+    console.log('Lecturer ID:', lecturer_id);
+    console.log('Lecturer Username:', lecturer_username);
     
-    // If no student info provided, return all discussions (for admin/lecturer view)
+    // If lecturer info provided, filter by lecturer's programs
+    if (lecturer_id || lecturer_username) {
+      console.log('Fetching discussions for lecturer...');
+      
+      // Get lecturer's programs (both regular and short-term)
+      let lecturerPrograms = [];
+      
+      // Get regular programs
+      const regularProgramsResult = await pool.query(`
+        SELECT name FROM programs 
+        WHERE lecturer_id = $1 OR lecturer_name = $2
+      `, [lecturer_id || null, lecturer_username || '']);
+      lecturerPrograms = regularProgramsResult.rows.map(p => p.name);
+      
+      // Get short-term programs
+      const shortTermResult = await pool.query(`
+        SELECT title FROM short_term_programs 
+        WHERE lecturer_id = $1 OR lecturer_name = $2
+      `, [lecturer_id || null, lecturer_username || '']);
+      const shortTermPrograms = shortTermResult.rows.map(p => p.title);
+      lecturerPrograms = [...lecturerPrograms, ...shortTermPrograms];
+      
+      console.log('Lecturer Programs:', lecturerPrograms);
+      
+      // Get all discussions
+      const allDiscussionsResult = await pool.query(`
+        SELECT d.*, 
+               (SELECT COUNT(*) FROM discussion_replies WHERE discussion_id = d.id) as reply_count
+        FROM discussions d 
+        ORDER BY d.created_at DESC
+      `);
+      
+      // Filter discussions by lecturer's programs with improved matching
+      const filteredDiscussions = allDiscussionsResult.rows.filter(discussion => {
+        if (!discussion.program || discussion.program.trim() === '') {
+          return false; // Don't show discussions without program
+        }
+        
+        const discussionProgram = discussion.program.toLowerCase().trim();
+        
+        return lecturerPrograms.some(program => {
+          if (!program) return false;
+          
+          const lecturerProgram = program.toLowerCase().trim();
+          
+          // 1. Exact match
+          if (lecturerProgram === discussionProgram) {
+            console.log(`✅ Discussion "${discussion.title}" - Exact match: ${discussion.program}`);
+            return true;
+          }
+          
+          // 2. Contains match (either direction)
+          if (lecturerProgram.includes(discussionProgram) || discussionProgram.includes(lecturerProgram)) {
+            console.log(`✅ Discussion "${discussion.title}" - Contains match: ${discussion.program}`);
+            return true;
+          }
+          
+          // 3. Word-based matching (at least 2 common significant words)
+          const lecturerWords = lecturerProgram.split(/\s+/).filter(w => w.length > 3);
+          const discussionWords = discussionProgram.split(/\s+/).filter(w => w.length > 3);
+          const commonWords = lecturerWords.filter(word => discussionWords.includes(word));
+          
+          if (commonWords.length >= 2) {
+            console.log(`✅ Discussion "${discussion.title}" - Word match (${commonWords.join(', ')}): ${discussion.program}`);
+            return true;
+          }
+          
+          // 4. Single significant word match for short program names
+          if (lecturerWords.length === 1 && discussionWords.length === 1 && lecturerWords[0] === discussionWords[0]) {
+            console.log(`✅ Discussion "${discussion.title}" - Single word match: ${discussion.program}`);
+            return true;
+          }
+          
+          return false;
+        });
+      });
+      
+      console.log(`Filtered ${filteredDiscussions.length} discussions for lecturer from ${allDiscussionsResult.rows.length} total`);
+      return res.json({ success: true, data: filteredDiscussions });
+    }
+    
+    // If no student or lecturer info provided, return all discussions (for admin view)
     if (!student_id && !student_username) {
       const result = await pool.query(`
         SELECT d.*, 
@@ -7534,6 +7776,241 @@ app.post('/api/change-password', async (req, res) => {
       message: 'Server error while changing password',
       error: error.message 
     });
+  }
+});
+
+// ==================== BULK UPLOAD ENDPOINTS ====================
+// Bulk upload students from CSV
+app.post('/api/students/bulk-upload', async (req, res) => {
+  try {
+    const { students } = req.body;
+    
+    if (!students || !Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Students array is required and must not be empty' 
+      });
+    }
+
+    console.log(`=== BULK UPLOAD STUDENTS - Processing ${students.length} students ===`);
+    
+    const results = {
+      successful: [],
+      failed: []
+    };
+
+    // Process each student
+    for (let i = 0; i < students.length; i++) {
+      const student = students[i];
+      
+      try {
+        // Validate required fields
+        if (!student.name || !student.email || !student.courseId) {
+          results.failed.push({
+            row: i + 1,
+            data: student,
+            error: 'Missing required fields (name, email, courseId)'
+          });
+          continue;
+        }
+
+        // Check if email already exists
+        const existingEmail = await pool.query(
+          'SELECT id FROM students WHERE email = $1',
+          [student.email]
+        );
+        
+        if (existingEmail.rows.length > 0) {
+          results.failed.push({
+            row: i + 1,
+            data: student,
+            error: `Email ${student.email} already exists`
+          });
+          continue;
+        }
+
+        // Check if registration number already exists (if provided)
+        if (student.registrationNumber) {
+          const existingRegNumber = await pool.query(
+            'SELECT id FROM students WHERE registration_number = $1',
+            [student.registrationNumber]
+          );
+          
+          if (existingRegNumber.rows.length > 0) {
+            results.failed.push({
+              row: i + 1,
+              data: student,
+              error: `Registration number ${student.registrationNumber} already exists`
+            });
+            continue;
+          }
+        }
+
+        // Insert student
+        const result = await pool.query(
+          `INSERT INTO students (name, registration_number, academic_year, course_id, current_semester, email, phone, password, year_of_study, academic_level) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+          [
+            student.name,
+            student.registrationNumber || null,
+            student.academicYear || new Date().getFullYear().toString(),
+            student.courseId,
+            student.currentSemester || 1,
+            student.email,
+            student.phone || null,
+            student.password || 'student123', // Default password
+            student.yearOfStudy || 1, // Default to first year
+            student.academicLevel || 'bachelor' // Default to bachelor
+          ]
+        );
+
+        // Save to password records
+        await pool.query(
+          `INSERT INTO password_records (user_type, user_id, username, password_hash) 
+           VALUES ('student', $1, $2, $3)`,
+          [result.rows[0].id, student.registrationNumber || student.email, student.password || 'student123']
+        );
+
+        results.successful.push({
+          row: i + 1,
+          data: result.rows[0]
+        });
+
+      } catch (error) {
+        console.error(`Error processing student at row ${i + 1}:`, error);
+        results.failed.push({
+          row: i + 1,
+          data: student,
+          error: error.message
+        });
+      }
+    }
+
+    console.log(`Bulk upload completed: ${results.successful.length} successful, ${results.failed.length} failed`);
+    
+    res.json({ 
+      success: true, 
+      message: `Processed ${students.length} students: ${results.successful.length} successful, ${results.failed.length} failed`,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('Error in bulk upload students:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Bulk upload lecturers from CSV
+app.post('/api/lecturers/bulk-upload', async (req, res) => {
+  try {
+    const { lecturers } = req.body;
+    
+    if (!lecturers || !Array.isArray(lecturers) || lecturers.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Lecturers array is required and must not be empty' 
+      });
+    }
+
+    console.log(`=== BULK UPLOAD LECTURERS - Processing ${lecturers.length} lecturers ===`);
+    
+    const results = {
+      successful: [],
+      failed: []
+    };
+
+    // Process each lecturer
+    for (let i = 0; i < lecturers.length; i++) {
+      const lecturer = lecturers[i];
+      
+      try {
+        // Validate required fields
+        if (!lecturer.name || !lecturer.email || !lecturer.employeeId) {
+          results.failed.push({
+            row: i + 1,
+            data: lecturer,
+            error: 'Missing required fields (name, email, employeeId)'
+          });
+          continue;
+        }
+
+        // Check if email already exists
+        const existingEmail = await pool.query(
+          'SELECT id FROM lecturers WHERE email = $1',
+          [lecturer.email]
+        );
+        
+        if (existingEmail.rows.length > 0) {
+          results.failed.push({
+            row: i + 1,
+            data: lecturer,
+            error: `Email ${lecturer.email} already exists`
+          });
+          continue;
+        }
+
+        // Check if employee ID already exists
+        const existingEmployeeId = await pool.query(
+          'SELECT id FROM lecturers WHERE employee_id = $1',
+          [lecturer.employeeId]
+        );
+        
+        if (existingEmployeeId.rows.length > 0) {
+          results.failed.push({
+            row: i + 1,
+            data: lecturer,
+            error: `Employee ID ${lecturer.employeeId} already exists`
+          });
+          continue;
+        }
+
+        // Insert lecturer
+        const result = await pool.query(
+          `INSERT INTO lecturers (name, employee_id, specialization, email, phone, password) 
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+          [
+            lecturer.name,
+            lecturer.employeeId,
+            lecturer.specialization || null,
+            lecturer.email,
+            lecturer.phone || null,
+            lecturer.password || 'lecturer123' // Default password
+          ]
+        );
+
+        // Save to password records
+        await pool.query(
+          `INSERT INTO password_records (user_type, user_id, username, password_hash) 
+           VALUES ('lecturer', $1, $2, $3)`,
+          [result.rows[0].id, lecturer.employeeId, lecturer.password || 'lecturer123']
+        );
+
+        results.successful.push({
+          row: i + 1,
+          data: result.rows[0]
+        });
+
+      } catch (error) {
+        console.error(`Error processing lecturer at row ${i + 1}:`, error);
+        results.failed.push({
+          row: i + 1,
+          data: lecturer,
+          error: error.message
+        });
+      }
+    }
+
+    console.log(`Bulk upload completed: ${results.successful.length} successful, ${results.failed.length} failed`);
+    
+    res.json({ 
+      success: true, 
+      message: `Processed ${lecturers.length} lecturers: ${results.successful.length} successful, ${results.failed.length} failed`,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('Error in bulk upload lecturers:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
