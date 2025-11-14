@@ -2042,7 +2042,7 @@ app.get('/api/courses', async (req, res) => {
 
 app.post('/api/programs', async (req, res) => {
   try {
-    const { name, courseId, lecturerName, credits, totalSemesters, duration, description } = req.body;
+    const { name, courseId, lecturerName, credits, totalSemesters, duration, description, semester } = req.body;
     
     // Find lecturer by name or employee_id
     let lecturerId = null;
@@ -2057,9 +2057,9 @@ app.post('/api/programs', async (req, res) => {
     }
     
     const result = await pool.query(
-      `INSERT INTO programs (name, course_id, lecturer_id, credits, total_semesters, duration, lecturer_name, description) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [name, courseId, lecturerId, credits || 0, totalSemesters || 1, duration || 1, lecturerName, description]
+      `INSERT INTO programs (name, course_id, lecturer_id, credits, total_semesters, duration, lecturer_name, description, semester) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [name, courseId, lecturerId, credits || 0, totalSemesters || 1, duration || 1, lecturerName, description, semester || null]
     );
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -2563,7 +2563,7 @@ app.put('/api/courses/:id', async (req, res) => {
 app.put('/api/programs/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, courseId, lecturerName, credits, totalSemesters, duration, description } = req.body;
+    const { name, courseId, lecturerName, credits, totalSemesters, duration, description, semester } = req.body;
     
     // Find lecturer by name or employee_id
     let lecturerId = null;
@@ -2578,8 +2578,8 @@ app.put('/api/programs/:id', async (req, res) => {
     }
     
     const result = await pool.query(
-      'UPDATE programs SET name = $1, course_id = $2, lecturer_id = $3, credits = $4, total_semesters = $5, duration = $6, lecturer_name = $7, description = $8 WHERE id = $9 RETURNING *',
-      [name, courseId, lecturerId, credits, totalSemesters, duration, lecturerName, description, id]
+      'UPDATE programs SET name = $1, course_id = $2, lecturer_id = $3, credits = $4, total_semesters = $5, duration = $6, lecturer_name = $7, description = $8, semester = $9 WHERE id = $10 RETURNING *',
+      [name, courseId, lecturerId, credits, totalSemesters, duration, lecturerName, description, semester || null, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Program not found' });
