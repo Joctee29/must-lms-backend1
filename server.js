@@ -951,8 +951,6 @@ app.post('/api/auth/login', async (req, res) => {
       success: false, 
       error: 'Server error during login. Please try again.' 
     });
-  }
-});
 
 // ==================== SELF-REGISTRATION ENDPOINTS ====================
 
@@ -961,9 +959,6 @@ app.post('/api/auth/student-register', async (req, res) => {
   try {
     const { 
       registrationNumber, 
-      courseLevel, 
-      yearOfStudy, 
-      courseId, 
       password, 
       confirmPassword, 
       email 
@@ -971,13 +966,10 @@ app.post('/api/auth/student-register', async (req, res) => {
 
     console.log('=== STUDENT SELF-REGISTRATION ===');
     console.log('Registration Number:', registrationNumber);
-    console.log('Course Level:', courseLevel);
-    console.log('Year of Study:', yearOfStudy);
-    console.log('Course ID:', courseId);
     console.log('Email:', email);
 
     // Validate required fields
-    if (!registrationNumber || !courseLevel || !yearOfStudy || !courseId || !password || !confirmPassword || !email) {
+    if (!registrationNumber || !password || !confirmPassword || !email) {
       return res.status(400).json({ 
         success: false, 
         error: 'All fields are required' 
@@ -1027,32 +1019,7 @@ app.post('/api/auth/student-register', async (req, res) => {
     // VALIDATION: Verify submitted details match admin records
     console.log('=== VALIDATING STUDENT DETAILS ===');
     console.log('Admin Record - Course ID:', student.course_id, 'Academic Level:', student.academic_level, 'Year:', student.year_of_study);
-    console.log('Submitted - Course ID:', courseId, 'Academic Level:', courseLevel, 'Year:', yearOfStudy);
-
-    // Validate course ID matches
-    if (parseInt(courseId) !== parseInt(student.course_id)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Course mismatch. Admin registered you for course ID ${student.course_id}. Please verify your details or contact admin.` 
-      });
-    }
-
-    // Validate academic level matches
-    if (courseLevel !== student.academic_level) {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Academic level mismatch. Admin registered you for ${student.academic_level} level. Please verify your details or contact admin.` 
-      });
-    }
-
-    // Validate year of study matches
-    if (parseInt(yearOfStudy) !== parseInt(student.year_of_study)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Year of study mismatch. Admin registered you for year ${student.year_of_study}. Please verify your details or contact admin.` 
-      });
-    }
-
+    console.log('Using admin records for course, level, and year of study; no additional client-side matching required.');
     console.log('✅ All details validated successfully');
 
     // Update student record with new information and activate account
@@ -1060,14 +1027,11 @@ app.post('/api/auth/student-register', async (req, res) => {
       `UPDATE students 
        SET email = $1, 
            password = $2, 
-           course_id = $3, 
-           academic_level = $4, 
-           year_of_study = $5, 
            is_active = true, 
            updated_at = CURRENT_TIMESTAMP 
-       WHERE registration_number = $6 
+       WHERE registration_number = $3 
        RETURNING *`,
-      [email, password, courseId, courseLevel, yearOfStudy, registrationNumber]
+      [email, password, registrationNumber]
     );
 
     // Try to update password records (non-critical - don't fail if it errors)
