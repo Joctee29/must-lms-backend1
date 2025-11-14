@@ -8443,6 +8443,190 @@ app.post('/api/students/bulk-upload', async (req, res) => {
   }
 });
 
+// Bulk upload course management data (colleges, departments, courses, programs)
+app.post('/api/course-management/bulk-upload', async (req, res) => {
+  try {
+    const { records } = req.body;
+
+    if (!records || !Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Records array is required and must not be empty'
+      });
+    }
+
+    console.log(`=== BULK UPLOAD COURSE MANAGEMENT - Processing ${records.length} records ===`);
+
+    const results = {
+      successful: [],
+      failed: []
+    };
+
+    for (let i = 0; i < records.length; i++) {
+      const record = records[i];
+
+      try {
+        // Track created / reused IDs for this row
+        let collegeId = null;
+        let departmentId = null;
+        let courseId = null;
+        let programId = null;
+
+        // 1. College
+        if (record.collegeName) {
+          const collegeResult = await pool.query(
+            'SELECT id FROM colleges WHERE name = $1',
+            [record.collegeName]
+          );
+
+          if (collegeResult.rows.length > 0) {
+            collegeId = collegeResult.rows[0].id;
+          } else {
+            const newCollege = await pool.query(
+              `INSERT INTO colleges (name, short_name, description, established)
+               VALUES ($1, $2, $3, $4) RETURNING id`,
+              [
+                record.collegeName,
+                record.collegeShortName || record.collegeName.substring(0, 10),
+                record.collegeDescription || null,
+                record.collegeEstablished || null
+              ]
+            );
+            collegeId = newCollege.rows[0].id;
+          }
+        }
+
+        // 2. Department
+        if (record.departmentName) {
+          const departmentResult = await pool.query(
+            'SELECT id FROM departments WHERE name = $1',
+            [record.departmentName]
+          );
+
+          if (departmentResult.rows.length > 0) {
+            departmentId = departmentResult.rows[0].id;
+          } else {
+            const newDepartment = await pool.query(
+              `INSERT INTO departments (name, college_id, description, head_of_department)
+               VALUES ($1, $2, $3, $4) RETURNING id`,
+              [
+                record.departmentName,
+                collegeId,
+                record.departmentDescription || null,
+                null
+              ]
+            );
+            departmentId = newDepartment.rows[0].id;
+          }
+        }
+
+        // 3. Course
+        if (record.courseName || record.courseCode) {
+          let courseResult = null;
+
+          if (record.courseCode) {
+            courseResult = await pool.query(
+              'SELECT id FROM courses WHERE code = $1',
+              [record.courseCode]
+            );
+          }
+
+          if (!courseResult || courseResult.rows.length === 0) {
+            if (record.courseName) {
+              const fallbackCourseResult = await pool.query(
+                'SELECT id FROM courses WHERE name = $1',
+                [record.courseName]
+              );
+
+              if (fallbackCourseResult.rows.length > 0) {
+                courseResult = fallbackCourseResult;
+              }
+            }
+          }
+
+          if (courseResult && courseResult.rows.length > 0) {
+            courseId = courseResult.rows[0].id;
+          } else {
+            const newCourse = await pool.query(
+              `INSERT INTO courses (name, code, department_id, duration, academic_level, year_of_study, description)
+               VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+              [
+                record.courseName || record.courseCode,
+                record.courseCode || `${record.courseName || 'COURSE'}-${Date.now()}`,
+                departmentId,
+                record.courseDuration || 4,
+                record.courseAcademicLevel || 'bachelor',
+                record.courseYearOfStudy || 1,
+                record.courseDescription || null
+              ]
+            );
+            courseId = newCourse.rows[0].id;
+          }
+        }
+
+        // 4. Program
+        if (record.programName && courseId) {
+          // Try to find lecturer by name or employee_id
+          let lecturerId = null;
+          if (record.programLecturerName) {
+            const lecturerResult = await pool.query(
+              'SELECT id FROM lecturers WHERE name = $1 OR employee_id = $1',
+              [record.programLecturerName]
+            );
+            if (lecturerResult.rows.length > 0) {
+              lecturerId = lecturerResult.rows[0].id;
+            }
+          }
+
+          const programResult = await pool.query(
+            `INSERT INTO programs (name, course_id, lecturer_id, credits, total_semesters, duration, lecturer_name, description)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+            [
+              record.programName,
+              courseId,
+              lecturerId,
+              record.programCredits || 0,
+              record.programTotalSemesters || 1,
+              record.programDuration || 1,
+              record.programLecturerName || null,
+              record.programDescription || null
+            ]
+          );
+          programId = programResult.rows[0].id;
+        }
+
+        results.successful.push({
+          row: i + 1,
+          data: {
+            collegeId,
+            departmentId,
+            courseId,
+            programId
+          }
+        });
+      } catch (error) {
+        console.error(`Error processing course management record at row ${i + 1}:`, error);
+        results.failed.push({
+          row: i + 1,
+          data: record,
+          error: error.message
+        });
+      }
+    }
+
+    console.log(`Bulk course management upload completed: ${results.successful.length} successful, ${results.failed.length} failed`);
+
+    res.json({
+      success: true,
+      message: `Processed ${records.length} records: ${results.successful.length} successful, ${results.failed.length} failed`,
+      data: results
+    });
+  } catch (error) {
+    console.error('Error in bulk course management upload:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Bulk upload lecturers from CSV
 app.post('/api/lecturers/bulk-upload', async (req, res) => {
   try {
