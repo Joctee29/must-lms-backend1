@@ -1534,6 +1534,45 @@ app.post('/api/students', async (req, res) => {
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Error creating student:', error);
+
+    // Handle common database errors with clearer messages
+    if (error.code === '23505') {
+      // Unique constraint violation (e.g. duplicate registration number or email)
+      return res.status(400).json({
+        success: false,
+        error: 'Student with this registration number or email already exists'
+      });
+    }
+
+    if (error.code === '23502') {
+      // NOT NULL constraint violation
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required student fields. Please make sure name, registration number, academic year, course, semester, email and password are filled.'
+      });
+    }
+
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get active academic period (for global year/semester settings)
+app.get('/api/academic-periods/active', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM academic_periods WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'No active academic period found'
+      });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error fetching active academic period:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
