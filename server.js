@@ -587,6 +587,7 @@ const initializeDatabase = async () => {
       await pool.query(`ALTER TABLE programs ADD COLUMN IF NOT EXISTS lecturer_name VARCHAR(255)`);
       await pool.query(`ALTER TABLE programs ALTER COLUMN credits SET DEFAULT 0`);
       await pool.query(`ALTER TABLE programs ALTER COLUMN total_semesters SET DEFAULT 1`);
+      await pool.query(`ALTER TABLE programs ADD COLUMN IF NOT EXISTS semester INTEGER`);
     } catch (error) {
       console.log('Programs table alteration completed or not needed');
     }
@@ -640,6 +641,20 @@ const initializeDatabase = async () => {
     } catch (error) {
       console.log('is_active column may already exist:', error.message);
     }
+
+    // Create academic_periods table for global academic year & semester settings
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS academic_periods (
+        id SERIAL PRIMARY KEY,
+        academic_year VARCHAR(20) NOT NULL,
+        semester INTEGER NOT NULL,
+        is_active BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Ensure only one active period logically enforced by updates (no unique constraint errors on old data)
 
     // Create passwords table for password management
     await pool.query(`
@@ -1008,6 +1023,37 @@ app.post('/api/auth/student-register', async (req, res) => {
         error: 'This account has already been activated. Please login instead.' 
       });
     }
+
+    // VALIDATION: Verify submitted details match admin records
+    console.log('=== VALIDATING STUDENT DETAILS ===');
+    console.log('Admin Record - Course ID:', student.course_id, 'Academic Level:', student.academic_level, 'Year:', student.year_of_study);
+    console.log('Submitted - Course ID:', courseId, 'Academic Level:', courseLevel, 'Year:', yearOfStudy);
+
+    // Validate course ID matches
+    if (parseInt(courseId) !== parseInt(student.course_id)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Course mismatch. Admin registered you for course ID ${student.course_id}. Please verify your details or contact admin.` 
+      });
+    }
+
+    // Validate academic level matches
+    if (courseLevel !== student.academic_level) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Academic level mismatch. Admin registered you for ${student.academic_level} level. Please verify your details or contact admin.` 
+      });
+    }
+
+    // Validate year of study matches
+    if (parseInt(yearOfStudy) !== parseInt(student.year_of_study)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Year of study mismatch. Admin registered you for year ${student.year_of_study}. Please verify your details or contact admin.` 
+      });
+    }
+
+    console.log('✅ All details validated successfully');
 
     // Update student record with new information and activate account
     const updateResult = await pool.query(
