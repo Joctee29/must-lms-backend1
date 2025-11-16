@@ -8761,24 +8761,24 @@ const server = app.listen(PORT, () => {
     }, 2000); // Wait 2 seconds after database init
     
     console.log('📅 Scheduler will auto-start classes when their scheduled time arrives');
-    console.log('🚀 Server is ready to accept requests');
+      console.log('🚀 Server is ready to accept requests');
+    
+    // Start the server
+    const PORT = process.env.PORT || 5000;
+    const server = app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+
+    // Keep server alive
+    process.on('SIGINT', () => {
+      console.log('Shutting down server...');
+      server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+      });
+    });
   } catch (error) {
     console.error('❌ Database initialization failed:', error);
     console.log('⚠️ Server running but database may not be ready');
   }
 })();
-
-// Keep server alive
-process.on('SIGINT', () => {
-  console.log('Shutting down server...');
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
-
-// Start the server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
