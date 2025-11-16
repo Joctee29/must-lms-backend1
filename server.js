@@ -951,8 +951,8 @@ app.post('/api/auth/login', async (req, res) => {
       success: false, 
       error: 'Server error during login. Please try again.' 
     });
-
-// ==================== SELF-REGISTRATION ENDPOINTS ====================
+  }
+});
 
 // Student self-registration endpoint
 app.post('/api/auth/student-register', async (req, res) => {
@@ -8775,4 +8775,10 @@ process.on('SIGINT', () => {
     console.log('Server closed');
     process.exit(0);
   });
+});
+
+// Start the server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
