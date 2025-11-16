@@ -984,15 +984,6 @@ app.post('/api/auth/student-register', async (req, res) => {
       });
     }
 
-    // Validate password strength (minimum 8 characters, at least 1 uppercase, 1 lowercase, 1 number)
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-    if (!passwordRegex.test(password)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number' 
-      });
-    }
-
     // Check if registration number exists in database (pre-registered by admin)
     const existingStudent = await pool.query(
       'SELECT * FROM students WHERE registration_number = $1',
@@ -1015,12 +1006,6 @@ app.post('/api/auth/student-register', async (req, res) => {
         error: 'This account has already been activated. Please login instead.' 
       });
     }
-
-    // VALIDATION: Verify submitted details match admin records
-    console.log('=== VALIDATING STUDENT DETAILS ===');
-    console.log('Admin Record - Course ID:', student.course_id, 'Academic Level:', student.academic_level, 'Year:', student.year_of_study);
-    console.log('Using admin records for course, level, and year of study; no additional client-side matching required.');
-    console.log('✅ All details validated successfully');
 
     // Update student record with new information and activate account
     const updateResult = await pool.query(
