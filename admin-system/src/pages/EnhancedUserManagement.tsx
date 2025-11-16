@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { lecturerOperations, studentOperations, courseOperations, initializeDatabase } from "@/lib/database";
+import { lecturerOperations, studentOperations, courseOperations, initializeDatabase, academicPeriodOperations } from "@/lib/database";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,8 +36,6 @@ interface Lecturer {
   courses: string[];
 }
 
-const mockAcademicYears = ["2025/2026", "2024/2025", "2023/2024"];
-
 export const EnhancedUserManagement = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
@@ -52,6 +50,8 @@ export const EnhancedUserManagement = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showStudentDetails, setShowStudentDetails] = useState(false);
+  const [activeAcademicYear, setActiveAcademicYear] = useState<string>("2024/2025");
+  const [activeSemester, setActiveSemester] = useState<number>(1);
 
   // Student form state
   const [studentForm, setStudentForm] = useState({
@@ -62,8 +62,7 @@ export const EnhancedUserManagement = () => {
     academicLevel: "bachelor" as 'certificate' | 'diploma' | 'bachelor' | 'masters' | 'phd',
     currentSemester: 1,
     email: "",
-    phone: "",
-    password: ""
+    phone: ""
   });
 
   // Lecturer form state
@@ -72,8 +71,7 @@ export const EnhancedUserManagement = () => {
     employeeId: "",
     specialization: "",
     email: "",
-    phone: "",
-    password: ""
+    phone: ""
   });
 
   // Load data on component mount
@@ -81,6 +79,23 @@ export const EnhancedUserManagement = () => {
     const loadData = async () => {
       try {
         await initializeDatabase();
+        // Load active academic period so that academic year & semester follow Academic Settings
+        try {
+          const active = await academicPeriodOperations.getActive();
+          if (active && active.academic_year) {
+            const year = active.academic_year as string;
+            const sem = (active.semester as number) || 1;
+            setActiveAcademicYear(year);
+            setActiveSemester(sem);
+            setStudentForm(prev => ({
+              ...prev,
+              academicYear: year,
+              currentSemester: sem,
+            }));
+          }
+        } catch (error) {
+          console.error('Error loading active academic period in user management:', error);
+        }
         await loadStudents();
         await loadLecturers();
         await loadCourses();
@@ -181,28 +196,24 @@ export const EnhancedUserManagement = () => {
       toast.error("Please enter registration number");
       return;
     }
-    if (!studentForm.email.trim() || !studentForm.email.includes('@')) {
-      toast.error("Please enter a valid email address");
-      return;
-    }
-    if (!studentForm.password.trim() || studentForm.password.length < 6) {
-      return;
-    }
     if (studentForm.name && studentForm.registrationNumber && studentForm.courseId && studentForm.academicYear) {
       setLoading(true);
       try {
         // AUTOMATIC LINKING - Get student info based on course selection
         const automaticInfo = getAutomaticStudentInfo(studentForm.courseId);
+        const emailToUse = studentForm.email && studentForm.email.trim().length > 0
+          ? studentForm.email.trim()
+          : `${studentForm.registrationNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}@students.must.ac.tz`;
         
         await studentOperations.create({
           name: studentForm.name,
           registrationNumber: studentForm.registrationNumber,
-          academicYear: studentForm.academicYear,
+          academicYear: activeAcademicYear,
           courseId: parseInt(studentForm.courseId),
-          currentSemester: studentForm.currentSemester,
-          email: studentForm.email,
+          currentSemester: activeSemester,
+          email: emailToUse,
           phone: studentForm.phone,
-          password: studentForm.password,
+          password: 'temp_password_' + Math.random().toString(36).substring(7), // Temporary password - will be set during self-registration
           // AUTOMATIC LINKING DATA
           college: automaticInfo.college,
           department: automaticInfo.department,
@@ -214,12 +225,11 @@ export const EnhancedUserManagement = () => {
         setStudentForm({
           name: "",
           registrationNumber: "",
-          academicYear: "2024/2025",
+          academicYear: activeAcademicYear,
           courseId: "",
-          currentSemester: 1,
+          currentSemester: activeSemester,
           email: "",
-          phone: "",
-          password: ""
+          phone: ""
         });
         
         await loadStudents();
@@ -286,10 +296,6 @@ export const EnhancedUserManagement = () => {
       toast.error("Please enter a valid email address");
       return;
     }
-    if (!lecturerForm.password.trim() || lecturerForm.password.length < 6) {
-      toast.error("Password must be at least 6 characters long");
-      return;
-    }
     if (lecturerForm.name && lecturerForm.employeeId) {
       setLoading(true);
       try {
@@ -299,7 +305,7 @@ export const EnhancedUserManagement = () => {
           specialization: lecturerForm.specialization,
           email: lecturerForm.email,
           phone: lecturerForm.phone,
-          password: lecturerForm.password
+          password: 'temp_password_' + Math.random().toString(36).substring(7) // Temporary password - will be set during self-registration
         });
         await loadLecturers();
         setLecturerForm({
@@ -307,8 +313,7 @@ export const EnhancedUserManagement = () => {
           employeeId: "",
           specialization: "",
           email: "",
-          phone: "",
-          password: ""
+          phone: ""
         });
         toast.success("Lecturer registered successfully!");
       } catch (error) {
@@ -491,16 +496,6 @@ export const EnhancedUserManagement = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="studentEmail">Email</Label>
-                  <Input
-                    id="studentEmail"
-                    type="email"
-                    value={studentForm.email}
-                    onChange={(e) => setStudentForm({...studentForm, email: e.target.value})}
-                    placeholder="student@must.ac.tz"
-                  />
-                </div>
-                <div>
                   <Label htmlFor="studentPhone">Phone</Label>
                   <Input
                     id="studentPhone"
@@ -511,18 +506,11 @@ export const EnhancedUserManagement = () => {
                 </div>
                 <div>
                   <Label htmlFor="academicYear">Academic Year</Label>
-                  <Select value={studentForm.academicYear} onValueChange={(value) => setStudentForm({...studentForm, academicYear: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select academic year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mockAcademicYears.map((year) => (
-                        <SelectItem key={year} value={year}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    id="academicYear"
+                    value={studentForm.academicYear}
+                    disabled
+                  />
                 </div>
                 <div>
                   <Label htmlFor="academicLevel">Academic Level</Label>
@@ -556,15 +544,10 @@ export const EnhancedUserManagement = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label htmlFor="studentPassword">Password</Label>
-                  <Input
-                    id="studentPassword"
-                    type="password"
-                    value={studentForm.password}
-                    onChange={(e) => setStudentForm({...studentForm, password: e.target.value})}
-                    placeholder="Enter password"
-                  />
+                <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
+                  <p className="text-sm text-blue-800">
+                    <strong>Note:</strong> Password will be set by the student during their first login/registration.
+                  </p>
                 </div>
               </div>
               <Button onClick={handleAddStudent} className="w-full" disabled={loading}>
@@ -699,15 +682,10 @@ export const EnhancedUserManagement = () => {
                     placeholder="+255 712 345 678"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="lecturerPassword">Password</Label>
-                  <Input
-                    id="lecturerPassword"
-                    type="password"
-                    value={lecturerForm.password}
-                    onChange={(e) => setLecturerForm({...lecturerForm, password: e.target.value})}
-                    placeholder="Enter password"
-                  />
+                <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
+                  <p className="text-sm text-blue-800">
+                    <strong>Note:</strong> Password will be set by the lecturer during their first login/registration.
+                  </p>
                 </div>
               </div>
               <Button onClick={handleAddLecturer} className="w-full" disabled={loading}>
@@ -968,18 +946,11 @@ export const EnhancedUserManagement = () => {
                 </div>
                 <div>
                   <Label htmlFor="editAcademicYear">Academic Year</Label>
-                  <Select value={studentForm.academicYear} onValueChange={(value) => setStudentForm({...studentForm, academicYear: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mockAcademicYears.map((year) => (
-                        <SelectItem key={year} value={year}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    id="editAcademicYear"
+                    value={studentForm.academicYear}
+                    disabled
+                  />
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={handleUpdateStudent} disabled={loading}>

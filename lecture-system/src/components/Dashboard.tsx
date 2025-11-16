@@ -22,6 +22,8 @@ export const Dashboard = () => {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeAcademicYear, setActiveAcademicYear] = useState<string>("2024/2025");
+  const [activeSemester, setActiveSemester] = useState<number>(1);
 
   useEffect(() => {
     const user = localStorage.getItem('currentUser');
@@ -49,6 +51,26 @@ export const Dashboard = () => {
         console.log('=== DASHBOARD DATA FETCH ===');
         console.log('Current User:', currentUser);
         console.log('Username for query:', currentUser.username);
+
+        // Fetch active academic period so lecturer dashboard follows Academic Settings
+        let semesterFilter = 1;
+        try {
+          const periodResponse = await fetch(`${API_BASE_URL}/academic-periods/active`);
+          if (periodResponse.ok) {
+            const periodResult = await periodResponse.json();
+            console.log('Academic Period Response:', periodResult);
+            const period = periodResult.data || periodResult;
+            if (period && period.academic_year) {
+              const year = period.academic_year as string;
+              const sem = (period.semester as number) || 1;
+              semesterFilter = sem;
+              setActiveAcademicYear(year);
+              setActiveSemester(sem);
+            }
+          }
+        } catch (periodError) {
+          console.error('Error fetching academic period for lecturer dashboard:', periodError);
+        }
         
         // Fetch lecturer info using efficient endpoint
         const lecturerUrl = `${API_BASE_URL}/lecturers?username=${encodeURIComponent(currentUser.username)}`;
@@ -90,7 +112,7 @@ export const Dashboard = () => {
         const programsResponse = await fetch(programsUrl);
         console.log('Programs Response Status:', programsResponse.status);
         
-        let allPrograms = [];
+        let allPrograms: any[] = [];
         if (programsResponse.ok) {
           const programsResult = await programsResponse.json();
           console.log('Regular Programs Response:', programsResult);
@@ -142,7 +164,13 @@ export const Dashboard = () => {
           console.log('❌ Short-term programs URL called:', shortTermUrl);
         }
         
-        setPrograms(allPrograms);
+        // Filter programs by active semester when semester field is set
+        const filteredPrograms = allPrograms.filter((program: any) => {
+          if (program.semester == null) return true;
+          return program.semester === semesterFilter;
+        });
+
+        setPrograms(filteredPrograms);
         console.log('📊 FINAL PROGRAMS COUNT:', allPrograms.length);
         
         if (allPrograms.length === 0) {

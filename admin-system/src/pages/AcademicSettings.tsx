@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, Clock, Plus, Edit, Trash2, Save } from "lucide-react";
+import { academicPeriodOperations } from "@/lib/database";
 
 interface AcademicYear {
   id: string;
@@ -28,6 +29,7 @@ interface Semester {
 export const AcademicSettings = () => {
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [saving, setSaving] = useState(false);
 
   // Academic Year form state
   const [yearForm, setYearForm] = useState({
@@ -46,7 +48,42 @@ export const AcademicSettings = () => {
     isActive: false
   });
 
+  // Load active academic period from backend for reality integration
+  useEffect(() => {
+    const loadActivePeriod = async () => {
+      try {
+        const active = await academicPeriodOperations.getActive();
+        if (active && active.academic_year && active.semester) {
+          // Ensure there is at least one academic year in the list marked as active
+          const yearId = Date.now().toString();
+          const activeYear: AcademicYear = {
+            id: yearId,
+            name: active.academic_year,
+            startDate: "",
+            endDate: "",
+            isActive: true,
+          };
+          setAcademicYears([activeYear]);
 
+          // Ensure there is at least one semester in the list marked as active
+          const semId = (Date.now() + 1).toString();
+          const activeSemester: Semester = {
+            id: semId,
+            name: `Semester ${active.semester}`,
+            academicYearId: yearId,
+            startDate: "",
+            endDate: "",
+            isActive: true,
+          };
+          setSemesters([activeSemester]);
+        }
+      } catch (error) {
+        console.error("Error loading active academic period:", error);
+      }
+    };
+
+    loadActivePeriod();
+  }, []);
 
   const handleAddAcademicYear = () => {
     if (yearForm.name && yearForm.startDate && yearForm.endDate) {
@@ -86,6 +123,31 @@ export const AcademicSettings = () => {
       ...semester,
       isActive: semester.id === semesterId
     })));
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      setSaving(true);
+
+      const activeYear = academicYears.find(y => y.isActive);
+      const activeSemester = semesters.find(s => s.isActive);
+
+      if (!activeYear || !activeSemester) {
+        console.error("Active academic year or semester not selected");
+        setSaving(false);
+        return;
+      }
+
+      // Derive semester number (1 or 2) from the semester name
+      const match = activeSemester.name.match(/(1|2)/);
+      const semesterNumber = match ? parseInt(match[1], 10) : 1;
+
+      await academicPeriodOperations.setActive(activeYear.name, semesterNumber);
+    } catch (error) {
+      console.error("Error saving academic settings:", error);
+    } finally {
+      setSaving(false);
+    }
   };
 
 
@@ -209,13 +271,24 @@ export const AcademicSettings = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="semesterName">Semester Name</Label>
-                <Input
-                  id="semesterName"
+                <Label htmlFor="semesterName">Semester</Label>
+                <Select
                   value={semesterForm.name}
-                  onChange={(e) => setSemesterForm({...semesterForm, name: e.target.value})}
-                  placeholder="e.g., Semester 1"
-                />
+                  onValueChange={(value) =>
+                    setSemesterForm({
+                      ...semesterForm,
+                      name: value === "1" ? "Semester 1" : "Semester 2",
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select semester" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Semester 1</SelectItem>
+                    <SelectItem value="2">Semester 2</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="semesterYear">Academic Year</Label>
@@ -335,9 +408,14 @@ export const AcademicSettings = () => {
               <span>Standard Semesters</span>
               <span className="text-xs text-muted-foreground">Create Sem 1 & Sem 2</span>
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col">
+            <Button
+              variant="outline"
+              className="h-20 flex flex-col"
+              onClick={handleSaveSettings}
+              disabled={saving}
+            >
               <Save className="h-6 w-6 mb-2" />
-              <span>Save Settings</span>
+              <span>{saving ? "Saving..." : "Save Settings"}</span>
               <span className="text-xs text-muted-foreground">Apply configurations</span>
             </Button>
           </div>

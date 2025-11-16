@@ -89,9 +89,8 @@ const StudentRegisterPage = ({ onBack, onRegisterSuccess }: StudentRegisterPageP
     setMessage("");
     setLoading(true);
 
-    // Validate all fields
-    if (!registerData.registrationNumber || !registerData.courseLevel || !registerData.yearOfStudy || 
-        !registerData.courseId || !registerData.password || !registerData.confirmPassword || !registerData.email) {
+    // Validate required fields for registration
+    if (!registerData.registrationNumber || !registerData.password || !registerData.confirmPassword || !registerData.email) {
       setMessage("All fields are required");
       setMessageType('error');
       setLoading(false);
@@ -124,9 +123,6 @@ const StudentRegisterPage = ({ onBack, onRegisterSuccess }: StudentRegisterPageP
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           registrationNumber: registerData.registrationNumber,
-          courseLevel: registerData.courseLevel,
-          yearOfStudy: parseInt(registerData.yearOfStudy),
-          courseId: parseInt(registerData.courseId),
           password: registerData.password,
           confirmPassword: registerData.confirmPassword,
           email: registerData.email
@@ -225,88 +221,6 @@ const StudentRegisterPage = ({ onBack, onRegisterSuccess }: StudentRegisterPageP
                     className="h-11 text-sm border-2 focus:border-blue-500"
                     required
                   />
-                </div>
-
-                {/* Course Level */}
-                <div className="space-y-2">
-                  <Label htmlFor="course-level" className="text-sm font-medium flex items-center">
-                    <GraduationCap className="h-4 w-4 mr-2" />
-                    Academic Level *
-                  </Label>
-                  <Select 
-                    value={registerData.courseLevel} 
-                    onValueChange={(value) => setRegisterData({...registerData, courseLevel: value, courseId: ""})}
-                  >
-                    <SelectTrigger id="course-level" className="h-11">
-                      <SelectValue placeholder="Select academic level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="certificate">Certificate Level</SelectItem>
-                      <SelectItem value="diploma">Diploma Level</SelectItem>
-                      <SelectItem value="bachelor">Bachelor Degree</SelectItem>
-                      <SelectItem value="masters">Masters Degree</SelectItem>
-                      <SelectItem value="phd">PhD Level</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Year of Study */}
-                <div className="space-y-2">
-                  <Label htmlFor="year-of-study" className="text-sm font-medium flex items-center">
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Year of Study *
-                  </Label>
-                  <Select 
-                    value={registerData.yearOfStudy} 
-                    onValueChange={(value) => setRegisterData({...registerData, yearOfStudy: value, courseId: ""})}
-                  >
-                    <SelectTrigger id="year-of-study" className="h-11">
-                      <SelectValue placeholder="Select year of study" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">First Year</SelectItem>
-                      <SelectItem value="2">Second Year</SelectItem>
-                      <SelectItem value="3">Third Year</SelectItem>
-                      <SelectItem value="4">Fourth Year</SelectItem>
-                      <SelectItem value="5">Fifth Year</SelectItem>
-                      <SelectItem value="6">Sixth Year</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Course Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="course" className="text-sm font-medium flex items-center">
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Course/Program *
-                  </Label>
-                  <Select 
-                    value={registerData.courseId} 
-                    onValueChange={(value) => setRegisterData({...registerData, courseId: value})}
-                    disabled={!registerData.courseLevel || !registerData.yearOfStudy}
-                  >
-                    <SelectTrigger id="course" className="h-11">
-                      <SelectValue placeholder={
-                        !registerData.courseLevel || !registerData.yearOfStudy 
-                          ? "Select level and year first" 
-                          : filteredCourses.length === 0 
-                            ? "No courses available" 
-                            : "Select your course"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredCourses.map((course) => (
-                        <SelectItem key={course.id} value={course.id.toString()}>
-                          {course.code} - {course.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {registerData.courseLevel && registerData.yearOfStudy && filteredCourses.length === 0 && (
-                    <p className="text-xs text-amber-600">
-                      No courses found for this level and year. Please contact admin.
-                    </p>
-                  )}
                 </div>
 
                 {/* Email */}

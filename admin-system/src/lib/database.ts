@@ -46,6 +46,27 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   }
 };
 
+// Academic period operations (global academic year & semester)
+export const academicPeriodOperations = {
+  // Get active academic period
+  getActive: async () => {
+    try {
+      return await apiCall('/academic-periods/active');
+    } catch (error) {
+      console.error('Error fetching active academic period:', error);
+      return null;
+    }
+  },
+
+  // Set active academic period
+  setActive: async (academicYear: string, semester: number) => {
+    return await apiCall('/academic-periods/active', {
+      method: 'POST',
+      body: JSON.stringify({ academicYear, semester }),
+    });
+  },
+};
+
 // Initialize database (handled by backend)
 export const initializeDatabase = async () => {
   try {

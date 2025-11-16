@@ -71,7 +71,7 @@ export const CourseManagement = () => {
     name: "", collegeId: "", description: "", headOfDepartment: ""
   });
   const [courseForm, setCourseForm] = useState({
-    name: "", code: "", departmentId: "", duration: 0, academicLevel: "bachelor" as 'certificate' | 'diploma' | 'bachelor' | 'masters' | 'phd', yearOfStudy: 1, description: ""
+    name: "", code: "", courseId: "", departmentId: "", duration: 0, academicLevel: "bachelor" as 'certificate' | 'diploma' | 'bachelor' | 'masters' | 'phd', yearOfStudy: 1, description: ""
   });
   const [programForm, setProgramForm] = useState({
     name: "", courseId: "", credits: 0, totalSemesters: 0, lecturerName: "", description: ""
@@ -379,7 +379,7 @@ export const CourseManagement = () => {
       await loadData();
       
       // Reset form
-      setCourseForm({ name: "", code: "", departmentId: "", duration: 0, academicLevel: "bachelor" as const, yearOfStudy: 1, description: "" });
+      setCourseForm({ name: "", code: "", courseId: "", departmentId: "", duration: 0, academicLevel: "bachelor" as const, yearOfStudy: 1, description: "" });
       toast.success("Course added successfully!");
       
       console.log('Updated Courses:', courses);
@@ -469,6 +469,7 @@ export const CourseManagement = () => {
       await courseOperations.updateCourse(editingCourse.id, {
         name: courseForm.name,
         code: courseForm.code,
+        courseId: courseForm.courseId,
         departmentId: parseInt(courseForm.departmentId),
         duration: courseForm.duration,
         academicLevel: courseForm.academicLevel,
@@ -477,7 +478,7 @@ export const CourseManagement = () => {
       });
       await loadData();
       setEditingCourse(null);
-      setCourseForm({ name: "", code: "", departmentId: "", duration: 0, academicLevel: "bachelor" as const, yearOfStudy: 1, description: "" });
+      setCourseForm({ name: "", code: "", courseId: "", departmentId: "", duration: 0, academicLevel: "bachelor" as const, yearOfStudy: 1, description: "" });
       toast.success("Course updated successfully!");
     } catch (error) {
       console.error('Error updating course:', error);
@@ -892,6 +893,19 @@ export const CourseManagement = () => {
                   />
                 </div>
                 <div>
+                  <Label htmlFor="course-id">Course ID</Label>
+                  <Input
+                    id="course-id"
+                    name="courseId"
+                    value={courseForm.courseId}
+                    onChange={(e) => setCourseForm({...courseForm, courseId: e.target.value})}
+                    placeholder="Unique ID for bulk student upload"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This ID will be used when uploading students in bulk. Leave empty for auto-generation.
+                  </p>
+                </div>
+                <div>
                   <Label htmlFor="course-department">Department</Label>
                   <div className="space-y-2">
                     <div className="relative">
@@ -993,7 +1007,7 @@ export const CourseManagement = () => {
                       variant="outline" 
                       onClick={() => {
                         setEditingCourse(null);
-                        setCourseForm({ name: "", code: "", departmentId: "", duration: 0, academicLevel: "bachelor" as const, yearOfStudy: 1, description: "" });
+                        setCourseForm({ name: "", code: "", courseId: "", departmentId: "", duration: 0, academicLevel: "bachelor" as const, yearOfStudy: 1, description: "" });
                       }}
                     >
                       Cancel
@@ -1078,6 +1092,11 @@ export const CourseManagement = () => {
                               >
                                 {(course.academic_level || course.academicLevel)?.toUpperCase() || 'BACHELOR'}
                               </Badge>
+                              {course.id && (
+                                <Badge variant="outline" className="text-xs font-mono">
+                                  ID: {course.id}
+                                </Badge>
+                              )}
                             </div>
                           </div>
                           <div className="mt-2 flex justify-end">

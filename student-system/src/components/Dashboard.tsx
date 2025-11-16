@@ -25,6 +25,8 @@ export const Dashboard = () => {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeAcademicYear, setActiveAcademicYear] = useState<string>("2024/2025");
+  const [activeSemester, setActiveSemester] = useState<number>(1);
 
   useEffect(() => {
     // Get current user from localStorage
@@ -52,6 +54,26 @@ export const Dashboard = () => {
         console.log('=== STUDENT DASHBOARD DATA FETCH ===');
         console.log('Current User:', currentUser);
         
+        // Fetch active academic period so student dashboard follows Academic Settings
+        let semesterFilter = 1;
+        try {
+          const periodResponse = await fetch(`${API_BASE_URL}/academic-periods/active`);
+          if (periodResponse.ok) {
+            const periodResult = await periodResponse.json();
+            console.log('Academic Period Response (student):', periodResult);
+            const period = periodResult.data || periodResult;
+            if (period && period.academic_year) {
+              const year = period.academic_year as string;
+              const sem = (period.semester as number) || 1;
+              semesterFilter = sem;
+              setActiveAcademicYear(year);
+              setActiveSemester(sem);
+            }
+          }
+        } catch (periodError) {
+          console.error('Error fetching academic period for student dashboard:', periodError);
+        }
+
         // Use the dedicated /api/students/me endpoint for students
         const response = await fetch(`${API_BASE_URL}/students/me?username=${encodeURIComponent(currentUser.username)}`);
         if (response.ok) {
@@ -120,8 +142,8 @@ export const Dashboard = () => {
                 // Real college information
                 college: collegeInfo?.name || student.college_name || student.college || 'Unknown College',
                 // Academic information
-                academic_year: student.academic_year || '2024/2025',
-                current_semester: student.current_semester || 1,
+                academic_year: activeAcademicYear || student.academic_year || '2024/2025',
+                current_semester: activeSemester || student.current_semester || 1,
                 // Academic level from course
                 academic_level: courseInfo?.academic_level || courseInfo?.academicLevel || 'bachelor'
               };
@@ -167,7 +189,14 @@ export const Dashboard = () => {
           
           if (programsResult.success && programsResult.data) {
             console.log('Student Programs Found:', programsResult.data);
-            setStudentPrograms(programsResult.data);
+
+            // Filter programs by active semester when semester field is set
+            const filteredPrograms = programsResult.data.filter((program: any) => {
+              if (program.semester == null) return true;
+              return program.semester === (activeSemester || semesterFilter);
+            });
+
+            setStudentPrograms(filteredPrograms);
             
             // Now fetch assignments based on found programs - pass student_id for filtering
             const assignmentsResponse = await fetch(`${API_BASE_URL}/assignments?user_type=student&student_id=${studentInfo.id}`);
