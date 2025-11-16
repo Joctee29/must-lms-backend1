@@ -1526,6 +1526,37 @@ app.get('/api/academic-periods/active', async (req, res) => {
   }
 });
 
+// Set active academic period (update global academic year & semester)
+app.post('/api/academic-periods/active', async (req, res) => {
+  const { academicYear, academic_year, semester } = req.body;
+  const year = academicYear || academic_year;
+  const sem = parseInt(semester, 10);
+
+  if (!year || isNaN(sem)) {
+    return res.status(400).json({ success: false, error: 'academicYear and semester are required' });
+  }
+
+  try {
+    await pool.query('BEGIN');
+    // Deactivate any existing active period
+    await pool.query(`UPDATE academic_periods SET is_active = false WHERE is_active = true`);
+
+    // Insert new active period
+    const insertResult = await pool.query(
+      `INSERT INTO academic_periods (academic_year, semester, is_active) VALUES ($1, $2, true) RETURNING *`,
+      [year, sem]
+    );
+
+    await pool.query('COMMIT');
+
+    return res.json({ success: true, data: insertResult.rows[0] });
+  } catch (error) {
+    await pool.query('ROLLBACK');
+    console.error('Error setting active academic period:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get students with proper filtering based on user type
 app.get('/api/students', optionalAuth, async (req, res) => {
   try {
