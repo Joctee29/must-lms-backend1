@@ -18,25 +18,30 @@ const JWT_REFRESH_EXPIRES_IN = '7d';
 // Track active sessions
 const activeSessions = new Map(); // userId -> { userType, username, loginTime }
 
-// Email configuration - SendPulse SMTP for transactional emails
-// IMPORTANT: Set these environment variables in your production environment:
-// - SENDPULSE_USER: Your SendPulse SMTP username
-// - SENDPULSE_PASS: Your SendPulse SMTP password
-// - ADMIN_EMAIL: The email address that will be used as the sender
+// Email configuration - Gmail SMTP for real email delivery
+// IMPORTANT: Set these environment variables or update directly:
+// - GMAIL_USER: Your Gmail address (e.g., mustlms@gmail.com)
+// - GMAIL_APP_PASSWORD: Your 16-character Gmail App Password
+// 
+// TO SETUP GMAIL APP PASSWORD:
+// 1. Enable 2-factor authentication: https://myaccount.google.com/security
+// 2. Generate app password: https://myaccount.google.com/apppasswords
+// 3. Select "Mail" and "Other (MUST LMS)"
+// 4. Copy the 16-character password (format: xxxx xxxx xxxx xxxx)
+// 5. Set environment variables or update EMAIL_CONFIG below
 
-// Default to environment variables or use placeholders
-let CURRENT_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'noreply@must.ac.tz';
+let CURRENT_ADMIN_EMAIL = process.env.GMAIL_USER || 'your-gmail@gmail.com';
 const EMAIL_CONFIG = {
-  host: 'smtp-pulse.com',  // SendPulse SMTP server
-  port: 465,               // 465 for SSL, 587 for TLS
-  secure: true,            // true for 465, false for other ports
+  host: 'smtp.gmail.com',  // Gmail SMTP server
+  port: 587,
+  secure: false,  // Use STARTTLS
   auth: {
-    user: process.env.SENDPULSE_USER || 'your-sendpulse-username',
-    pass: process.env.SENDPULSE_PASS || 'your-sendpulse-password'
+    user: process.env.GMAIL_USER || 'your-gmail@gmail.com',  // Replace with your Gmail
+    pass: process.env.GMAIL_APP_PASSWORD || 'your-16-char-app-password'  // Replace with your App Password
   }
 };
 
-// Fallback to Ethereal for testing if SendPulse not configured
+// FALLBACK: If Gmail credentials not set, use Ethereal for testing
 const FALLBACK_EMAIL_CONFIG = {
   host: 'smtp.ethereal.email',
   port: 587,
@@ -94,12 +99,14 @@ try {
   console.warn('Emails will be simulated.');
 }
 
-// Function to send password reset email using SendPulse
-async function sendResetCodeEmail(userEmail, userName, resetCode) {
-  // If no transporter is configured, log to console and simulate success
+// Function to send real email
+const sendResetCodeEmail = async (userEmail, userName, resetCode) => {
+  // Get current admin email from database
+  const adminEmail = await getAdminEmail();
+  
   if (!emailTransporter) {
     console.log('📧 EMAIL SIMULATION (No transporter configured):');
-    console.log(`📧 FROM: ${CURRENT_ADMIN_EMAIL}`);
+    console.log(`📧 FROM: ${adminEmail}`);
     console.log(`📧 TO: ${userEmail}`);
     console.log(`📧 SUBJECT: Password Reset Code - MUST LMS`);
     console.log(`📧 CODE: ${resetCode}`);
@@ -107,151 +114,67 @@ async function sendResetCodeEmail(userEmail, userName, resetCode) {
   }
 
   try {
-    console.log('📧 SENDING PASSWORD RESET EMAIL VIA SENDPULSE:');
-    console.log(`📧 FROM: ${CURRENT_ADMIN_EMAIL}`);
-    console.log(`📧 TO: ${userEmail}`);
+    // Update email config with current admin email
+    EMAIL_CONFIG.auth.user = adminEmail;
     
-    // Create new transporter with SendPulse config
+    // Real email sending enabled with Gmail credentials
+    console.log('📧 SENDING REAL EMAIL:');
+    console.log(`📧 FROM: ${adminEmail}`);
+    console.log(`📧 TO: ${userEmail}`);
+    console.log(`📧 SUBJECT: Password Reset Code - MUST LMS`);
+    
+    // Create new transporter with updated config
     emailTransporter = nodemailer.createTransport(EMAIL_CONFIG);
-
+    
     const mailOptions = {
-      from: `"MUST LMS" <${CURRENT_ADMIN_EMAIL}>`,
+      from: `"MUST LMS" <${adminEmail}>`,
       to: userEmail,
-      subject: '🔑 Password Reset Code - MUST LMS',
+      subject: 'Password Reset Code - MUST LMS',
       html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Password Reset - MUST LMS</title>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 0; }
-            .container { padding: 20px; }
-            .header { background-color: #1a365d; padding: 20px; text-align: center; }
-            .header img { max-width: 200px; height: auto; }
-            .content { padding: 20px; background-color: #f8fafc; border-radius: 8px; }
-            .code { 
-              background: #ffffff; 
-              padding: 15px; 
-              margin: 20px 0; 
-              text-align: center; 
-              border-radius: 6px; 
-              border: 1px solid #e2e8f0;
-              font-size: 24px;
-              font-weight: bold;
-              letter-spacing: 2px;
-              color: #1e40af;
-            }
-            .footer { 
-              margin-top: 30px; 
-              padding-top: 20px; 
-              border-top: 1px solid #e2e8f0; 
-              text-align: center; 
-              font-size: 12px; 
-              color: #64748b; 
-            }
-            .button {
-              display: inline-block;
-              padding: 10px 20px;
-              background-color: #1a365d;
-              color: white !important;
-              text-decoration: none;
-              border-radius: 4px;
-              margin: 15px 0;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <!-- Replace with your logo URL -->
-            <img src="https://www.must.ac.tz/wp-content/uploads/2019/11/cropped-must-logo-1.png" alt="MUST Logo">
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #1e40af;">MUST Learning Management System</h1>
           </div>
           
-          <div class="container">
-            <div class="content">
-              <h2>Hello ${userName},</h2>
-              <p>We received a request to reset your password for your MUST LMS account. Please use the following verification code to proceed:</p>
-              
-              <div class="code">${resetCode}</div>
-              
-              <p>This code will expire in <strong>15 minutes</strong>. If you didn't request this, please ignore this email or contact our support team if you have any concerns.</p>
-              
-              <p style="text-align: center;">
-                <a href="${process.env.FRONTEND_URL || 'https://lms.must.ac.tz'}/reset-password?code=${resetCode}&email=${encodeURIComponent(userEmail)}" class="button">
-                  Reset Password
-                </a>
-              </p>
-              
-              <p>If the button doesn't work, copy and paste this link into your browser:</p>
-              <p style="word-break: break-all; font-size: 12px; color: #4b5563;">
-                ${process.env.FRONTEND_URL || 'https://lms.must.ac.tz'}/reset-password?code=${resetCode}&email=${encodeURIComponent(userEmail)}
-              </p>
-              
-              <div class="footer">
-                <p>This is an automated message, please do not reply directly to this email.</p>
-                <p>© ${new Date().getFullYear()} Mbeya University of Science and Technology</p>
-                <p>IT Support: +255 25 295 7544 | support@must.ac.tz</p>
-              </div>
+          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: #334155; margin-top: 0;">Password Reset Request</h2>
+            <p>Dear ${userName},</p>
+            <p>You have requested a password reset for your MUST LMS account.</p>
+            
+            <div style="background: white; padding: 15px; border-radius: 6px; text-align: center; margin: 20px 0;">
+              <p style="margin: 0; color: #64748b; font-size: 14px;">Your verification code is:</p>
+              <h1 style="color: #1e40af; font-size: 32px; letter-spacing: 4px; margin: 10px 0;">${resetCode}</h1>
+              <p style="margin: 0; color: #ef4444; font-size: 12px;">This code expires in 15 minutes</p>
             </div>
+            
+            <p><strong>Important:</strong></p>
+            <ul>
+              <li>Do not share this code with anyone</li>
+              <li>If you did not request this reset, please ignore this email</li>
+              <li>Contact IT Support if you need assistance: +255 25 295 7544</li>
+            </ul>
           </div>
-        </body>
-        </html>
-      `,
-      text: `Password Reset Request
-
-Hello ${userName},
-
-You have requested to reset your password for your MUST LMS account.
-
-Your verification code is: ${resetCode}
-
-This code will expire in 15 minutes.
-
-If you didn't request this, please ignore this email or contact support if you have concerns.
-
-© ${new Date().getFullYear()} Mbeya University of Science and Technology
-IT Support: +255 25 295 7544 | support@must.ac.tz`
+          
+          <div style="text-align: center; color: #64748b; font-size: 12px;">
+            <p>© 2026 Mbeya University of Science and Technology</p>
+            <p>This is an automated message, please do not reply.</p>
+          </div>
+        </div>
+      `
     };
-    
+
     const info = await emailTransporter.sendMail(mailOptions);
     console.log('✅ Email sent successfully:', info.messageId);
-    return { success: true, simulated: false, messageId: info.messageId };
+    return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('❌ Error sending email via SendPulse:', error);
-    
-    // Fallback to console logging if email sending fails
-    console.log('📧 FALLBACK EMAIL LOGGING (SMTP failed):');
+    console.error('❌ Email sending failed:', error);
+    // Fallback to simulation if email fails
+    console.log('📧 EMAIL FALLBACK SIMULATION:');
     console.log(`📧 TO: ${userEmail}`);
-    console.log(`📧 RESET CODE: ${resetCode}`);
-    console.log(`📧 ERROR: ${error.message}`);
-    
-    // Try to use fallback email config if main config fails
-    if (EMAIL_CONFIG.host !== FALLBACK_EMAIL_CONFIG.host) {
-      console.log('🔄 Attempting to use fallback email configuration...');
-      try {
-        emailTransporter = nodemailer.createTransport(FALLBACK_EMAIL_CONFIG);
-        const info = await emailTransporter.sendMail({
-          from: `"MUST LMS" <${FALLBACK_EMAIL_CONFIG.auth.user}>`,
-          to: userEmail,
-          subject: 'Password Reset Code - MUST LMS',
-          text: `Your password reset code is: ${resetCode}`
-        });
-        console.log('✅ Fallback email sent successfully:', info.messageId);
-        return { success: true, simulated: false, fallback: true, messageId: info.messageId };
-      } catch (fallbackError) {
-        console.error('❌ Fallback email also failed:', fallbackError);
-      }
-    }
-    
-    return { 
-      success: false, 
-      error: error.message,
-      fallbackTried: EMAIL_CONFIG.host !== FALLBACK_EMAIL_CONFIG.host
-    };
+    console.log(`📧 CODE: ${resetCode}`);
+    return { success: true, simulated: true, error: error.message };
   }
 };
-
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -8162,130 +8085,43 @@ app.post('/api/password-reset/verify-and-reset', async (req, res) => {
     
     console.log('✅ Password reset completed for:', resetLog.user_name);
     
-    // Send password reset confirmation email
+    // Send confirmation email
     try {
       if (emailTransporter) {
         const confirmationEmail = {
-          from: `"MUST LMS" <${CURRENT_ADMIN_EMAIL}>`,
+          from: `"MUST LMS" <${ADMIN_EMAIL}>`,
           to: email,
-          subject: '✅ Password Successfully Reset - MUST LMS',
+          subject: 'Password Reset Successful - MUST LMS',
           html: `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Password Reset Successful - MUST LMS</title>
-              <style>
-                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 0; }
-                .container { padding: 20px; }
-                .header { background-color: #16a34a; padding: 20px; text-align: center; }
-                .header img { max-width: 200px; height: auto; }
-                .content { padding: 20px; background-color: #f0fdf4; border-radius: 8px; }
-                .success-icon { 
-                  font-size: 48px; 
-                  color: #16a34a; 
-                  text-align: center;
-                  margin: 20px 0;
-                }
-                .footer { 
-                  margin-top: 30px; 
-                  padding-top: 20px; 
-                  border-top: 1px solid #dcfce7; 
-                  text-align: center; 
-                  font-size: 12px; 
-                  color: #64748b; 
-                }
-                .button {
-                  display: inline-block;
-                  padding: 10px 20px;
-                  background-color: #16a34a;
-                  color: white !important;
-                  text-decoration: none;
-                  border-radius: 4px;
-                  margin: 15px 0;
-                }
-                .security-notice {
-                  background-color: #dcfce7;
-                  border-left: 4px solid #16a34a;
-                  padding: 12px 15px;
-                  margin: 20px 0;
-                  border-radius: 4px;
-                }
-              </style>
-            </head>
-            <body>
-              <div class="header">
-                <!-- Replace with your logo URL -->
-                <img src="https://www.must.ac.tz/wp-content/uploads/2019/11/cropped-must-logo-1.png" alt="MUST Logo">
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #16a34a;">Password Reset Successful</h1>
               </div>
               
-              <div class="container">
-                <div class="content">
-                  <div class="success-icon">✓</div>
-                  <h2 style="text-align: center; color: #166534;">Password Successfully Reset</h2>
-                  
-                  <p>Dear ${resetLog.user_name},</p>
-                  <p>Your MUST LMS account password has been successfully updated.</p>
-                  
-                  <div class="security-notice">
-                    <p><strong>Security Notice:</strong> This is a confirmation that your password was changed.</p>
-                    <p style="margin-bottom: 0;">If you did not make this change, please contact our support team immediately.</p>
-                  </div>
-                  
-                  <p style="text-align: center;">
-                    <a href="${process.env.FRONTEND_URL || 'https://lms.must.ac.tz'}/login" class="button">
-                      Log In to Your Account
-                    </a>
-                  </p>
-                  
-                  <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
-                  
-                  <div class="footer">
-                    <p>This is an automated message, please do not reply directly to this email.</p>
-                    <p>© ${new Date().getFullYear()} Mbeya University of Science and Technology</p>
-                    <p>IT Support: +255 25 295 7544 | support@must.ac.tz</p>
-                  </div>
+              <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <p>Dear ${resetLog.user_name},</p>
+                <p>Your password has been successfully reset for your MUST LMS account.</p>
+                <p>You can now log in with your new password.</p>
+                
+                <div style="background: #dcfce7; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                  <p style="margin: 0; color: #166534;"><strong>Security Notice:</strong></p>
+                  <p style="margin: 5px 0 0 0; color: #166534;">If you did not make this change, please contact IT Support immediately.</p>
                 </div>
               </div>
-            </body>
-            </html>
-          `,
-          text: `Password Successfully Reset
-
-Dear ${resetLog.user_name},
-
-Your MUST LMS account password has been successfully updated.
-
-Security Notice: This is a confirmation that your password was changed.
-If you did not make this change, please contact our support team immediately.
-
-Log in to your account: ${process.env.FRONTEND_URL || 'https://lms.must.ac.tz'}/login
-
-If you have any questions or need assistance, please don't hesitate to contact our support team.
-
-© ${new Date().getFullYear()} Mbeya University of Science and Technology
-IT Support: +255 25 295 7544 | support@must.ac.tz`
+              
+              <div style="text-align: center; color: #64748b; font-size: 12px;">
+                <p>© 2026 Mbeya University of Science and Technology</p>
+                <p>Contact IT Support: +255 25 295 7544</p>
+              </div>
+            </div>
+          `
         };
         
-        const info = await emailTransporter.sendMail(confirmationEmail);
-        console.log('✅ Password reset confirmation email sent:', info.messageId);
+        await emailTransporter.sendMail(confirmationEmail);
+        console.log('✅ Password reset confirmation email sent');
       }
     } catch (error) {
       console.warn('⚠️ Failed to send confirmation email:', error.message);
-      
-      // Try to send a simple text email if HTML fails
-      try {
-        await emailTransporter.sendMail({
-          from: `"MUST LMS" <${CURRENT_ADMIN_EMAIL}>`,
-          to: email,
-          subject: 'Password Reset Successful - MUST LMS',
-          text: `Your password has been successfully reset. If you did not make this change, please contact support immediately.`
-        });
-        console.log('✅ Sent simple confirmation email');
-      } catch (simpleError) {
-        console.error('❌ Failed to send simple confirmation email:', simpleError.message);
-      }
     }
 
     res.json({ 
