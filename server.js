@@ -1538,18 +1538,40 @@ app.post('/api/academic-periods/active', async (req, res) => {
 
   try {
     await pool.query('BEGIN');
+    
+    // Check if academic period already exists
+    const existingResult = await pool.query(
+      `SELECT * FROM academic_periods WHERE academic_year = $1 AND semester = $2`,
+      [year, sem]
+    );
+    
+    let periodRecord;
+    
+    if (existingResult.rows.length > 0) {
+      // Period exists, just update its is_active status
+      periodRecord = existingResult.rows[0];
+    } else {
+      // Period doesn't exist, create it
+      const insertResult = await pool.query(
+        `INSERT INTO academic_periods (academic_year, semester, is_active) VALUES ($1, $2, false) RETURNING *`,
+        [year, sem]
+      );
+      periodRecord = insertResult.rows[0];
+    }
+    
     // Deactivate any existing active period
     await pool.query(`UPDATE academic_periods SET is_active = false WHERE is_active = true`);
-
-    // Insert new active period
-    const insertResult = await pool.query(
-      `INSERT INTO academic_periods (academic_year, semester, is_active) VALUES ($1, $2, true) RETURNING *`,
+    
+    // Activate the selected period
+    const updateResult = await pool.query(
+      `UPDATE academic_periods SET is_active = true WHERE academic_year = $1 AND semester = $2 RETURNING *`,
       [year, sem]
     );
 
     await pool.query('COMMIT');
-
-    return res.json({ success: true, data: insertResult.rows[0] });
+    
+    console.log(`✅ Academic period activated: ${year} - Semester ${sem}`);
+    return res.json({ success: true, data: updateResult.rows[0] });
   } catch (error) {
     await pool.query('ROLLBACK');
     console.error('Error setting active academic period:', error);
