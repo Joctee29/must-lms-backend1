@@ -2082,8 +2082,19 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       return res.json({ success: true, data: result.rows });
     }
     
-    // For lecturers by username - find programs by lecturer username/employee_id
+    // For lecturers by username - find programs by lecturer username/employee_id AND active semester
     if (lecturer_username) {
+      // First, get active academic period
+      const activePeriodResult = await pool.query(
+        `SELECT * FROM academic_periods WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
+      );
+      
+      let activeSemester = 1; // Default to semester 1
+      if (activePeriodResult.rows.length > 0) {
+        activeSemester = activePeriodResult.rows[0].semester;
+        console.log('Active semester from database:', activeSemester);
+      }
+      
       // First, try to find lecturer by direct field matches
       let lecturerResult = await pool.query(
         'SELECT id, employee_id, name FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
@@ -2117,45 +2128,21 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       console.log('Lecturer ID:', lecturer.id);
       console.log('Lecturer Employee ID:', lecturer.employee_id);
       console.log('Lecturer Name:', lecturer.name);
+      console.log('Active Semester Filter:', activeSemester);
       
-      // More flexible query using ILIKE for partial matching
+      // More flexible query using ILIKE for partial matching AND filter by active semester
       const result = await pool.query(
         `SELECT * FROM programs 
-         WHERE lecturer_id = $1 
+         WHERE (lecturer_id = $1 
             OR lecturer_name = $2 
             OR lecturer_name = $3
             OR lecturer_name ILIKE $4
-            OR lecturer_name ILIKE $5
+            OR lecturer_name ILIKE $5)
+         AND (semester = $6 OR semester IS NULL)
          ORDER BY created_at DESC`,
-        [lecturer.id, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`]
+        [lecturer.id, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`, activeSemester]
       );
-      console.log(`Found ${result.rows.length} programs for lecturer username: ${lecturer_username}`);
-      
-      // If no programs found, check what programs exist and their lecturer assignments
-      if (result.rows.length === 0) {
-        console.log('=== NO PROGRAMS FOUND - DEBUGGING ===');
-        
-        // Check total programs in database
-        const totalPrograms = await pool.query('SELECT COUNT(*) FROM programs');
-        console.log('Total programs in database:', totalPrograms.rows[0].count);
-        
-        // Check programs with lecturer assignments
-        const programsWithLecturer = await pool.query(`
-          SELECT id, name, lecturer_id, lecturer_name, course_id 
-          FROM programs 
-          WHERE lecturer_id IS NOT NULL OR lecturer_name IS NOT NULL 
-          LIMIT 10
-        `);
-        console.log('Sample programs with lecturer assigned:', programsWithLecturer.rows);
-        
-        // Check if any programs match this lecturer by different criteria
-        const possibleMatches = await pool.query(`
-          SELECT id, name, lecturer_id, lecturer_name, course_id 
-          FROM programs 
-          WHERE lecturer_name ILIKE $1 OR lecturer_name ILIKE $2 OR lecturer_id::text = $3
-        `, [`%${lecturer.employee_id}%`, `%${lecturer.name}%`, lecturer.id.toString()]);
-        console.log('Possible program matches:', possibleMatches.rows);
-      }
+      console.log(`Found ${result.rows.length} programs for lecturer username: ${lecturer_username} in semester ${activeSemester}`);
       
       return res.json({ success: true, data: result.rows });
     }
