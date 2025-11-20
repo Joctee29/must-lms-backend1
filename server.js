@@ -480,6 +480,17 @@ const initializeDatabase = async () => {
       console.log('is_active column may already exist:', error.message);
     }
 
+    // Fix password field size if it's too small (varchar(10) -> varchar(255))
+    try {
+      await pool.query(`
+        ALTER TABLE lecturers 
+        ALTER COLUMN password TYPE VARCHAR(255)
+      `);
+      console.log('✅ Password field in lecturers table resized to VARCHAR(255)');
+    } catch (error) {
+      console.log('Password field resize may not be needed:', error.message);
+    }
+
     // Create colleges table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS colleges (
@@ -640,6 +651,17 @@ const initializeDatabase = async () => {
       console.log('is_active column added/verified in students table');
     } catch (error) {
       console.log('is_active column may already exist:', error.message);
+    }
+
+    // Fix password field size if it's too small (varchar(10) -> varchar(255))
+    try {
+      await pool.query(`
+        ALTER TABLE students 
+        ALTER COLUMN password TYPE VARCHAR(255)
+      `);
+      console.log('✅ Password field in students table resized to VARCHAR(255)');
+    } catch (error) {
+      console.log('Password field resize may not be needed:', error.message);
     }
 
     // Create academic_periods table for global academic year & semester settings
@@ -852,15 +874,6 @@ app.post('/api/auth/login', async (req, res) => {
       if (result.rows.length > 0) {
         const student = result.rows[0];
         
-        // Check if account is locked
-        if (student.is_locked === true) {
-          return res.status(403).json({ 
-            success: false, 
-            error: 'Your account is temporarily locked. Please contact the system administrator to unlock your account.',
-            accountLocked: true
-          });
-        }
-        
         // Check if account is active
         if (student.is_active === false) {
           return res.status(403).json({ 
@@ -905,15 +918,6 @@ app.post('/api/auth/login', async (req, res) => {
       
       if (result.rows.length > 0) {
         const lecturer = result.rows[0];
-        
-        // Check if account is locked
-        if (lecturer.is_locked === true) {
-          return res.status(403).json({ 
-            success: false, 
-            error: 'Your account is temporarily locked. Please contact the system administrator to unlock your account.',
-            accountLocked: true
-          });
-        }
         
         // Check if account is active
         if (lecturer.is_active === false) {
@@ -2247,34 +2251,6 @@ app.post('/api/auth', loginLimiter, async (req, res) => {
     
     if (result.rows.length > 0) {
       const user = result.rows[0];
-      
-      // Check if user account is locked
-      let isLocked = false;
-      if (userType === 'student') {
-        const studentResult = await pool.query(
-          'SELECT is_locked FROM students WHERE id = $1',
-          [user.user_id]
-        );
-        if (studentResult.rows.length > 0) {
-          isLocked = studentResult.rows[0].is_locked === true;
-        }
-      } else if (userType === 'lecturer') {
-        const lecturerResult = await pool.query(
-          'SELECT is_locked FROM lecturers WHERE id = $1',
-          [user.user_id]
-        );
-        if (lecturerResult.rows.length > 0) {
-          isLocked = lecturerResult.rows[0].is_locked === true;
-        }
-      }
-      
-      if (isLocked) {
-        return res.status(403).json({ 
-          success: false, 
-          error: 'Your account is temporarily locked. Please contact the system administrator to unlock your account.',
-          accountLocked: true
-        });
-      }
       
       // Generate JWT access token
       const accessToken = jwt.sign(
@@ -7990,100 +7966,6 @@ app.post('/api/password-reset/manual', async (req, res) => {
     
   } catch (error) {
     console.error('Error in manual password reset:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Lock user account endpoint
-app.post('/api/user/lock', async (req, res) => {
-  try {
-    const { userId, userType } = req.body;
-    
-    console.log('=== LOCKING USER ACCOUNT ===');
-    console.log('User ID:', userId);
-    console.log('User Type:', userType);
-    
-    let updateResult;
-    let userName = '';
-    
-    if (userType === 'student') {
-      updateResult = await pool.query(
-        'UPDATE students SET is_locked = true, locked_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING name, email',
-        [userId]
-      );
-      if (updateResult.rows.length > 0) {
-        userName = updateResult.rows[0].name;
-      }
-    } else if (userType === 'lecturer') {
-      updateResult = await pool.query(
-        'UPDATE lecturers SET is_locked = true, locked_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING name, email',
-        [userId]
-      );
-      if (updateResult.rows.length > 0) {
-        userName = updateResult.rows[0].name;
-      }
-    }
-    
-    if (!updateResult || updateResult.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-    
-    console.log('✅ User account locked:', userName);
-    res.json({ 
-      success: true, 
-      message: `User account locked: ${userName}`,
-      data: { userName, userType }
-    });
-    
-  } catch (error) {
-    console.error('Error locking user:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Unlock user account endpoint
-app.post('/api/user/unlock', async (req, res) => {
-  try {
-    const { userId, userType } = req.body;
-    
-    console.log('=== UNLOCKING USER ACCOUNT ===');
-    console.log('User ID:', userId);
-    console.log('User Type:', userType);
-    
-    let updateResult;
-    let userName = '';
-    
-    if (userType === 'student') {
-      updateResult = await pool.query(
-        'UPDATE students SET is_locked = false, locked_at = NULL WHERE id = $1 RETURNING name, email',
-        [userId]
-      );
-      if (updateResult.rows.length > 0) {
-        userName = updateResult.rows[0].name;
-      }
-    } else if (userType === 'lecturer') {
-      updateResult = await pool.query(
-        'UPDATE lecturers SET is_locked = false, locked_at = NULL WHERE id = $1 RETURNING name, email',
-        [userId]
-      );
-      if (updateResult.rows.length > 0) {
-        userName = updateResult.rows[0].name;
-      }
-    }
-    
-    if (!updateResult || updateResult.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-    
-    console.log('✅ User account unlocked:', userName);
-    res.json({ 
-      success: true, 
-      message: `User account unlocked: ${userName}`,
-      data: { userName, userType }
-    });
-    
-  } catch (error) {
-    console.error('Error unlocking user:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
