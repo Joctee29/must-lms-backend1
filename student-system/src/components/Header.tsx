@@ -58,7 +58,7 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
         const [assignmentsRes, assessmentsRes, liveClassesRes, announcementsRes] = await Promise.all([
           fetch(`${API_BASE_URL}/assignments?student_username=${encodeURIComponent(currentUser.username)}`),
           fetch(`${API_BASE_URL}/assessments?status=published&student_username=${encodeURIComponent(currentUser.username)}`),
-          fetch(`${API_BASE_URL}/live-classes`),
+          fetch(`${API_BASE_URL}/live-classes?student_username=${encodeURIComponent(currentUser.username)}`),
           fetch(`${API_BASE_URL}/announcements?student_username=${encodeURIComponent(currentUser.username)}`)
         ]);
         

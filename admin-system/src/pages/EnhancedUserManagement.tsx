@@ -570,7 +570,7 @@ export const EnhancedUserManagement = () => {
                   </div>
                 ) : (
                   filteredStudents.map((student) => (
-                    <Card key={student.id} className="border-l-4 border-l-blue-500">
+                    <Card key={student.id}>
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between">
                           <div className="space-y-2">
@@ -708,7 +708,7 @@ export const EnhancedUserManagement = () => {
                   </div>
                 ) : (
                   filteredLecturers.map((lecturer) => (
-                    <Card key={lecturer.id} className="border-l-4 border-l-green-500">
+                    <Card key={lecturer.id}>
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between">
                           <div className="space-y-2">

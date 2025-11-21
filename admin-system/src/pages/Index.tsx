@@ -24,7 +24,7 @@ const Index = () => {
   const renderContent = () => {
     switch (activeSection) {
       case "dashboard":
-        return <Dashboard />;
+        return <Dashboard onSectionChange={setActiveSection} />;
       case "users":
         return <EnhancedUserManagement />;
       case "bulk-upload":
@@ -52,7 +52,7 @@ const Index = () => {
       case "short-term-programs":
         return <ShortTermPrograms />;
       default:
-        return <Dashboard />;
+        return <Dashboard onSectionChange={setActiveSection} />;
     }
   };
 

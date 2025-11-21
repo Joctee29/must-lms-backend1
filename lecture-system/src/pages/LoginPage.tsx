@@ -24,7 +24,7 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
     newPassword: "",
     confirmPassword: ""
   });
-  const [resetStatus, setResetStatus] = useState<'idle' | 'sending' | 'sent' | 'error' | 'verifying' | 'resetting'>('idle');
+  const [resetStatus, setResetStatus] = useState<'idle' | 'sending' | 'sent' | 'error' | 'verifying' | 'validating' | 'resetting'>('idle');
   const [resetMessage, setResetMessage] = useState("");
   const [userType, setUserType] = useState("");
 
@@ -96,10 +96,40 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
   // Send reset code to email
   const handleSendResetCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setResetStatus('sending');
-    setResetMessage("");
+    
+    // Validate email format first
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(forgotPasswordData.email)) {
+      setResetStatus('error');
+      setResetMessage('Please enter a valid email address');
+      return;
+    }
+    
+    setResetStatus('validating');
+    setResetMessage("Verifying email address...");
     
     try {
+      // FIRST: Verify email exists in database for lecturer
+      const verifyResponse = await fetch('https://must-lms-backend.onrender.com/api/password-reset/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: forgotPasswordData.email,
+          userType: 'lecturer'
+        })
+      });
+      
+      const verifyResult = await verifyResponse.json();
+      
+      if (!verifyResult.success) {
+        setResetStatus('error');
+        setResetMessage(verifyResult.error || 'Email not found in system. Please check your email address.');
+        return;
+      }
+      
+      setResetStatus('sending');
+      setResetMessage("Sending reset code...");
+      
       // Fetch admin email from backend first
       let adminEmail = 'admin@must.ac.tz'; // Default fallback
       try {
@@ -114,6 +144,7 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
         console.warn('Could not fetch admin email, using default');
       }
       
+      // SECOND: Send reset code
       const response = await fetch('https://must-lms-backend.onrender.com/api/password-reset/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,16 +159,19 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
       
       if (result.success) {
         setResetStatus('sent');
-        setResetMessage(`Reset code sent to ${forgotPasswordData.email}. Please check your email.`);
+        setResetMessage(`✅ Reset code sent to ${forgotPasswordData.email}. Please check your email (and spam folder).`);
         setUserType(result.data.userType || 'lecturer');
-        setResetStep('code');
+        setTimeout(() => {
+          setResetStep('code');
+        }, 1500);
       } else {
         setResetStatus('error');
         setResetMessage(result.error || 'Failed to send reset code');
       }
     } catch (error) {
+      console.error('Error:', error);
       setResetStatus('error');
-      setResetMessage('Network error. Please check your connection.');
+      setResetMessage('Network error. Please check your connection and try again.');
     }
   };
 

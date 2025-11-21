@@ -114,6 +114,7 @@ export const PasswordManagement = () => {
   const [adminEmail, setAdminEmail] = useState("uj23hiueddhpna2y@ethereal.email");
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [isProcessingReset, setIsProcessingReset] = useState(false);
+  const [activeTab, setActiveTab] = useState("users");
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -137,6 +138,12 @@ export const PasswordManagement = () => {
       return;
     }
 
+    // Validate password strength (at least one uppercase, one lowercase, one number, one special char)
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      alert("Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (!@#$%^&*)");
+      return;
+    }
 
     try {
       const response = await fetch('https://must-lms-backend.onrender.com/api/password-reset/manual', {
@@ -178,22 +185,74 @@ export const PasswordManagement = () => {
     }
   };
 
-  const handleUnlockUser = (userId: string) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? { ...user, status: "active" as const }
-        : user
-    ));
-    alert("User account unlocked successfully");
+  const handleUnlockUser = async (userId: string) => {
+    if (!selectedUser) {
+      alert("Please select a user first");
+      return;
+    }
+
+    try {
+      const response = await fetch('https://must-lms-backend.onrender.com/api/user/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userId,
+          userType: selectedUser.userType
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Update user in local state
+        setUsers(users.map(user => 
+          user.id === userId 
+            ? { ...user, status: "active" as const }
+            : user
+        ));
+        alert(`Account unlocked for ${result.data.userName}`);
+      } else {
+        alert(`Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error unlocking user:', error);
+      alert('Failed to unlock account. Please check server connection.');
+    }
   };
 
-  const handleLockUser = (userId: string) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? { ...user, status: "locked" as const }
-        : user
-    ));
-    alert("User account locked successfully");
+  const handleLockUser = async (userId: string) => {
+    if (!selectedUser) {
+      alert("Please select a user first");
+      return;
+    }
+
+    try {
+      const response = await fetch('https://must-lms-backend.onrender.com/api/user/lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userId,
+          userType: selectedUser.userType
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Update user in local state
+        setUsers(users.map(user => 
+          user.id === userId 
+            ? { ...user, status: "locked" as const }
+            : user
+        ));
+        alert(`Account locked for ${result.data.userName}`);
+      } else {
+        alert(`Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error locking user:', error);
+      alert('Failed to lock account. Please check server connection.');
+    }
   };
 
   const handlePasswordResetRequest = (requestId: string, action: "approve" | "reject") => {
@@ -213,11 +272,30 @@ export const PasswordManagement = () => {
   };
 
   const generateRandomPassword = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
+    // Generate strong password with at least 12 characters
+    // Including uppercase, lowercase, numbers, and special characters
+    const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const lowercase = "abcdefghijklmnopqrstuvwxyz";
+    const numbers = "0123456789";
+    const specialChars = "!@#$%^&*";
+    
     let password = "";
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    
+    // Ensure at least one character from each category
+    password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
+    password += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
+    password += numbers.charAt(Math.floor(Math.random() * numbers.length));
+    password += specialChars.charAt(Math.floor(Math.random() * specialChars.length));
+    
+    // Fill the rest with random characters from all categories
+    const allChars = uppercase + lowercase + numbers + specialChars;
+    for (let i = 4; i < 12; i++) {
+      password += allChars.charAt(Math.floor(Math.random() * allChars.length));
     }
+    
+    // Shuffle the password to avoid predictable patterns
+    password = password.split('').sort(() => Math.random() - 0.5).join('');
+    
     setNewPassword(password);
     setConfirmPassword(password);
   };
@@ -403,7 +481,7 @@ export const PasswordManagement = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="users" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">User Accounts</TabsTrigger>
           <TabsTrigger value="reset">Manual Reset</TabsTrigger>
@@ -489,7 +567,10 @@ export const PasswordManagement = () => {
                               </Button>
                             )}
                             
-                            <Button size="sm" onClick={() => setSelectedUser(user)}>
+                            <Button size="sm" onClick={() => {
+                              setSelectedUser(user);
+                              setActiveTab("reset");
+                            }}>
                               <Key className="h-4 w-4 mr-1" />
                               Reset Password
                             </Button>

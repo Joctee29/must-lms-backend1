@@ -302,49 +302,57 @@ export const Discussions = () => {
   }
 
   return (
-    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+    <div className="p-2 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Course Discussions</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">View and manage student discussions</p>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Course Discussions</h1>
+          <p className="text-xs sm:text-sm md:text-base text-muted-foreground">View and manage student discussions</p>
         </div>
       </div>
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
         <Input
           placeholder="Search discussions..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
+          className="pl-8 sm:pl-10 text-sm sm:text-base h-9 sm:h-10"
         />
       </div>
 
       {/* Category Tabs - Mobile Optimized */}
-      <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
-        {categories.map((category) => (
-          <Button
-            key={category.id}
-            variant={activeTab === category.id ? "default" : "outline"}
-            onClick={() => setActiveTab(category.id)}
-            className="whitespace-nowrap flex-shrink-0 text-xs sm:text-sm px-2 sm:px-4 py-1 sm:py-2"
-            size="sm"
-          >
-            <span className="hidden sm:inline">{category.label}</span>
-            <span className="sm:hidden">
-              {category.id === "all" ? "All" : 
-               category.id === "help" ? "Help" :
-               category.id === "study-group" ? "Groups" :
-               category.id === "resources" ? "Resources" :
-               "General"}
-            </span>
-            <Badge variant="secondary" className="ml-1 sm:ml-2 text-xs px-1 sm:px-2">
-              {category.count}
-            </Badge>
-          </Button>
-        ))}
+      <div className="relative">
+        <div className="flex space-x-1.5 sm:space-x-2 overflow-x-auto pb-1 sm:pb-2 scrollbar-hide">
+          {categories.map((category) => (
+            <Button
+              key={category.id}
+              variant={activeTab === category.id ? "default" : "outline"}
+              onClick={() => setActiveTab(category.id)}
+              className="whitespace-nowrap flex-shrink-0 text-[10px] xs:text-xs sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1.5 h-auto"
+              size="sm"
+            >
+              <span className="hidden xs:inline">
+                {category.id === "all" ? "All" : 
+                 category.id === "help" ? "Help" :
+                 category.id === "study-group" ? "Groups" :
+                 category.id === "resources" ? "Resources" :
+                 "General"}
+              </span>
+              <span className="xs:hidden">
+                {category.id === "all" ? "All" : 
+                 category.id === "help" ? "Help" :
+                 category.id === "study-group" ? "Grp" :
+                 category.id === "resources" ? "Res" :
+                 "Gen"}
+              </span>
+              <Badge variant={activeTab === category.id ? "secondary" : "outline"} className="ml-1 text-[10px] sm:text-xs px-1 sm:px-1.5 py-0">
+                {category.count}
+              </Badge>
+            </Button>
+          ))}
+        </div>
       </div>
 
 
@@ -390,14 +398,14 @@ export const Discussions = () => {
       )}
 
       {/* Discussions List */}
-      <div className="space-y-3 sm:space-y-4">
+      <div className="space-y-2 sm:space-y-3">
         {filteredDiscussions.map((discussion) => (
           <Card 
             key={discussion.id} 
-            className="hover:shadow-md transition-shadow cursor-pointer"
+            className="hover:shadow-md transition-shadow cursor-pointer overflow-hidden"
             onClick={() => handleViewReplies(discussion)}
           >
-            <CardContent className="p-4 sm:p-6">
+            <CardContent className="p-3 sm:p-4 md:p-6">
               <div className="flex flex-col sm:flex-row sm:items-start space-y-3 sm:space-y-0 sm:space-x-4">
                 {/* Avatar */}
                 <Avatar className="hidden sm:block">
@@ -428,16 +436,21 @@ export const Discussions = () => {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge className={`${getCategoryColor(discussion.category)} text-xs`}>
-                        <span className="flex items-center gap-1">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5">
+                      <div className="flex items-start sm:items-center space-x-2">
+                        <div className={`${getCategoryColor(discussion.category)} text-[10px] xs:text-xs px-1.5 xs:px-2 py-0.5 rounded-full flex items-center space-x-1 flex-shrink-0`}>
                           {getCategoryIcon(discussion.category)}
-                          <span className="hidden sm:inline">{discussion.category}</span>
-                        </span>
-                      </Badge>
-                      {discussion.priority === 'high' && (
-                        <Badge variant="destructive" className="text-xs">High</Badge>
-                      )}
+                          <span className="hidden xs:inline">
+                            {discussion.category === 'study-group' ? 'Group' : 
+                             discussion.category === 'resources' ? 'Resource' : 
+                             discussion.category.charAt(0).toUpperCase() + discussion.category.slice(1)}
+                          </span>
+                        </div>
+                        <h3 className="font-medium text-sm sm:text-base leading-tight line-clamp-2">{discussion.title}</h3>
+                      </div>
+                      <div className="flex items-center justify-end sm:justify-start space-x-2 text-[10px] xs:text-xs text-muted-foreground">
+                        <span>{formatTimeAgo(discussion.created_at)}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -566,24 +579,27 @@ export const Discussions = () => {
                   <div className="flex items-center gap-2 mb-2">
                     <h4 className="font-semibold text-lg">{selectedDiscussion.title}</h4>
                     <Badge className={getCategoryColor(selectedDiscussion.category)}>
-                      {selectedDiscussion.category}
+                      <div className="mt-2 text-xs sm:text-sm text-muted-foreground line-clamp-2 leading-snug">
+                        {selectedDiscussion.content}
+                      </div>
                     </Badge>
                   </div>
-                  <p className="text-gray-700 mb-3">{selectedDiscussion.content}</p>
-                  <div className="flex items-center gap-6 text-sm text-gray-600">
-                    <span className="flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      By {selectedDiscussion.author}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      {formatTimeAgo(selectedDiscussion.createdAt)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <BookOpen className="h-4 w-4" />
-                      Program: {selectedDiscussion.program}
-                    </span>
+                  <div className="mt-2 sm:mt-3 flex flex-col xs:flex-row xs:items-center justify-between text-[10px] xs:text-xs text-muted-foreground gap-1.5">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-1">
+                        <MessageSquare className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
+                        <span>{selectedDiscussion.replies || 0} {selectedDiscussion.replies === 1 ? 'reply' : 'replies'}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Eye className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
+                        <span>{selectedDiscussion.views || 0} views</span>
+                      </div>
+                    </div>
+                    <div className="text-right xs:text-left">
+                      <span className="text-[10px] xs:text-xs">Posted by {selectedDiscussion.author}</span>
+                    </div>
                   </div>
+                  <p className="text-gray-700 mb-3">{selectedDiscussion.program}</p>
                 </div>
               </div>
             </div>

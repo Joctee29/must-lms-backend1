@@ -897,13 +897,11 @@ export const CourseManagement = () => {
                   <Input
                     id="course-id"
                     name="courseId"
-                    value={courseForm.courseId}
-                    onChange={(e) => setCourseForm({...courseForm, courseId: e.target.value})}
-                    placeholder="Unique ID for bulk student upload"
+                    value={courseForm.courseId || 'Auto-generated'}
+                    readOnly
+                    className="bg-gray-100"
+                    placeholder="Auto-generated"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This ID will be used when uploading students in bulk. Leave empty for auto-generation.
-                  </p>
                 </div>
                 <div>
                   <Label htmlFor="course-department">Department</Label>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +60,17 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
         console.log('=== MY PROGRAMS DATA FETCH ===');
         console.log('Current User:', currentUser);
         
+        // Fetch active academic period first
+        const activePeriodResult = await fetch(`${API_BASE_URL}/academic-periods/active`);
+        let activeSemester = 1;
+        if (activePeriodResult.ok) {
+          const periodResult = await activePeriodResult.json();
+          if (periodResult.data && periodResult.data.semester) {
+            activeSemester = periodResult.data.semester;
+            console.log('Active semester from database:', activeSemester);
+          }
+        }
+        
         // Fetch lecturer info using efficient endpoint
         const lecturerResponse = await fetch(`${API_BASE_URL}/lecturers?username=${encodeURIComponent(currentUser.username)}`);
         const lecturerResult = await lecturerResponse.json();
@@ -85,8 +96,12 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
         
         let allPrograms = [];
         if (programsResult.success) {
-          allPrograms = [...programsResult.data];
-          console.log('Lecturer Regular Programs:', allPrograms.length);
+          // Filter programs by active semester
+          const filteredPrograms = (programsResult.data || []).filter((program: any) => {
+            return program.semester === activeSemester || program.semester === null || program.semester === undefined;
+          });
+          allPrograms = [...filteredPrograms];
+          console.log('Lecturer Regular Programs (filtered by semester):', allPrograms.length);
         }
 
         // Fetch short-term programs using efficient endpoint
@@ -100,7 +115,7 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
         }
         
         setPrograms(allPrograms);
-        console.log('Total Regular Programs:', allPrograms.length);
+        console.log('Total Regular Programs (filtered):', allPrograms.length);
         console.log('Total Short-Term Programs:', shortTermPrograms.length)
 
         // Fetch courses

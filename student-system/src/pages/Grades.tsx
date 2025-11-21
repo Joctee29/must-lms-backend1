@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   BarChart3,
   TrendingUp,
@@ -12,8 +12,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
+const API_BASE_URL = 'https://must-lms-backend.onrender.com/api';
+
 export const Grades = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [activeAcademicYear, setActiveAcademicYear] = useState<string>("2024/2025");
+  const [activeSemester, setActiveSemester] = useState<number>(1);
+  
+  // Track previous academic period to detect changes
+  const previousPeriodRef = useRef<{ year: string; semester: number } | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const user = localStorage.getItem('currentUser');
@@ -22,12 +30,68 @@ export const Grades = () => {
     }
   }, []);
 
+  // Function to fetch active academic period
+  const fetchActivePeriod = async () => {
+    try {
+      const periodResponse = await fetch(`${API_BASE_URL}/academic-periods/active`);
+      if (periodResponse.ok) {
+        const periodResult = await periodResponse.json();
+        console.log('Academic Period Response (Grades):', periodResult);
+        const period = periodResult.data || periodResult;
+        if (period && period.academic_year) {
+          const year = period.academic_year as string;
+          const sem = (period.semester as number) || 1;
+          
+          // Check if period has changed
+          const periodChanged = 
+            !previousPeriodRef.current ||
+            previousPeriodRef.current.year !== year ||
+            previousPeriodRef.current.semester !== sem;
+          
+          if (periodChanged) {
+            console.log('📢 Academic period changed in Grades! Old:', previousPeriodRef.current, 'New:', { year, sem });
+            previousPeriodRef.current = { year, sem };
+            setActiveAcademicYear(year);
+            setActiveSemester(sem);
+            return { year, sem, changed: true };
+          }
+          
+          return { year, sem, changed: false };
+        }
+      }
+    } catch (periodError) {
+      console.error('Error fetching academic period for Grades:', periodError);
+    }
+    return { year: activeAcademicYear, sem: activeSemester, changed: false };
+  };
+
+  // Initial fetch of academic period
+  useEffect(() => {
+    fetchActivePeriod();
+  }, []);
+
+  // Setup polling to detect academic period changes
+  useEffect(() => {
+    // Poll every 30 seconds to check for academic period changes
+    pollingIntervalRef.current = setInterval(async () => {
+      console.log('🔄 Polling for academic period changes in Grades...');
+      await fetchActivePeriod();
+    }, 30000); // Poll every 30 seconds
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
+
   // Real student profile from logged in user
   const studentProfile = {
     name: currentUser?.username || "Student",
     registrationNumber: currentUser?.username || "Not logged in",
     program: "To be assigned",
-    semester: "Not enrolled",
+    semester: activeSemester,
+    academicYear: activeAcademicYear,
     totalCredits: 0,
     status: "Active",
     lastLogin: new Date().toISOString()
@@ -97,8 +161,8 @@ export const Grades = () => {
               <p className="text-lg font-semibold">{studentProfile.registrationNumber}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Program</p>
-              <p className="text-lg font-semibold">{studentProfile.program}</p>
+              <p className="text-sm font-medium text-muted-foreground">Academic Year</p>
+              <p className="text-lg font-semibold">{studentProfile.academicYear}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Current Semester</p>

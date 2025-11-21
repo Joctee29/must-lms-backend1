@@ -17,7 +17,11 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { lecturerOperations, studentOperations, courseOperations } from "@/lib/database";
 
-export const Dashboard = () => {
+interface DashboardProps {
+  onSectionChange?: (section: string) => void;
+}
+
+export const Dashboard = ({ onSectionChange }: DashboardProps) => {
   const [stats, setStats] = useState({
     students: 0,
     lecturers: 0,
@@ -206,7 +210,21 @@ export const Dashboard = () => {
                       <span className="text-muted-foreground">{stat.trend}</span>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      if (stat.id === 1 && onSectionChange) {
+                        onSectionChange("system");
+                      } else if (stat.id === 2 && onSectionChange) {
+                        onSectionChange("students");
+                      } else if (stat.id === 3 && onSectionChange) {
+                        onSectionChange("database");
+                      } else if (stat.id === 4 && onSectionChange) {
+                        onSectionChange("courses");
+                      }
+                    }}
+                  >
                     Monitor
                   </Button>
                 </div>

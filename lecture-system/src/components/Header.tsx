@@ -50,11 +50,10 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
       if (!currentUser?.username) return;
       
       try {
-        // Fetch assignment submissions, live classes, and announcements
-        // CRITICAL: Use lecturer-specific endpoint to get only this lecturer's announcements
+        // Fetch assignment submissions, live classes, and announcements for current lecturer only
         const [submissionsRes, liveClassesRes, announcementsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/assignment-submissions`),
-          fetch(`${API_BASE_URL}/live-classes`),
+          fetch(`${API_BASE_URL}/assignment-submissions?lecturer_id=${currentUser.id}`),
+          fetch(`${API_BASE_URL}/live-classes?lecturer_id=${currentUser.id}`),
           fetch(`${API_BASE_URL}/announcements/lecturer?lecturer_id=${currentUser.id}`)
         ]);
         
@@ -62,14 +61,21 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
         const liveClasses = await liveClassesRes.json();
         const announcements = await announcementsRes.json();
         
+        console.log('Fetched notifications for lecturer:', currentUser.id);
+        console.log('Submissions:', submissions.data?.length || 0);
+        console.log('Live Classes:', liveClasses.data?.length || 0);
+        console.log('Announcements:', announcements.data?.length || 0);
+        
         const newNotifications: any[] = [];
         
-        // Add new submissions
+        // Add new submissions - only for current lecturer's assignments
         if (submissions.success && submissions.data) {
           const recentSubmissions = submissions.data.filter((s: any) => {
             const submittedDate = new Date(s.submitted_at);
             const daysSinceSubmitted = (Date.now() - submittedDate.getTime()) / (1000 * 60 * 60 * 24);
-            return daysSinceSubmitted <= 2; // Last 2 days
+            const isLecturerSubmission = s.lecturer_id === currentUser.id || 
+                                      s.lecturer_username === currentUser.username;
+            return daysSinceSubmitted <= 2 && isLecturerSubmission; // Last 2 days and for this lecturer
           });
           
           recentSubmissions.slice(0, 10).forEach((s: any) => {
@@ -77,23 +83,28 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
               id: `submission_${s.id || s.student_name}_${s.submitted_at}`,
               title: '📝 New Submission',
               message: `${s.student_name} submitted ${s.assignment_title}`,
-              time: new Date(s.submitted_at).toLocaleString()
+              time: new Date(s.submitted_at).toLocaleString(),
+              lecturerId: s.lecturer_id || s.lecturer_username
             });
           });
         }
         
-        // Add live classes
+        // Add live classes - only for current lecturer
         if (liveClasses.success && liveClasses.data) {
-          const activeClasses = liveClasses.data.filter((c: any) => 
-            c.status === 'live' || c.status === 'scheduled'
-          );
+          const activeClasses = liveClasses.data.filter((c: any) => {
+            // Only include if it's the current lecturer's class
+            const isLecturerClass = c.lecturer_id === currentUser.id || 
+                                 c.lecturer_username === currentUser.username;
+            return (c.status === 'live' || c.status === 'scheduled') && isLecturerClass;
+          });
           
           activeClasses.forEach((c: any) => {
             newNotifications.push({
               id: `class_${c.id || c.title}_${c.date}_${c.time}`,
               title: c.status === 'live' ? '🔴 Live Class Active' : '⏰ Scheduled Class',
               message: `${c.title} - ${c.program_name}`,
-              time: `${c.date} at ${c.time}`
+              time: `${c.date} at ${c.time}`,
+              lecturerId: c.lecturer_id || c.lecturer_username
             });
           });
         }
@@ -106,12 +117,19 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
             return daysSinceCreated <= 7; // Last 7 days
           });
           
-          recentAnnouncements.slice(0, 5).forEach((a: any) => {
+          // Only include announcements created by this lecturer
+          const lecturerAnnouncements = recentAnnouncements.filter((a: any) => {
+            return a.created_by_id === currentUser.id || 
+                   a.created_by === currentUser.username;
+          });
+          
+          lecturerAnnouncements.slice(0, 5).forEach((a: any) => {
             newNotifications.push({
               id: `announcement_${a.id || a.title}_${a.created_at}`,
-              title: '📢 Announcement',
+              title: '📢 Your Announcement',
               message: a.title,
-              time: new Date(a.created_at).toLocaleString()
+              time: new Date(a.created_at).toLocaleString(),
+              lecturerId: a.created_by_id || a.created_by
             });
           });
         }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { User, Mail, Phone, Calendar, BookOpen, GraduationCap, MapPin, Edit, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,12 @@ export const Profile = () => {
     email: "",
     phone: ""
   });
+  const [activeAcademicYear, setActiveAcademicYear] = useState<string>("2024/2025");
+  const [activeSemester, setActiveSemester] = useState<number>(1);
+  
+  // Track previous academic period to detect changes
+  const previousPeriodRef = useRef<{ year: string; semester: number } | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const user = localStorage.getItem('currentUser');
@@ -26,6 +32,41 @@ export const Profile = () => {
       setCurrentUser(JSON.parse(user));
     }
   }, []);
+
+  // Function to fetch active academic period
+  const fetchActivePeriod = async () => {
+    try {
+      const periodResponse = await fetch(`${API_BASE_URL}/academic-periods/active`);
+      if (periodResponse.ok) {
+        const periodResult = await periodResponse.json();
+        console.log('Academic Period Response (profile):', periodResult);
+        const period = periodResult.data || periodResult;
+        if (period && period.academic_year) {
+          const year = period.academic_year as string;
+          const sem = (period.semester as number) || 1;
+          
+          // Check if period has changed
+          const periodChanged = 
+            !previousPeriodRef.current ||
+            previousPeriodRef.current.year !== year ||
+            previousPeriodRef.current.semester !== sem;
+          
+          if (periodChanged) {
+            console.log('📢 Academic period changed in profile! Old:', previousPeriodRef.current, 'New:', { year, sem });
+            previousPeriodRef.current = { year, sem };
+            setActiveAcademicYear(year);
+            setActiveSemester(sem);
+            return { year, sem, changed: true };
+          }
+          
+          return { year, sem, changed: false };
+        }
+      }
+    } catch (periodError) {
+      console.error('Error fetching academic period for profile:', periodError);
+    }
+    return { year: activeAcademicYear, sem: activeSemester, changed: false };
+  };
 
   // Fetch ONLY student's own data using efficient endpoint
   useEffect(() => {
@@ -38,6 +79,9 @@ export const Profile = () => {
         console.log('=== STUDENT PROFILE DATA FETCH ===');
         console.log('Current User:', currentUser);
         
+        // Fetch active academic period first
+        const periodData = await fetchActivePeriod();
+        
         // Use efficient endpoint to fetch ONLY this student's data
         const response = await fetch(`${API_BASE_URL}/students/me?username=${encodeURIComponent(currentUser.username)}`);
         const result = await response.json();
@@ -46,7 +90,15 @@ export const Profile = () => {
         if (result.success && result.data) {
           const student = result.data;
           console.log('Found Student:', student);
-          setStudentData(student);
+          
+          // Update student data with active academic period
+          const updatedStudent = {
+            ...student,
+            academic_year: periodData.year,
+            current_semester: periodData.sem
+          };
+          
+          setStudentData(updatedStudent);
           setEditForm({
             name: student.name || "",
             email: student.email || "",
@@ -67,6 +119,33 @@ export const Profile = () => {
 
     fetchStudentData();
   }, [currentUser]);
+
+  // Setup polling to detect academic period changes
+  useEffect(() => {
+    if (!currentUser?.username) return;
+
+    // Poll every 30 seconds to check for academic period changes
+    pollingIntervalRef.current = setInterval(async () => {
+      console.log('🔄 Polling for academic period changes in profile...');
+      const periodData = await fetchActivePeriod();
+      
+      if (periodData.changed && studentData) {
+        console.log('✅ Academic period changed detected in profile! Updating...');
+        // Update student data with new period
+        setStudentData({
+          ...studentData,
+          academic_year: periodData.year,
+          current_semester: periodData.sem
+        });
+      }
+    }, 30000); // Poll every 30 seconds
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [currentUser, studentData]);
 
   const handleSaveProfile = async () => {
     if (!studentData) return;

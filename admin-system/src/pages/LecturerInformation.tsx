@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Users, BookOpen, Calendar, Mail, Phone, Eye } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface LecturerInfo {
   id: string;
@@ -35,7 +36,6 @@ interface LecturerInfo {
 export const LecturerInformation = () => {
   const [lecturers, setLecturers] = useState<LecturerInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedLecturer, setSelectedLecturer] = useState<LecturerInfo | null>(null);
 
   // Function to load lecturers data
   const loadLecturers = async () => {
@@ -180,37 +180,64 @@ export const LecturerInformation = () => {
                       console.warn(`⚠️ Program ${program.name || program.id} has no course_id!`);
                     }
                     
-                    // Create a single, accurate semester entry per program
-                    const rawSemester =
-                      (program.semester as number | string | undefined) ||
-                      (program.semester_number as number | string | undefined) ||
-                      (program.semesterNumber as number | string | undefined);
-
-                    let semesterValue = 1;
-                    if (rawSemester !== undefined && rawSemester !== null) {
-                      if (typeof rawSemester === 'number') {
-                        semesterValue = rawSemester;
+                    // Enhanced semester assignment logic - PRIORITY ORDER
+                    let semesterValue = 1; // Default to semester 1
+                    
+                    console.log(`\n📊 ANALYZING PROGRAM: ${program.name}`);
+                    console.log(`   - program.semester: ${program.semester}`);
+                    console.log(`   - program.semester_number: ${program.semester_number}`);
+                    console.log(`   - program.semesterNumber: ${program.semesterNumber}`);
+                    console.log(`   - program.total_semesters: ${program.total_semesters}`);
+                    console.log(`   - program.totalSemesters: ${program.totalSemesters}`);
+                    
+                    // 1. FIRST PRIORITY: Check if program has explicit semester field from database
+                    if (program.semester !== undefined && program.semester !== null && program.semester !== '') {
+                      const parsedSem = parseInt(program.semester, 10);
+                      if (!isNaN(parsedSem) && parsedSem >= 1 && parsedSem <= 2) {
+                        semesterValue = parsedSem;
+                        console.log(`   ✅ Using explicit semester from DB: ${semesterValue}`);
+                      }
+                    }
+                    // 2. SECOND PRIORITY: Try to extract from program name
+                    else if (program.name) {
+                      const programName = program.name.toLowerCase();
+                      console.log(`   - Checking program name: "${programName}"`);
+                      
+                      // Check for explicit semester 2 indicators (MUST come first)
+                      const semester2Indicators = [
+                        'semester 2', 'sem 2', 'second semester', 'semester2',
+                        'semester ii', 'semester-2', 'sem-2', 'semester two',
+                        'semester two', 'level 2', 'year 2', 'level two', 'year two',
+                        'sem2', 'sem-2', 'sem 2', 'semester-2', 'sem 2', 'sem2'
+                      ];
+                      
+                      const hasSem2 = semester2Indicators.some(indicator => programName.includes(indicator));
+                      console.log(`   - Has Semester 2 indicators: ${hasSem2}`);
+                      
+                      if (hasSem2) {
+                        semesterValue = 2;
+                        console.log(`   ✅ Detected Semester 2 from name indicators`);
                       } else {
-                        const match = String(rawSemester).match(/\d+/);
-                        const parsed = match ? Number(match[0]) : NaN;
-                        if (!Number.isNaN(parsed)) {
-                          semesterValue = parsed;
+                        // Check for semester 1 indicators
+                        const semester1Indicators = [
+                          'semester 1', 'sem 1', 'first semester', 'semester1',
+                          'semester i', 'semester-1', 'sem-1', 'semester one',
+                          'sem1', 'sem-1', 'sem 1', 'semester-1'
+                        ];
+                        
+                        const hasSem1 = semester1Indicators.some(indicator => programName.includes(indicator));
+                        console.log(`   - Has Semester 1 indicators: ${hasSem1}`);
+                        
+                        if (hasSem1) {
+                          semesterValue = 1;
+                          console.log(`   ✅ Detected Semester 1 from name indicators`);
+                        } else {
+                          console.log(`   ⚠️ No semester indicators found, defaulting to Semester 1`);
                         }
                       }
                     }
                     
-                    // ENHANCED SEMESTER ASSIGNMENT - Use program name or totalSemesters to determine semester
-                    if (semesterValue === 1 && program.name) {
-                      const programName = program.name.toLowerCase();
-                      if (programName.includes('semester 2') || programName.includes('sem 2') || programName.includes('second semester')) {
-                        semesterValue = 2;
-                      } else if (program.totalSemesters === 2 && Math.random() > 0.5) {
-                        // For programs with 2 semesters, randomly assign some to semester 2 for demo
-                        semesterValue = 2;
-                      }
-                    }
-                    
-                    console.log(`📊 Program ${program.name}: assigned to semester ${semesterValue} (raw: ${rawSemester}, totalSemesters: ${program.totalSemesters})`);
+                    console.log(`   📊 FINAL SEMESTER ASSIGNMENT: ${semesterValue}\n`);
 
                     return [{
                       id: `${program.id}-sem${semesterValue}`,
@@ -469,15 +496,8 @@ export const LecturerInformation = () => {
                       </span>
                     </CardDescription>
                   </div>
+                  
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setSelectedLecturer(lecturer)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View Details
-                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -500,113 +520,6 @@ export const LecturerInformation = () => {
           ))
         )}
       </div>
-
-      {/* Lecturer Details Modal */}
-      {selectedLecturer && (
-        <Card className="fixed inset-4 z-50 bg-white shadow-2xl border-2 overflow-auto">
-          <CardHeader className="bg-blue-50 border-b">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl">Lecturer Details</CardTitle>
-                <CardDescription>{selectedLecturer.name} - {selectedLecturer.employeeId}</CardDescription>
-              </div>
-              <Button 
-                variant="outline" 
-                onClick={() => setSelectedLecturer(null)}
-              >
-                Close
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="space-y-6">
-              {/* Basic Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">Personal Information</h3>
-                    <div className="space-y-2">
-                      <p><span className="font-medium">Full Name:</span> {selectedLecturer.name}</p>
-                      <p><span className="font-medium">Employee ID:</span> {selectedLecturer.employeeId}</p>
-                      <p><span className="font-medium">Email:</span> {selectedLecturer.email}</p>
-                      <p><span className="font-medium">Phone:</span> {selectedLecturer.phone}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Teaching Load by Semester */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Teaching Load by Semester</h3>
-                
-                {/* Semester 1 */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Semester 1 - Subjects</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {selectedLecturer.assignedCourses.filter(course => course.semester === 1).length > 0 ? (
-                        selectedLecturer.assignedCourses.filter(course => course.semester === 1).map((course, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded border">
-                            <div className="flex items-center gap-3">
-                              <BookOpen className="h-5 w-5 text-blue-600" />
-                              <div>
-                                <p className="font-medium text-blue-900">{course.subjectName}</p>
-                                <p className="text-sm text-blue-700">Code: {course.subjectCode} | Program: {course.program}</p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <Badge variant="secondary">{course.students} Students</Badge>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-4 text-muted-foreground">
-                          <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                          <p>No subjects assigned for Semester 1</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Semester 2 */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Semester 2 - Subjects</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {selectedLecturer.assignedCourses.filter(course => course.semester === 2).length > 0 ? (
-                        selectedLecturer.assignedCourses.filter(course => course.semester === 2).map((course, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-green-50 rounded border">
-                            <div className="flex items-center gap-3">
-                              <BookOpen className="h-5 w-5 text-green-600" />
-                              <div>
-                                <p className="font-medium text-green-900">{course.subjectName}</p>
-                                <p className="text-sm text-green-700">Code: {course.subjectCode} | Program: {course.program}</p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <Badge variant="secondary">{course.students} Students</Badge>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-4 text-muted-foreground">
-                          <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                          <p>No subjects assigned for Semester 2</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };

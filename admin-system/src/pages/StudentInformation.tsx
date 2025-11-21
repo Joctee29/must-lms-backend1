@@ -66,6 +66,8 @@ export const StudentInformation = () => {
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const [selectedCourse, setSelectedCourse] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [selectedStudent, setSelectedStudent] = useState<StudentInfo | null>(null);
 
   // Function to load students and filtering data from database
   const loadData = async () => {
@@ -322,9 +324,6 @@ export const StudentInformation = () => {
       clearInterval(pollInterval);
     };
   }, []);
-
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [selectedStudent, setSelectedStudent] = useState<StudentInfo | null>(null);
 
   // Advanced filtering functions
   const handleLevelChange = (level: string) => {
@@ -752,7 +751,7 @@ export const StudentInformation = () => {
           ) : (
             <div className="space-y-4">
               {filteredStudents.map((student) => (
-              <Card key={student.id} className="border-l-4 border-l-blue-500">
+              <Card key={student.id} className="">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="space-y-3 flex-1">
@@ -802,13 +801,6 @@ export const StudentInformation = () => {
                             <span className="font-medium">College:</span>
                           </div>
                           <p className="text-muted-foreground ml-6">{student.college}</p>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">Academic Year:</span>
-                          </div>
-                          <p className="text-muted-foreground ml-6">{student.academicYear}</p>
                         </div>
                       </div>
 
@@ -876,14 +868,6 @@ export const StudentInformation = () => {
                       <Label className="text-sm font-medium">Registration Number</Label>
                       <p className="text-lg font-semibold">{selectedStudent.registrationNumber}</p>
                     </div>
-                    <div>
-                      <Label className="text-sm font-medium">Academic Year</Label>
-                      <p className="text-lg">{selectedStudent.academicYear}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium">Current Semester</Label>
-                      <p className="text-lg">Semester {selectedStudent.currentSemester}</p>
-                    </div>
                   </div>
                   <div className="space-y-4">
                     <div>
@@ -905,31 +889,26 @@ export const StudentInformation = () => {
                   </div>
                 </div>
 
-                {/* Student Programs for All Semesters */}
+                {/* All Student Programs */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <BookOpen className="h-5 w-5" />
-                    Academic Programs by Semester
+                    Programs
                   </h3>
                   
-                  {/* Semester 1 Programs */}
                   <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Semester 1 - Programs</CardTitle>
-                    </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-6">
                       <div className="space-y-3">
-                        {studentPrograms[selectedStudent.id]?.filter((program: any) => program.semester === 1).length > 0 ? (
-                          studentPrograms[selectedStudent.id]?.filter((program: any) => program.semester === 1).map((program: any, index: number) => (
-                            <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded border">
+                        {studentPrograms[selectedStudent.id]?.length > 0 ? (
+                          studentPrograms[selectedStudent.id]?.map((program: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
                               <div className="flex items-center gap-3">
-                                <BookOpen className="h-5 w-5 text-blue-600" />
+                                <BookOpen className="h-5 w-5 text-gray-600" />
                                 <div>
-                                  <p className="font-medium text-blue-900">{program.name}</p>
-                                  <p className="text-sm text-blue-700">Lecturer: {program.lecturer_name}</p>
+                                  <p className="font-medium text-gray-900">{program.name}</p>
+                                  <p className="text-sm text-gray-700">Lecturer: {program.lecturer_name}</p>
                                 </div>
                               </div>
-                              <Badge variant="secondary">Semester 1</Badge>
                             </div>
                           ))
                         ) : (
@@ -937,40 +916,7 @@ export const StudentInformation = () => {
                             <BookOpen className="h-5 w-5 text-yellow-600" />
                             <div>
                               <p className="font-medium text-yellow-900">No Programs Assigned</p>
-                              <p className="text-sm text-yellow-700">No programs have been assigned for Semester 1 yet.</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Semester 2 Programs */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Semester 2 - Programs</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {studentPrograms[selectedStudent.id]?.filter((program: any) => program.semester === 2).length > 0 ? (
-                          studentPrograms[selectedStudent.id]?.filter((program: any) => program.semester === 2).map((program: any, index: number) => (
-                            <div key={index} className="flex items-center justify-between p-3 bg-green-50 rounded border">
-                              <div className="flex items-center gap-3">
-                                <BookOpen className="h-5 w-5 text-green-600" />
-                                <div>
-                                  <p className="font-medium text-green-900">{program.name}</p>
-                                  <p className="text-sm text-green-700">Lecturer: {program.lecturer_name}</p>
-                                </div>
-                              </div>
-                              <Badge variant="secondary">Semester 2</Badge>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded border border-yellow-200">
-                            <BookOpen className="h-5 w-5 text-yellow-600" />
-                            <div>
-                              <p className="font-medium text-yellow-900">No Programs Assigned</p>
-                              <p className="text-sm text-yellow-700">No programs have been assigned for Semester 2 yet.</p>
+                              <p className="text-sm text-yellow-700">No programs have been assigned to this student yet.</p>
                             </div>
                           </div>
                         )}

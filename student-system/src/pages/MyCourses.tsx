@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,12 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
   const [courses, setCourses] = useState<any[]>([]);
   const [lecturers, setLecturers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeAcademicYear, setActiveAcademicYear] = useState<string>("2024/2025");
+  const [activeSemester, setActiveSemester] = useState<number>(1);
+  
+  // Track previous academic period to detect changes
+  const previousPeriodRef = useRef<{ year: string; semester: number } | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
     const user = localStorage.getItem('currentUser');
@@ -28,6 +34,41 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
       setCurrentUser(JSON.parse(user));
     }
   }, []);
+
+  // Function to fetch active academic period
+  const fetchActivePeriod = async () => {
+    try {
+      const periodResponse = await fetch(`${API_BASE_URL}/academic-periods/active`);
+      if (periodResponse.ok) {
+        const periodResult = await periodResponse.json();
+        console.log('Academic Period Response (MyCourses):', periodResult);
+        const period = periodResult.data || periodResult;
+        if (period && period.academic_year) {
+          const year = period.academic_year as string;
+          const sem = (period.semester as number) || 1;
+          
+          // Check if period has changed
+          const periodChanged = 
+            !previousPeriodRef.current ||
+            previousPeriodRef.current.year !== year ||
+            previousPeriodRef.current.semester !== sem;
+          
+          if (periodChanged) {
+            console.log('📢 Academic period changed in MyCourses! Old:', previousPeriodRef.current, 'New:', { year, sem });
+            previousPeriodRef.current = { year, sem };
+            setActiveAcademicYear(year);
+            setActiveSemester(sem);
+            return { year, sem, changed: true };
+          }
+          
+          return { year, sem, changed: false };
+        }
+      }
+    } catch (periodError) {
+      console.error('Error fetching academic period for MyCourses:', periodError);
+    }
+    return { year: activeAcademicYear, sem: activeSemester, changed: false };
+  };
 
   // Fetch real data from database
   useEffect(() => {
@@ -37,6 +78,9 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
       try {
         setLoading(true);
         
+        // Fetch active academic period first
+        const periodData = await fetchActivePeriod();
+        
         // Fetch student info using dedicated endpoint
         const studentResponse = await fetch(`${API_BASE_URL}/students/me?username=${encodeURIComponent(currentUser.username)}`);
         const studentResult = await studentResponse.json();
@@ -44,16 +88,23 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
         let student = null;
         if (studentResult.success && studentResult.data) {
           student = studentResult.data;
+          // Update with active academic period
+          student.academic_year = periodData.year;
+          student.current_semester = periodData.sem;
           setStudentData(student);
           
           if (student) {
-            // Fetch programs for this student - backend filters by course_id
+            // Fetch programs for this student - backend filters by course_id AND semester
             const programsResponse = await fetch(`${API_BASE_URL}/programs?user_type=student&student_id=${student.id}`);
             const programsResult = await programsResponse.json();
             
             if (programsResult.success) {
-              // Backend already filters by student's course
-              setEnrolledPrograms(programsResult.data || []);
+              // Filter programs by active semester
+              const filteredPrograms = (programsResult.data || []).filter((program: any) => {
+                // Show programs that match active semester OR have no semester specified
+                return program.semester === periodData.sem || program.semester === null || program.semester === undefined;
+              });
+              setEnrolledPrograms(filteredPrograms);
             } else {
               setEnrolledPrograms([]);
             }
@@ -157,6 +208,33 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
 
     fetchData();
   }, [currentUser]);
+
+  // Setup polling to detect academic period changes
+  useEffect(() => {
+    if (!currentUser?.username) return;
+
+    // Poll every 30 seconds to check for academic period changes
+    pollingIntervalRef.current = setInterval(async () => {
+      console.log('🔄 Polling for academic period changes in MyCourses...');
+      const periodData = await fetchActivePeriod();
+      
+      if (periodData.changed && studentData) {
+        console.log('✅ Academic period changed detected in MyCourses! Updating...');
+        // Update student data with new period
+        setStudentData({
+          ...studentData,
+          academic_year: periodData.year,
+          current_semester: periodData.sem
+        });
+      }
+    }, 30000); // Poll every 30 seconds
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [currentUser, studentData]);
 
   const studentInfo = {
     name: studentData?.name || currentUser?.username || "Student",

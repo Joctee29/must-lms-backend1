@@ -55,9 +55,25 @@ export const Assignments = () => {
           return;
         }
         
+        // Fetch active academic period first
+        let activeSemester = 1;
+        try {
+          const activePeriodResult = await fetch(`https://must-lms-backend.onrender.com/api/academic-periods/active`);
+          if (activePeriodResult.ok) {
+            const periodResult = await activePeriodResult.json();
+            if (periodResult.data && periodResult.data.semester) {
+              activeSemester = periodResult.data.semester;
+              console.log('Active semester from database:', activeSemester);
+            }
+          }
+        } catch (periodError) {
+          console.error('Error fetching academic period:', periodError);
+        }
+        
         let allPrograms = [];
         
         // Fetch lecturer's regular programs using lecturer_username parameter
+        // Backend already filters by active semester, so no need to filter again
         try {
           const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs?lecturer_username=${encodeURIComponent(currentUser.username)}`);
           
@@ -66,8 +82,9 @@ export const Assignments = () => {
             console.log('Regular Programs from API:', programsResult);
             
             if (programsResult.success && programsResult.data) {
+              // Backend already filters by active semester
               allPrograms = [...programsResult.data];
-              console.log(`✅ Found ${programsResult.data.length} regular programs`);
+              console.log(`✅ Found ${programsResult.data.length} regular programs (already filtered by backend)`);
             }
           } else {
             console.error('Failed to fetch regular programs:', programsResponse.status);

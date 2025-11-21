@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { 
@@ -44,6 +44,8 @@ const Timetable = () => {
   const [studentData, setStudentData] = useState<StudentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<TimetableEntry | null>(null);
+  const [activeAcademicYear, setActiveAcademicYear] = useState<string>("2024/2025");
+  const [activeSemester, setActiveSemester] = useState<number>(1);
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const timeSlots = [
@@ -52,8 +54,47 @@ const Timetable = () => {
   ];
   const API_BASE_URL = 'https://must-lms-backend.onrender.com/api';
 
+  // Track previous academic period to detect changes
+  const previousPeriodRef = useRef<{ year: string; semester: number } | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Get current user
   const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+
+  // Function to fetch active academic period
+  const fetchActivePeriod = async () => {
+    try {
+      const periodResponse = await fetch(`${API_BASE_URL}/academic-periods/active`);
+      if (periodResponse.ok) {
+        const periodResult = await periodResponse.json();
+        console.log('Academic Period Response (Timetable):', periodResult);
+        const period = periodResult.data || periodResult;
+        if (period && period.academic_year) {
+          const year = period.academic_year as string;
+          const sem = (period.semester as number) || 1;
+          
+          // Check if period has changed
+          const periodChanged = 
+            !previousPeriodRef.current ||
+            previousPeriodRef.current.year !== year ||
+            previousPeriodRef.current.semester !== sem;
+          
+          if (periodChanged) {
+            console.log('📢 Academic period changed in Timetable! Old:', previousPeriodRef.current, 'New:', { year, sem });
+            previousPeriodRef.current = { year, sem };
+            setActiveAcademicYear(year);
+            setActiveSemester(sem);
+            return { year, sem, changed: true };
+          }
+          
+          return { year, sem, changed: false };
+        }
+      }
+    } catch (periodError) {
+      console.error('Error fetching academic period for Timetable:', periodError);
+    }
+    return { year: activeAcademicYear, sem: activeSemester, changed: false };
+  };
 
   useEffect(() => {
     fetchStudentTimetable();
@@ -65,6 +106,9 @@ const Timetable = () => {
       console.log('=== STUDENT TIMETABLE DEBUG ===');
       console.log('Current User:', currentUser);
       console.log('Username:', currentUser.username);
+
+      // Fetch active academic period first
+      const periodData = await fetchActivePeriod();
 
       // 1. Get student information
       const studentsResponse = await fetch(`${API_BASE_URL}/students`);
@@ -85,7 +129,13 @@ const Timetable = () => {
         console.log('Student Course Name:', student?.course_name);
 
         if (student) {
-          setStudentData(student);
+          // Update student data with active academic period
+          const updatedStudent = {
+            ...student,
+            academic_year: periodData.year,
+            current_semester: periodData.sem
+          };
+          setStudentData(updatedStudent);
 
           // 2. Get programs for student's course
           const programsResponse = await fetch(`${API_BASE_URL}/programs`);
@@ -138,7 +188,7 @@ const Timetable = () => {
               department_name: 'Computer Science',
               college_name: 'College of Informatics',
               semester: 1,
-              academic_year: '2024/2025'
+              academic_year: periodData.year
             },
             {
               id: 2,
@@ -152,7 +202,7 @@ const Timetable = () => {
               department_name: 'Computer Science',
               college_name: 'College of Informatics',
               semester: 1,
-              academic_year: '2024/2025'
+              academic_year: periodData.year
             },
             {
               id: 3,
@@ -166,7 +216,7 @@ const Timetable = () => {
               department_name: 'Computer Science',
               college_name: 'College of Informatics',
               semester: 1,
-              academic_year: '2024/2025'
+              academic_year: periodData.year
             },
             {
               id: 4,
@@ -180,7 +230,7 @@ const Timetable = () => {
               department_name: 'Computer Science',
               college_name: 'College of Informatics',
               semester: 1,
-              academic_year: '2024/2025'
+              academic_year: periodData.year
             },
             {
               id: 5,
@@ -194,7 +244,7 @@ const Timetable = () => {
               department_name: 'Computer Science',
               college_name: 'College of Informatics',
               semester: 1,
-              academic_year: '2024/2025'
+              academic_year: periodData.year
             }
           ];
 
@@ -206,13 +256,16 @@ const Timetable = () => {
             course_name: 'Computer Science',
             department_name: 'Computer Science',
             college_name: 'College of Informatics',
-            current_semester: 1,
-            academic_year: '2024/2025'
+            current_semester: periodData.sem,
+            academic_year: periodData.year
           });
         }
       }
     } catch (error) {
       console.error('Error fetching student timetable:', error);
+      
+      // Fetch period data for demo
+      const periodData = await fetchActivePeriod();
       
       // Show demo timetable when server is unavailable
       const demoTimetable = [
@@ -228,7 +281,7 @@ const Timetable = () => {
           department_name: 'Computer Science',
           college_name: 'College of Informatics',
           semester: 1,
-          academic_year: '2024/2025'
+          academic_year: periodData.year
         },
         {
           id: 2,
@@ -242,7 +295,7 @@ const Timetable = () => {
           department_name: 'Computer Science',
           college_name: 'College of Informatics',
           semester: 1,
-          academic_year: '2024/2025'
+          academic_year: periodData.year
         }
       ];
 
@@ -254,13 +307,45 @@ const Timetable = () => {
         course_name: 'Computer Science',
         department_name: 'Computer Science',
         college_name: 'College of Informatics',
-        current_semester: 1,
-        academic_year: '2024/2025'
+        current_semester: periodData.sem,
+        academic_year: periodData.year
       });
     } finally {
       setLoading(false);
     }
   };
+
+  // Setup polling to detect academic period changes
+  useEffect(() => {
+    // Poll every 30 seconds to check for academic period changes
+    pollingIntervalRef.current = setInterval(async () => {
+      console.log('🔄 Polling for academic period changes in Timetable...');
+      const periodData = await fetchActivePeriod();
+      
+      if (periodData.changed && studentData) {
+        console.log('✅ Academic period changed detected in Timetable! Updating...');
+        // Update student data with new period
+        setStudentData({
+          ...studentData,
+          academic_year: periodData.year,
+          current_semester: periodData.sem
+        });
+        
+        // Also update timetable entries
+        setTimetableEntries(prev => prev.map(entry => ({
+          ...entry,
+          academic_year: periodData.year,
+          semester: periodData.sem
+        })));
+      }
+    }, 30000); // Poll every 30 seconds
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [studentData]);
 
   // Get entries for specific day and time slot
   const getEntriesForDayAndTime = (day: string, time: string) => {

@@ -199,9 +199,6 @@ const StudentRegisterPage = ({ onBack, onRegisterSuccess }: StudentRegisterPageP
               <CardDescription className="text-sm md:text-base">
                 Activate your account to access MUST LMS
               </CardDescription>
-              <CardDescription className="text-xs md:text-sm text-gray-600 mt-2">
-                Your account must be pre-registered by admin before you can activate it
-              </CardDescription>
             </CardHeader>
             
             <CardContent>
