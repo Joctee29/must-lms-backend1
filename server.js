@@ -918,6 +918,16 @@ app.post('/api/auth/login', async (req, res) => {
       if (result.rows.length > 0) {
         const student = result.rows[0];
         
+        // Check if account is locked
+        if (student.is_locked === true) {
+          console.log('❌ Login attempt on locked account:', username);
+          return res.status(403).json({ 
+            success: false, 
+            error: 'Account is locked. Please contact IT administrator to unlock your account.',
+            isLocked: true
+          });
+        }
+        
         // Check if account is active
         if (student.is_active === false) {
           return res.status(403).json({ 
@@ -962,6 +972,16 @@ app.post('/api/auth/login', async (req, res) => {
       
       if (result.rows.length > 0) {
         const lecturer = result.rows[0];
+        
+        // Check if account is locked
+        if (lecturer.is_locked === true) {
+          console.log('❌ Login attempt on locked account:', username);
+          return res.status(403).json({ 
+            success: false, 
+            error: 'Account is locked. Please contact IT administrator to unlock your account.',
+            isLocked: true
+          });
+        }
         
         // Check if account is active
         if (lecturer.is_active === false) {
@@ -2294,14 +2314,39 @@ app.post('/api/auth', loginLimiter, async (req, res) => {
     );
     
     if (result.rows.length > 0) {
-      const user = result.rows[0];
+      const passwordRecord = result.rows[0];
+      
+      // Check if user account is locked in the main user table
+      let userIsLocked = false;
+      
+      if (userType === 'student') {
+        const studentResult = await pool.query('SELECT is_locked FROM students WHERE id = $1', [passwordRecord.user_id]);
+        if (studentResult.rows.length > 0 && studentResult.rows[0].is_locked === true) {
+          userIsLocked = true;
+        }
+      } else if (userType === 'lecturer') {
+        const lecturerResult = await pool.query('SELECT is_locked FROM lecturers WHERE id = $1', [passwordRecord.user_id]);
+        if (lecturerResult.rows.length > 0 && lecturerResult.rows[0].is_locked === true) {
+          userIsLocked = true;
+        }
+      }
+      
+      // Block login if account is locked
+      if (userIsLocked) {
+        console.log('❌ Login attempt on locked account:', username);
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Account is locked. Please contact IT administrator to unlock your account.',
+          isLocked: true
+        });
+      }
       
       // Generate JWT access token
       const accessToken = jwt.sign(
         { 
-          userId: user.user_id, 
-          userType: user.user_type, 
-          username: user.username 
+          userId: passwordRecord.user_id, 
+          userType: passwordRecord.user_type, 
+          username: passwordRecord.username 
         },
         JWT_SECRET,
         { expiresIn: JWT_EXPIRES_IN }
@@ -2310,17 +2355,17 @@ app.post('/api/auth', loginLimiter, async (req, res) => {
       // Generate refresh token
       const refreshToken = jwt.sign(
         { 
-          userId: user.user_id, 
-          userType: user.user_type 
+          userId: passwordRecord.user_id, 
+          userType: passwordRecord.user_type 
         },
         JWT_SECRET,
         { expiresIn: JWT_REFRESH_EXPIRES_IN }
       );
       
       // Track active session
-      activeSessions.set(user.user_id, {
-        userType: user.user_type,
-        username: user.username,
+      activeSessions.set(passwordRecord.user_id, {
+        userType: passwordRecord.user_type,
+        username: passwordRecord.username,
         loginTime: new Date(),
         refreshToken
       });
@@ -2331,9 +2376,9 @@ app.post('/api/auth', loginLimiter, async (req, res) => {
       res.json({ 
         success: true, 
         data: {
-          userId: user.user_id,
-          username: user.username,
-          userType: user.user_type
+          userId: passwordRecord.user_id,
+          username: passwordRecord.username,
+          userType: passwordRecord.user_type
         },
         accessToken,
         refreshToken,
