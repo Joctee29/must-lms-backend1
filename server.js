@@ -8070,6 +8070,60 @@ app.post('/api/password-reset/manual', async (req, res) => {
   }
 });
 
+// Verify email exists in system - NEW ENDPOINT
+app.post('/api/password-reset/verify-email', async (req, res) => {
+  try {
+    const { email, userType } = req.body;
+    
+    console.log('=== VERIFYING EMAIL ===');
+    console.log('Email:', email);
+    console.log('User Type:', userType);
+    
+    if (!email || !userType) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Email and user type are required' 
+      });
+    }
+    
+    // Find user by email
+    let user = null;
+    
+    if (userType === 'student') {
+      const result = await pool.query('SELECT id, name, email FROM students WHERE email = $1', [email]);
+      if (result.rows.length > 0) {
+        user = result.rows[0];
+      }
+    } else if (userType === 'lecturer') {
+      const result = await pool.query('SELECT id, name, email FROM lecturers WHERE email = $1', [email]);
+      if (result.rows.length > 0) {
+        user = result.rows[0];
+      }
+    }
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `No ${userType} found with email: ${email}. Please verify your email address is correct.` 
+      });
+    }
+    
+    console.log('✅ Email verified for user:', user.name);
+    res.json({ 
+      success: true, 
+      message: 'Email verified',
+      data: {
+        userName: user.name,
+        email: user.email
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error verifying email:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Send reset code endpoint
 app.post('/api/password-reset/send-code', async (req, res) => {
   try {
