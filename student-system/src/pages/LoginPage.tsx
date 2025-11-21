@@ -150,7 +150,7 @@ const LoginPage = ({ onLogin, onBack }: LoginPageProps) => {
       
       if (result.success) {
         setResetStatus('sent');
-        setResetMessage(`✅ Reset code sent to ${forgotPasswordData.email}. Please check your email (and spam folder).`);
+        setResetMessage(`✅ Reset code sent to ${forgotPasswordData.email}. Please check your Gmail inbox.`);
         setUserType(result.data.userType || 'student');
         setTimeout(() => {
           setResetStep('code');
