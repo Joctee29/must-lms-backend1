@@ -7878,6 +7878,17 @@ const createPasswordResetTable = async () => {
       )
     `);
 
+    // Make sure reset_code column can hold longer markers (e.g. 'MANUAL_RESET')
+    try {
+      await pool.query(`
+        ALTER TABLE password_reset_logs
+        ALTER COLUMN reset_code TYPE VARCHAR(255)
+      `);
+      console.log('✅ reset_code column in password_reset_logs resized to VARCHAR(255)');
+    } catch (error) {
+      console.log('reset_code resize may not be needed or failed:', error.message);
+    }
+
     // Create admin_settings table for admin email
     await pool.query(`
       CREATE TABLE IF NOT EXISTS admin_settings (
