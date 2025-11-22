@@ -176,6 +176,30 @@ export const Discussions = () => {
     const matchesTab = activeTab === "all" || discussion.category === activeTab;
     const matchesSearch = discussion.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          discussion.content.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // For study-group category, filter by group membership
+    if (matchesTab && matchesSearch && discussion.category === "study-group") {
+      // Get current student's registration number
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      
+      // If discussion has group_members, check if student is in the list
+      if (discussion.group_members) {
+        try {
+          const groupMembers = JSON.parse(discussion.group_members);
+          // Check if current user's registration number is in the group members
+          const isMember = groupMembers.some(member => 
+            member.regNo && member.regNo.toLowerCase() === currentUser.registration_number?.toLowerCase()
+          );
+          return isMember;
+        } catch (e) {
+          console.error('Error parsing group members:', e);
+          return false;
+        }
+      }
+      // If no group_members field, show all study groups as fallback
+      return true;
+    }
+    
     return matchesTab && matchesSearch;
   });
 
