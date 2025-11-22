@@ -648,29 +648,46 @@ export const Discussions = () => {
                 </div>
               ) : (
                 <div className="space-y-4 max-h-60 overflow-y-auto">
-                  {replies.map((reply, index) => (
-                    <div key={reply.id || index} className="p-4 bg-white border rounded-lg shadow-sm">
-                      <div className="flex items-start gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-gray-600 text-white text-sm">
-                            {reply.author?.charAt(0)?.toUpperCase() || 'S'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-sm">{reply.author}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {reply.author_type === 'lecturer' ? 'Lecturer' : 'Student'}
-                            </Badge>
-                            <span className="text-xs text-gray-500">
-                              {formatTimeAgo(reply.created_at)}
-                            </span>
+                  {replies.map((reply, index) => {
+                    // Determine sender type and apply appropriate styling
+                    const senderType = reply.author_type === 'lecturer' ? 'lecturer' : 'student';
+                    
+                    const getBgColor = () => {
+                      return senderType === 'lecturer' 
+                        ? 'bg-orange-50 border-orange-200' 
+                        : 'bg-blue-50 border-blue-200';
+                    };
+
+                    const getBadgeColor = () => {
+                      return senderType === 'lecturer'
+                        ? 'bg-orange-100 text-orange-800'
+                        : 'bg-blue-100 text-blue-800';
+                    };
+
+                    return (
+                      <div key={reply.id || index} className={`p-4 border rounded-lg shadow-sm ${getBgColor()} transition-colors`}>
+                        <div className="flex items-start gap-3">
+                          <Avatar className="h-8 w-8 flex-shrink-0">
+                            <AvatarFallback className={`text-sm font-semibold ${getBadgeColor()}`}>
+                              {reply.author?.charAt(0)?.toUpperCase() || 'S'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-medium text-sm">{reply.author}</span>
+                              <Badge className={`text-xs ${getBadgeColor()}`}>
+                                {reply.author_type === 'lecturer' ? 'Lecturer' : 'Student'}
+                              </Badge>
+                              <span className="text-xs text-gray-500">
+                                {formatTimeAgo(reply.created_at)}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-700">{reply.content}</p>
                           </div>
-                          <p className="text-sm text-gray-700">{reply.content}</p>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

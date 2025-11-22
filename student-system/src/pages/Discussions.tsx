@@ -886,15 +886,74 @@ export const Discussions = () => {
               {replies.length === 0 ? (
                 <p className="text-center text-gray-500 py-4">No replies yet. Be the first to reply!</p>
               ) : (
-                replies.map((reply) => (
-                  <div key={reply.id} className="p-3 border rounded-lg">
-                    <p className="text-sm mb-2">{reply.content}</p>
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <span>By {reply.author}</span>
-                      <span>{formatTimeAgo(reply.created_at)}</span>
+                replies.map((reply) => {
+                  // Determine sender type and apply appropriate styling
+                  const getSenderType = () => {
+                    if (reply.created_by_type === 'lecturer') return 'lecturer';
+                    if (reply.created_by_type === 'admin') return 'admin';
+                    return 'student';
+                  };
+
+                  const senderType = getSenderType();
+                  
+                  // Apply different background colors based on sender type
+                  const getBgColor = () => {
+                    switch (senderType) {
+                      case 'lecturer':
+                        return 'bg-orange-50 border-orange-200';
+                      case 'admin':
+                        return 'bg-purple-50 border-purple-200';
+                      default:
+                        return 'bg-blue-50 border-blue-200';
+                    }
+                  };
+
+                  const getBadgeColor = () => {
+                    switch (senderType) {
+                      case 'lecturer':
+                        return 'bg-orange-100 text-orange-800';
+                      case 'admin':
+                        return 'bg-purple-100 text-purple-800';
+                      default:
+                        return 'bg-blue-100 text-blue-800';
+                    }
+                  };
+
+                  // Get display name - prefer lecturer_name if available, fallback to created_by
+                  const getDisplayName = () => {
+                    if (reply.lecturer_name) {
+                      return `${reply.lecturer_name} (Lecturer)`;
+                    }
+                    if (senderType === 'admin') {
+                      return `${reply.created_by || 'Admin'} (Admin)`;
+                    }
+                    return reply.created_by || 'Student';
+                  };
+
+                  return (
+                    <div key={reply.id} className={`p-4 border rounded-lg ${getBgColor()} transition-colors`}>
+                      <div className="flex items-start gap-3 mb-2">
+                        <Avatar className="h-8 w-8 flex-shrink-0">
+                          <AvatarFallback className={getBadgeColor()}>
+                            {reply.lecturer_name?.charAt(0)?.toUpperCase() || reply.created_by?.charAt(0)?.toUpperCase() || '?'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm">{getDisplayName()}</span>
+                            <Badge className={`text-xs ${getBadgeColor()}`}>
+                              {senderType.charAt(0).toUpperCase() + senderType.slice(1)}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-sm mb-2 text-gray-700">{reply.content}</p>
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <span>{formatTimeAgo(reply.created_at)}</span>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
