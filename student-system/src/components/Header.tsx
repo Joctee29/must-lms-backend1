@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, BookOpen, LogOut, Search, User, Video, Clock, Award } from "lucide-react";
+import { Bell, BookOpen, LogOut, Search, User, Video, Clock, Award, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,9 +19,11 @@ const API_BASE_URL = 'https://must-lms-backend.onrender.com/api';
 interface HeaderProps {
   onLogout?: () => void;
   onNavigate?: (section: string) => void;
+  isMobileMenuOpen?: boolean;
+  onMobileMenuChange?: (isOpen: boolean) => void;
 }
 
-export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
+export const Header = ({ onLogout, onNavigate, isMobileMenuOpen = false, onMobileMenuChange }: HeaderProps = {}) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [studentData, setStudentData] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -291,6 +293,17 @@ export const Header = ({ onLogout, onNavigate }: HeaderProps = {}) => {
 
         {/* Actions */}
         <div className="flex items-center space-x-2 md:space-x-4">
+          {/* Mobile Menu Button - Only visible on mobile */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="md:hidden"
+            onClick={() => onMobileMenuChange?.(!isMobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+
           {/* Notifications */}
           <DropdownMenu onOpenChange={handleNotificationOpen}>
             <DropdownMenuTrigger asChild>

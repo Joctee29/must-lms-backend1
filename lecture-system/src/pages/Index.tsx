@@ -22,6 +22,7 @@ import LoginPage from "@/pages/LoginPage";
 const Index = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Check if user is already logged in
   useEffect(() => {
@@ -273,11 +274,18 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onLogout={handleLogout} onNavigate={setActiveSection} />
+      <Header 
+        onLogout={handleLogout} 
+        onNavigate={setActiveSection}
+        isMobileMenuOpen={isMobileMenuOpen}
+        onMobileMenuChange={setIsMobileMenuOpen}
+      />
       <div className="flex">
         <Navigation 
           activeSection={activeSection} 
-          onSectionChange={setActiveSection} 
+          onSectionChange={setActiveSection}
+          isMobileMenuOpen={isMobileMenuOpen}
+          onMobileMenuChange={setIsMobileMenuOpen}
         />
         {renderContent()}
       </div>

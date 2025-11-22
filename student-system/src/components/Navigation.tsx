@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Home,
   BookOpen,
@@ -18,8 +17,6 @@ import {
   Search,
   CheckCircle,
   Megaphone,
-  Menu,
-  X,
   Video,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,11 +25,11 @@ import { cn } from "@/lib/utils";
 interface NavigationProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
+  isMobileMenuOpen?: boolean;
+  onMobileMenuChange?: (isOpen: boolean) => void;
 }
 
-export const Navigation = ({ activeSection, onSectionChange }: NavigationProps) => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
+export const Navigation = ({ activeSection, onSectionChange, isMobileMenuOpen = false, onMobileMenuChange }: NavigationProps) => {
   const navigationItems = [
     { id: "dashboard", label: "Dashboard", icon: Home },
     { id: "courses", label: "My Programs", icon: BookOpen },
@@ -49,25 +46,19 @@ export const Navigation = ({ activeSection, onSectionChange }: NavigationProps) 
 
   const handleNavClick = (sectionId: string) => {
     onSectionChange(sectionId);
-    setIsMobileMenuOpen(false); // Close menu after selection on mobile
+    // Close menu after selection on mobile
+    if (onMobileMenuChange) {
+      onMobileMenuChange(false);
+    }
   };
 
   return (
     <>
-      {/* Mobile Menu Button - Only visible on mobile */}
-      <button
-        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        className="md:hidden fixed top-24 left-4 z-50 text-gray-700 hover:text-gray-900 transition-colors"
-        aria-label="Toggle menu"
-      >
-        {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-      </button>
-
       {/* Overlay - Only on mobile when menu is open */}
       {isMobileMenuOpen && (
         <div
           className="md:hidden fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsMobileMenuOpen(false)}
+          onClick={() => onMobileMenuChange?.(false)}
         />
       )}
 
