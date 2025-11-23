@@ -541,13 +541,13 @@ export const Discussions = () => {
       </div>
 
       {/* Category Tabs - Mobile Responsive */}
-      <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="flex space-x-1 sm:space-x-2 overflow-x-auto pb-2 scrollbar-hide">
         {categories.map((category) => (
           <Button
             key={category.id}
             variant={activeTab === category.id ? "default" : "outline"}
             onClick={() => setActiveTab(category.id)}
-            className="whitespace-nowrap flex-shrink-0 text-xs sm:text-sm px-2 sm:px-4 py-1 sm:py-2"
+            className="whitespace-nowrap flex-shrink-0 text-[11px] xs:text-xs sm:text-sm px-1.5 xs:px-2 sm:px-4 py-0.5 xs:py-1 sm:py-2"
             size="sm"
           >
             <span className="hidden sm:inline">{category.label}</span>

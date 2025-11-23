@@ -104,48 +104,79 @@ export const AnnouncementManagement = () => {
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       
-      const announcementData = {
-        title: newAnnouncement.title,
-        content: newAnnouncement.content,
-        target_type: newAnnouncement.target_type,
-        target_value: newAnnouncement.target_value || null,
-        created_by: currentUser.username || 'Admin',
-        created_by_id: currentUser.id || null,
-        created_by_type: 'admin',
-        file_url: null,
-        file_name: null
-      };
-
-      // If PDF file is selected, handle file upload
+      // Check if file is selected - use FormData for multipart upload
       if (newAnnouncement.file) {
-        // For now, we'll just store the filename
-        announcementData.file_name = newAnnouncement.file.name;
-        announcementData.file_url = `/announcements/${newAnnouncement.file.name}`;
-      }
+        const formData = new FormData();
+        formData.append('title', newAnnouncement.title);
+        formData.append('content', newAnnouncement.content);
+        formData.append('target_type', newAnnouncement.target_type);
+        formData.append('target_value', newAnnouncement.target_value || '');
+        formData.append('created_by', currentUser.username || 'Admin');
+        formData.append('created_by_id', currentUser.id || '');
+        formData.append('created_by_type', 'admin');
+        formData.append('file', newAnnouncement.file);
 
-      const response = await fetch('https://must-lms-backend.onrender.com/api/announcements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(announcementData)
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setAnnouncements([result.data, ...announcements]);
-        
-        // Reset form
-        setNewAnnouncement({
-          title: "",
-          content: "",
-          target_type: "all",
-          target_value: "",
-          file: null
+        const response = await fetch('https://must-lms-backend.onrender.com/api/announcements', {
+          method: 'POST',
+          body: formData
         });
-        setShowCreateForm(false);
-        
-        alert('Announcement created successfully!');
+
+        if (response.ok) {
+          const result = await response.json();
+          setAnnouncements([result.data, ...announcements]);
+          
+          // Reset form
+          setNewAnnouncement({
+            title: "",
+            content: "",
+            target_type: "all",
+            target_value: "",
+            file: null
+          });
+          setShowCreateForm(false);
+          
+          alert('Announcement created successfully!');
+        } else {
+          alert('Failed to create announcement');
+        }
       } else {
-        alert('Failed to create announcement');
+        // No file - use JSON
+        const announcementData = {
+          title: newAnnouncement.title,
+          content: newAnnouncement.content,
+          target_type: newAnnouncement.target_type,
+          target_value: newAnnouncement.target_value || null,
+          created_by: currentUser.username || 'Admin',
+          created_by_id: currentUser.id || null,
+          created_by_type: 'admin',
+          file_url: null,
+          file_name: null
+        };
+
+        const response = await fetch('https://must-lms-backend.onrender.com/api/announcements', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(announcementData)
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          setAnnouncements([result.data, ...announcements]);
+          
+          // Reset form
+          setNewAnnouncement({
+            title: "",
+            content: "",
+            target_type: "all",
+            target_value: "",
+            file: null
+          });
+          setShowCreateForm(false);
+          
+          alert('Announcement created successfully!');
+        } else {
+          alert('Failed to create announcement');
+        }
       }
     } catch (error) {
       console.error('Error creating announcement:', error);
