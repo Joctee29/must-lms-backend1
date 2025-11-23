@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FileText, Video, Image, Download, Trash2, Eye, Search } from "lucide-react";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 
 // Materials Component
 const MaterialsComponent = () => {
@@ -358,6 +359,15 @@ const Index = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [activeSection, setActiveSection] = useState("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Session timeout hook: Logs out user after 10 minutes of inactivity when OUTSIDE app
+  useSessionTimeout({
+    timeoutMinutes: 10,
+    onTimeout: () => {
+      console.log('🚪 Session timeout: Logging out due to inactivity');
+      handleLogout();
+    }
+  });
 
   // Check if user is already logged in
   useEffect(() => {

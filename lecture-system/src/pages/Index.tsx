@@ -18,6 +18,7 @@ import { Announcements } from "@/pages/Announcements";
 import MySchedule from "@/pages/MySchedule";
 import { JedaNetworksCredit } from "@/components/JedaNetworksCredit";
 import LoginPage from "@/pages/LoginPage";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -52,6 +53,15 @@ const Index = () => {
     setIsLoggedIn(false);
     setActiveSection("dashboard");
   };
+
+  // Initialize session timeout - auto-logout after 10 minutes when outside app
+  useSessionTimeout({
+    timeoutMinutes: 10,
+    onTimeout: () => {
+      console.log('🚪 Session timeout: Logging out due to inactivity');
+      handleLogout();
+    }
+  });
 
   // Show login page if not logged in
   if (!isLoggedIn) {
