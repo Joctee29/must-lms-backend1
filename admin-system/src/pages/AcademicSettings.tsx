@@ -134,8 +134,11 @@ export const AcademicSettings = () => {
       
       setYearForm({ name: "", startDate: "", endDate: "", isActive: false });
 
-      // If marked as active, save to backend
-      if (newYear.isActive) {
+      // Only try to save to backend if there's also an active semester
+      // Otherwise just add locally and wait for semester to be added
+      const activeSemester = semesters.find(s => s.isActive);
+      
+      if (newYear.isActive && activeSemester) {
         const success = await handleSaveBoth(updatedYears, semesters);
         if (!success) {
           // Revert if save failed
@@ -146,7 +149,8 @@ export const AcademicSettings = () => {
           alert(`✅ Academic year "${newYear.name}" added and activated`);
         }
       } else {
-        alert(`✅ Academic year "${newYear.name}" added`);
+        // Just add locally - will save when semester is added
+        alert(`✅ Academic year "${newYear.name}" added.\n\nPlease add a semester to complete the setup.`);
       }
     } catch (error) {
       console.error("Error adding academic year:", error);
@@ -412,14 +416,14 @@ export const AcademicSettings = () => {
       const activeSemester = semestersToSave.find(s => s.isActive);
 
       if (!activeYear) {
-        console.error("❌ No active academic year selected. Please select an academic year and mark it as active.");
-        alert("Please select an active academic year first");
+        console.error("❌ No active academic year selected.");
+        alert("Please add and select an active academic year first");
         return false;
       }
 
       if (!activeSemester) {
-        console.error("❌ No active semester selected. Please select a semester and mark it as active.");
-        alert("Please select an active semester first");
+        console.error("❌ No active semester selected.");
+        alert("Please add and select an active semester first.\n\nAcademic year has been added locally. Add a semester to save to database.");
         return false;
       }
 
