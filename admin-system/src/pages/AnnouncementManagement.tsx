@@ -173,25 +173,25 @@ export const AnnouncementManagement = () => {
           }
         }
       } else {
-        // No file - use JSON endpoint
-        const announcementData = {
-          title: newAnnouncement.title.trim(),
-          content: newAnnouncement.content.trim(),
-          target_type: newAnnouncement.target_type,
-          target_value: newAnnouncement.target_value?.trim() || null,
-          created_by: currentUser.username || 'Admin',
-          created_by_id: currentUser.id || null,
-          created_by_type: 'admin',
-          file_url: null,
-          file_name: null
-        };
+        // No file - still use FormData for consistency with backend multipart handler
+        const formData = new FormData();
+        formData.append('title', newAnnouncement.title.trim());
+        formData.append('content', newAnnouncement.content.trim());
+        formData.append('target_type', newAnnouncement.target_type);
+        formData.append('target_value', newAnnouncement.target_value?.trim() || '');
+        formData.append('created_by', currentUser.username || 'Admin');
+        formData.append('created_by_id', currentUser.id ? currentUser.id.toString() : '');
+        formData.append('created_by_type', 'admin');
 
-        console.log('Creating announcement without file...', announcementData);
+        console.log('Creating announcement without file (using FormData)...');
+        console.log('Title:', newAnnouncement.title.trim());
+        console.log('Content:', newAnnouncement.content.trim());
+        console.log('Target type:', newAnnouncement.target_type);
+        console.log('Target value:', newAnnouncement.target_value);
 
-        const response = await fetch('https://must-lms-backend.onrender.com/api/announcements/json', {
+        const response = await fetch('https://must-lms-backend.onrender.com/api/announcements', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(announcementData)
+          body: formData
         });
 
         const responseText = await response.text();
