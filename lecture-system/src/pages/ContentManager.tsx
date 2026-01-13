@@ -421,18 +421,18 @@ export const ContentManager = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Content Manager</h1>
-        <Button onClick={() => setShowUploadForm(true)}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-2xl sm:text-3xl font-bold">Content Manager</h1>
+        <Button onClick={() => setShowUploadForm(true)} className="w-full sm:w-auto">
           <Upload className="h-4 w-4 mr-2" />
           Upload Content
         </Button>
       </div>
 
       {/* Search and Filter */}
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:space-x-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -442,13 +442,14 @@ export const ContentManager = () => {
             className="pl-10"
           />
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
           {["all", "video", "document", "image"].map((tab) => (
             <Button
               key={tab}
               variant={activeTab === tab ? "default" : "outline"}
               onClick={() => setActiveTab(tab)}
               size="sm"
+              className="flex-1 sm:flex-none"
             >
               {tab === "all" ? "All" : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </Button>
@@ -463,7 +464,7 @@ export const ContentManager = () => {
             <CardTitle>Upload New Content</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="text-sm font-medium">Content Title</label>
                 <Input
@@ -500,7 +501,7 @@ export const ContentManager = () => {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="text-sm font-medium flex items-center gap-2">
                   Content Type
@@ -509,30 +510,30 @@ export const ContentManager = () => {
                 <select
                   value={newContent.type}
                   onChange={(e) => handleContentTypeChange(e.target.value)}
-                  className="w-full border rounded px-3 py-2 bg-white"
+                  className="w-full border rounded px-3 py-2 bg-white text-sm"
                 >
                   <option value="document">📄 Document (PDF, DOC, PPT, Excel, ZIP)</option>
                   <option value="video">🎥 Video (MP4, AVI, MOV, WMV)</option>
                   <option value="image">🖼️ Image (JPG, PNG, GIF)</option>
                 </select>
                 <div className={`text-xs mt-1 p-2 rounded-md ${getTypeColor(newContent.type)}`}>
-                  <strong>Accepted files:</strong> {getFileTypeDescription(newContent.type)}
+                  <strong>Accepted:</strong> {getFileTypeDescription(newContent.type)}
                 </div>
               </div>
               <div>
                 <label className="text-sm font-medium">File Upload</label>
                 <Input
-                  key={fileInputKey} // This will reset the input when content type changes
+                  key={fileInputKey}
                   type="file"
                   onChange={handleFileUpload}
                   accept={getAcceptedFileTypes(newContent.type)}
-                  className="cursor-pointer"
+                  className="cursor-pointer text-sm"
                 />
                 <div className="text-xs mt-1">
                   {newContent.file ? (
                     <div className="flex items-center gap-2 p-2 bg-green-50 text-green-700 rounded-md">
                       <span>✅</span>
-                      <span>
+                      <span className="truncate">
                         <strong>Selected:</strong> {newContent.file.name} 
                         <span className="text-green-600"> ({(newContent.file.size / (1024 * 1024)).toFixed(2)} MB)</span>
                       </span>
@@ -566,14 +567,15 @@ export const ContentManager = () => {
               </div>
             )}
 
-            <div className="flex space-x-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Button 
                 onClick={handleUploadContent} 
                 disabled={!newContent.title || !newContent.file || !newContent.program || isUploading}
+                className="w-full sm:w-auto"
               >
                 Upload Content
               </Button>
-              <Button variant="outline" onClick={() => setShowUploadForm(false)}>
+              <Button variant="outline" onClick={() => setShowUploadForm(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
             </div>
@@ -582,7 +584,7 @@ export const ContentManager = () => {
       )}
 
       {/* Content Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {filteredContent.map((item) => (
           <Card key={item.id} className="hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
@@ -791,11 +793,11 @@ export const ContentManager = () => {
 
       {/* Supported File Types Info */}
       <Card className="border-green-200 bg-green-50">
-        <CardHeader>
-          <CardTitle className="text-green-800">Supported File Types</CardTitle>
+        <CardHeader className="p-3 sm:p-6">
+          <CardTitle className="text-green-800 text-base sm:text-lg">Supported File Types</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CardContent className="p-3 sm:p-6 pt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <h4 className="font-semibold mb-2 flex items-center">
                 <FileText className="h-4 w-4 mr-2" />

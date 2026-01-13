@@ -120,72 +120,21 @@ export const AnnouncementsNews = () => {
     }
   };
 
-  const handleDownloadPDF = async (announcement) => {
+  const handleDownloadPDF = (announcement) => {
     if (announcement.file_url) {
-      console.log('=== PDF DOWNLOAD DEBUG ===');
-      console.log('Original file_url:', announcement.file_url);
-      console.log('Announcement object:', announcement);
+      console.log('=== PDF DOWNLOAD ===');
+      console.log('File URL:', announcement.file_url);
+      console.log('Announcement:', announcement.title);
       
-      try {
-        // Enhanced file URL construction - backend serves files via /content path
-        let fileUrl = announcement.file_url;
-        
-        // Strategy 1: If file_url starts with /announcements/, replace with /content/
-        if (fileUrl.startsWith('/announcements/')) {
-          fileUrl = fileUrl.replace('/announcements/', '/content/');
-        }
-        // Strategy 2: If file_url already starts with /content/, keep it as is
-        else if (fileUrl.startsWith('/content/')) {
-          // Already correct, no change needed
-        }
-        // Strategy 3: If file_url doesn't start with /, add /content/ prefix
-        else if (!fileUrl.startsWith('/')) {
-          fileUrl = `/content/${fileUrl}`;
-        }
-        
-        const fullUrl = `https://must-lms-backend.onrender.com${fileUrl}`;
-        console.log('Fixed file URL:', fullUrl);
-        
-        // Fetch the file with proper headers
-        const response = await fetch(fullUrl);
-        
-        if (!response.ok) {
-          // If 404 or other error, try without /content prefix
-          if (response.status === 404 && fileUrl.includes('/content/')) {
-            console.log('File not found at /content path, trying original path...');
-            const alternativeUrl = `https://must-lms-backend.onrender.com${announcement.file_url}`;
-            const altResponse = await fetch(alternativeUrl);
-            if (!altResponse.ok) {
-              throw new Error(`HTTP error! status: ${altResponse.status}`);
-            }
-            const blob = await altResponse.blob();
-            downloadBlob(blob, announcement);
-            return;
-          }
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const blob = await response.blob();
-        downloadBlob(blob, announcement);
-        
-      } catch (error) {
-        console.error('Error downloading PDF:', error);
-        alert('Failed to download PDF. Please try again or contact support.');
-      }
+      // Simple and reliable download using window.open
+      const fullUrl = `https://must-lms-backend.onrender.com${announcement.file_url}`;
+      console.log('Opening URL:', fullUrl);
+      
+      // Open in new tab - browser will handle download
+      window.open(fullUrl, '_blank');
+    } else {
+      alert('PDF file not available for this announcement.');
     }
-  };
-
-  const downloadBlob = (blob: Blob, announcement) => {
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${announcement.title || 'announcement'}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    
-    console.log('PDF download completed for:', announcement.title);
   };
 
   if (loading) {

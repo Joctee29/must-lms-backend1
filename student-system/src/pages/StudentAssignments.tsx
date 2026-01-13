@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { 
   FileText, Clock, CheckCircle, AlertTriangle, Calendar, User, BookOpen, 
-  Award, Upload, Type, Send, ArrowLeft, Download
+  Award, Upload, Type, Send, ArrowLeft, Download, Eye
 } from "lucide-react";
 
 interface Assignment {
@@ -26,6 +26,8 @@ interface Assignment {
 interface Submission {
   id: number;
   assignment_id: number;
+  assignment_title?: string;
+  program_name?: string;
   submission_type: 'text' | 'pdf';
   text_content?: string;
   file_path?: string;
@@ -33,6 +35,7 @@ interface Submission {
   submitted_at: string;
   points_awarded: number;
   feedback?: string;
+  deadline?: string;
 }
 
 export const StudentAssignments = () => {
@@ -42,6 +45,7 @@ export const StudentAssignments = () => {
   const [loading, setLoading] = useState(true);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'submit'>('list');
+  const [deletingSubmission, setDeletingSubmission] = useState<number | null>(null);
   
   // Submission form state
   const [textSubmission, setTextSubmission] = useState('');
@@ -52,6 +56,18 @@ export const StudentAssignments = () => {
     fetchAssignments();
     fetchSubmittedAssignments();
   }, []);
+
+  // Filter out submitted assignments from available list
+  const getAvailableAssignments = () => {
+    const submittedIds = submittedAssignments.map(sub => sub.assignment_id);
+    return assignments.filter(assignment => {
+      const assignmentId = assignment.original_id || assignment.id;
+      // Check if this assignment has been submitted
+      return !submittedIds.includes(assignmentId) && 
+             !submittedIds.includes(Number(assignmentId)) &&
+             !submittedIds.includes(String(assignmentId));
+    });
+  };
 
   const fetchAssignments = async () => {
     try {
@@ -188,15 +204,79 @@ export const StudentAssignments = () => {
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       
-      if (!currentUser.id) {
+      if (!currentUser.id && !currentUser.username) {
         return;
       }
 
-      // This would need a new endpoint to get student's submissions
-      // For now, we'll use empty array
-      setSubmittedAssignments([]);
+      // Fetch student's submitted assignments from backend
+      const response = await fetch(`https://must-lms-backend.onrender.com/api/assignment-submissions?student_id=${currentUser.id || ''}&student_name=${encodeURIComponent(currentUser.username || '')}`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Fetched submitted assignments:', result);
+        
+        if (result.success && result.data) {
+          const formattedSubmissions = result.data.map((sub: any) => ({
+            id: sub.id,
+            assignment_id: sub.assignment_id,
+            assignment_title: sub.assignment_title || 'Assignment',
+            program_name: sub.program_name || sub.student_program || '',
+            submission_type: sub.submission_type || 'text',
+            text_content: sub.text_content,
+            file_path: sub.file_path,
+            file_name: sub.file_name,
+            submitted_at: sub.submitted_at || sub.created_at,
+            points_awarded: sub.points_awarded || 0,
+            feedback: sub.feedback,
+            deadline: sub.deadline
+          }));
+          
+          setSubmittedAssignments(formattedSubmissions);
+        }
+      }
     } catch (error) {
       console.error('Error fetching submitted assignments:', error);
+    }
+  };
+
+  // Delete submission function
+  const handleDeleteSubmission = async (submissionId: number, assignmentId: number) => {
+    const confirmDelete = window.confirm(
+      '🗑️ DELETE SUBMISSION?\n\n' +
+      'This will:\n' +
+      '• Remove your submission permanently\n' +
+      '• Delete from lecturer\'s view as well\n' +
+      '• Allow you to resubmit if deadline hasn\'t passed\n\n' +
+      'Are you sure you want to delete this submission?'
+    );
+
+    if (!confirmDelete) return;
+
+    setDeletingSubmission(submissionId);
+    
+    try {
+      const response = await fetch(`https://must-lms-backend.onrender.com/api/assignment-submissions/${submissionId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        // Remove from submitted list
+        setSubmittedAssignments(prev => prev.filter(sub => sub.id !== submissionId));
+        
+        // Refresh available assignments to show the assignment again
+        await fetchAssignments();
+        
+        alert('✅ Submission deleted successfully!\n\nYou can now resubmit if the deadline hasn\'t passed.');
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        alert(`Failed to delete submission: ${errorData.error || 'Please try again.'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting submission:', error);
+      alert('Error deleting submission. Please try again.');
+    } finally {
+      setDeletingSubmission(null);
     }
   };
 
@@ -509,7 +589,7 @@ export const StudentAssignments = () => {
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          Available ({assignments.length})
+          Available ({getAvailableAssignments().length})
         </button>
         <button
           onClick={() => setActiveTab('submitted')}
@@ -532,7 +612,7 @@ export const StudentAssignments = () => {
         <div className="space-y-4">
           {activeTab === 'available' && (
             <>
-              {assignments.length === 0 ? (
+              {getAvailableAssignments().length === 0 ? (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <FileText className="h-12 w-12 text-gray-400 mb-4" />
@@ -543,7 +623,7 @@ export const StudentAssignments = () => {
                   </CardContent>
                 </Card>
               ) : (
-                assignments.map((assignment) => (
+                getAvailableAssignments().map((assignment) => (
                   <Card key={assignment.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-4 sm:p-6">
                       <div className="flex flex-col sm:flex-row sm:items-start gap-4">
@@ -593,9 +673,9 @@ export const StudentAssignments = () => {
                             className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto text-sm"
                             disabled={new Date(assignment.deadline) <= new Date()}
                           >
-                            <Send className="h-4 w-4 mr-2" />
-                            <span className="hidden sm:inline">Submit Assignment</span>
-                            <span className="sm:hidden">Submit</span>
+                            <Eye className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">View Assignment</span>
+                            <span className="sm:hidden">View</span>
                           </Button>
                         </div>
                       </div>
@@ -607,15 +687,100 @@ export const StudentAssignments = () => {
           )}
 
           {activeTab === 'submitted' && (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <CheckCircle className="h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No submitted assignments</h3>
-                <p className="text-gray-500 text-center">
-                  Your submitted assignments will appear here
-                </p>
-              </CardContent>
-            </Card>
+            <>
+              {submittedAssignments.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <CheckCircle className="h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No submitted assignments</h3>
+                    <p className="text-gray-500 text-center">
+                      Your submitted assignments will appear here
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                submittedAssignments.map((submission) => {
+                  const deadlinePassed = submission.deadline ? new Date(submission.deadline) <= new Date() : true;
+                  
+                  return (
+                    <Card key={submission.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                          <div className="flex-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                              <h3 className="text-lg sm:text-xl font-semibold">{submission.assignment_title}</h3>
+                              <Badge className="bg-green-100 text-green-800 w-fit">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Submitted
+                              </Badge>
+                            </div>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 mb-3">
+                              <div className="flex items-center gap-1">
+                                <BookOpen className="h-4 w-4" />
+                                {submission.program_name || 'N/A'}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4" />
+                                Submitted: {new Date(submission.submitted_at).toLocaleString()}
+                              </div>
+                              {submission.submission_type === 'pdf' && submission.file_name && (
+                                <div className="flex items-center gap-1">
+                                  <Upload className="h-4 w-4" />
+                                  {submission.file_name}
+                                </div>
+                              )}
+                            </div>
+                            {submission.text_content && (
+                              <div className="bg-gray-50 p-3 rounded-lg mb-3">
+                                <p className="text-sm text-gray-700 line-clamp-3">{submission.text_content}</p>
+                              </div>
+                            )}
+                            {submission.feedback && (
+                              <div className="bg-blue-50 p-3 rounded-lg">
+                                <p className="text-sm font-medium text-blue-800 mb-1">Lecturer Feedback:</p>
+                                <p className="text-sm text-blue-700">{submission.feedback}</p>
+                              </div>
+                            )}
+                            {submission.points_awarded > 0 && (
+                              <div className="mt-2">
+                                <Badge className="bg-blue-100 text-blue-800">
+                                  <Award className="h-3 w-3 mr-1" />
+                                  Score: {submission.points_awarded} points
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-2 w-full sm:w-auto">
+                            <Button 
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteSubmission(submission.id, submission.assignment_id)}
+                              disabled={deletingSubmission === submission.id}
+                              className="text-red-600 hover:text-red-700 border-red-300 hover:border-red-400 w-full sm:w-auto"
+                            >
+                              {deletingSubmission === submission.id ? (
+                                <>Deleting...</>
+                              ) : (
+                                <>
+                                  <AlertTriangle className="h-4 w-4 mr-1" />
+                                  Delete
+                                </>
+                              )}
+                            </Button>
+                            {!deadlinePassed && (
+                              <p className="text-xs text-green-600 text-center">Can resubmit after delete</p>
+                            )}
+                            {deadlinePassed && (
+                              <p className="text-xs text-red-600 text-center">Deadline passed</p>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </>
           )}
         </div>
       )}

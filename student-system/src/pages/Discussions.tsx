@@ -391,7 +391,23 @@ export const Discussions = () => {
       const response = await fetch(`https://must-lms-backend.onrender.com/api/discussions/${discussion.id}/replies`);
       if (response.ok) {
         const result = await response.json();
-        setReplies(result.data || []);
+        let repliesData = result.data || [];
+        
+        // Sort replies: student replies first, then lecturer replies
+        repliesData.sort((a, b) => {
+          const aIsLecturer = a.author_type === 'lecturer' || a.lecturer_name;
+          const bIsLecturer = b.author_type === 'lecturer' || b.lecturer_name;
+          
+          // If types are different, student (false) comes before lecturer (true)
+          if (aIsLecturer !== bIsLecturer) {
+            return aIsLecturer ? 1 : -1;
+          }
+          
+          // If same type, keep original order (by creation time)
+          return 0;
+        });
+        
+        setReplies(repliesData);
       }
     } catch (error) {
       console.error('Error fetching replies:', error);
@@ -541,26 +557,36 @@ export const Discussions = () => {
       </div>
 
       {/* Category Tabs - Mobile Responsive */}
-      <div className="flex space-x-1 sm:space-x-2 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="hidden sm:grid grid-cols-3 md:grid-cols-5 gap-2">
         {categories.map((category) => (
           <Button
             key={category.id}
             variant={activeTab === category.id ? "default" : "outline"}
             onClick={() => setActiveTab(category.id)}
-            className="whitespace-nowrap flex-shrink-0 text-[11px] xs:text-xs sm:text-sm px-1.5 xs:px-2 sm:px-4 py-0.5 xs:py-1 sm:py-2"
+            className="whitespace-normal flex flex-col items-center justify-center text-xs sm:text-sm px-2 py-3 h-auto"
             size="sm"
           >
-            <span className="hidden sm:inline">{category.label}</span>
-            <span className="sm:hidden">
-              {category.id === "all" ? "All" : 
-               category.id === "help" ? "Help" :
-               category.id === "study-group" ? "Groups" :
-               category.id === "resources" ? "Resources" :
-               "General"}
-            </span>
-            <Badge variant="secondary" className="ml-1 sm:ml-2 text-xs px-1 sm:px-2">
-              {category.count}
-            </Badge>
+            <div className="flex flex-col items-center gap-1">
+              <span className="font-medium text-center">{category.label}</span>
+              <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                {category.count}
+              </Badge>
+            </div>
+          </Button>
+        ))}
+      </div>
+
+      {/* Mobile Category Tabs - Horizontal Scroll */}
+      <div className="sm:hidden flex gap-2 overflow-x-auto pb-2 -mx-6 px-6 scrollbar-hide">
+        {categories.map((category) => (
+          <Button
+            key={category.id}
+            variant={activeTab === category.id ? "default" : "outline"}
+            onClick={() => setActiveTab(category.id)}
+            className="whitespace-nowrap flex-shrink-0 text-xs px-2.5 py-1.5 h-8"
+            size="sm"
+          >
+            <span className="font-medium">{category.id === "all" ? "All" : category.id === "help" ? "Help" : category.id === "study-group" ? "Groups" : category.id === "resources" ? "Res" : "Gen"}</span>
           </Button>
         ))}
       </div>
@@ -771,93 +797,103 @@ export const Discussions = () => {
       )}
 
       {/* Discussions List */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {filteredDiscussions.map((discussion) => (
           <Card key={discussion.id} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-start space-x-4">
+            <CardContent className="p-3 sm:p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
                 {/* Avatar */}
-                <Avatar>
-                  <AvatarFallback className="bg-gradient-to-r from-primary to-secondary text-white">
+                <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 hidden sm:block">
+                  <AvatarFallback className="bg-gradient-to-r from-primary to-secondary text-white text-sm">
                     {discussion.authorInitials}
                   </AvatarFallback>
                 </Avatar>
 
                 {/* Content */}
-                <div className="flex-1 space-y-3">
+                <div className="flex-1 space-y-2 sm:space-y-3 min-w-0">
                   {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <div className="flex items-start gap-2">
                         {discussion.isPinned && (
-                          <Pin className="h-4 w-4 text-yellow-500" />
+                          <Pin className="h-4 w-4 text-yellow-500 flex-shrink-0 mt-0.5" />
                         )}
-                        <h3 className="font-semibold text-lg">{discussion.title}</h3>
+                        <h3 className="font-semibold text-base sm:text-lg break-words">{discussion.title}</h3>
                       </div>
-                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                        <span>{discussion.author}</span>
-                        <span>•</span>
-                        <span>{discussion.course}</span>
-                        <span>•</span>
-                        <Clock className="h-3 w-3" />
-                        <span>{formatTimeAgo(discussion.createdAt)}</span>
+                      <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
+                        <span className="truncate">{discussion.author}</span>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="truncate">{discussion.course}</span>
+                        <span className="hidden sm:inline">•</span>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3 flex-shrink-0" />
+                          <span>{formatTimeAgo(discussion.createdAt)}</span>
+                        </div>
                       </div>
                     </div>
-                    <Badge className={getCategoryColor(discussion.category)}>
+                    <Badge className={`${getCategoryColor(discussion.category)} flex-shrink-0 text-xs sm:text-sm`}>
                       {discussion.category}
                     </Badge>
                   </div>
 
                   {/* Content */}
-                  <p className="text-muted-foreground">{discussion.content}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 sm:line-clamp-none">{discussion.content}</p>
 
                   {/* Stats and Actions */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                      <div className="flex items-center space-x-1">
-                        <MessageSquare className="h-4 w-4" />
-                        <span>{discussion.replies} replies</span>
+                  <div className="flex flex-col gap-2 sm:gap-3 pt-1">
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span>{discussion.replies}</span>
+                        <span className="hidden sm:inline">replies</span>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <ThumbsUp className="h-4 w-4" />
+                      <div className="flex items-center gap-1">
+                        <ThumbsUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                         <span>{discussion.likes}</span>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <Eye className="h-4 w-4" />
-                        <span>{discussion.views} views</span>
+                      <div className="flex items-center gap-1">
+                        <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span>{discussion.views}</span>
+                        <span className="hidden sm:inline">views</span>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <Clock className="h-4 w-4" />
-                        <span>Last activity {formatTimeAgo(discussion.lastActivity)}</span>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span className="truncate">Last {formatTimeAgo(discussion.lastActivity)}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    {/* Actions */}
+                    <div className="flex flex-wrap items-center gap-1 sm:gap-2">
                       <Button 
                         variant="ghost" 
                         size="sm"
                         onClick={() => handleLike(discussion.id)}
+                        className="text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9"
                       >
-                        <ThumbsUp className="h-4 w-4 mr-1" />
-                        Like ({discussion.likes})
+                        <ThumbsUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        <span className="hidden xs:inline">Like</span>
+                        <span className="xs:hidden">{discussion.likes}</span>
                       </Button>
                       <Button 
                         variant="ghost" 
                         size="sm"
                         onClick={() => handleViewReplies(discussion)}
+                        className="text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9"
                       >
-                        <Reply className="h-4 w-4 mr-1" />
-                        Reply ({discussion.replies})
+                        <Reply className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        <span className="hidden xs:inline">Reply</span>
+                        <span className="xs:hidden">{discussion.replies}</span>
                       </Button>
                       {canDeleteDiscussion(discussion) && (
                         <Button 
                           variant="ghost" 
                           size="sm"
                           onClick={() => handleDeleteDiscussion(discussion.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9"
                         >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Delete
+                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                          <span className="hidden xs:inline">Delete</span>
                         </Button>
                       )}
                     </div>
@@ -913,26 +949,34 @@ export const Discussions = () => {
                 replies.map((reply) => {
                   // Determine sender type and apply appropriate styling
                   const getSenderType = () => {
-                    if (reply.created_by_type === 'lecturer') return 'lecturer';
-                    if (reply.created_by_type === 'admin') return 'admin';
+                    if (reply.author_type === 'lecturer') return 'lecturer';
+                    if (reply.author_type === 'admin') return 'admin';
                     return 'student';
                   };
 
                   const senderType = getSenderType();
+                  const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+                  const isOwnMessage = reply.author_id === currentUser.id || reply.created_by === currentUser.username;
                   
                   // Apply different background colors based on sender type
                   const getBgColor = () => {
+                    if (isOwnMessage && senderType === 'student') {
+                      return 'bg-cyan-50 border-cyan-300'; // Own messages (lighter cyan)
+                    }
                     switch (senderType) {
                       case 'lecturer':
-                        return 'bg-orange-50 border-orange-200';
+                        return 'bg-orange-50 border-orange-300'; // Lecturer messages (orange)
                       case 'admin':
-                        return 'bg-purple-50 border-purple-200';
+                        return 'bg-purple-50 border-purple-300'; // Admin messages (purple)
                       default:
-                        return 'bg-blue-50 border-blue-200';
+                        return 'bg-blue-50 border-blue-300'; // Other student messages (blue)
                     }
                   };
 
                   const getBadgeColor = () => {
+                    if (isOwnMessage && senderType === 'student') {
+                      return 'bg-cyan-200 text-cyan-900'; // Own messages badge
+                    }
                     switch (senderType) {
                       case 'lecturer':
                         return 'bg-orange-100 text-orange-800';
@@ -943,15 +987,32 @@ export const Discussions = () => {
                     }
                   };
 
-                  // Get display name - prefer lecturer_name if available, fallback to created_by
+                  // Get display name with proper info
                   const getDisplayName = () => {
-                    if (reply.lecturer_name) {
-                      return `${reply.lecturer_name} (Lecturer)`;
+                    // Lecturer check - show program name instead of lecturer name
+                    if (reply.lecturer_name || senderType === 'lecturer') {
+                      return `${selectedDiscussion.program || 'Program'}`;
                     }
+                    // Admin check
                     if (senderType === 'admin') {
-                      return `${reply.created_by || 'Admin'} (Admin)`;
+                      return `${reply.author || 'Admin'}`;
                     }
-                    return reply.created_by || 'Student';
+                    // For students, show name and leg no if available
+                    if (reply.leg_no) {
+                      return `${reply.author || 'Student'} (${reply.leg_no})`;
+                    }
+                    return reply.author || 'Student';
+                  };
+
+                  // Get badge label with better lecturer detection
+                  const getBadgeLabel = () => {
+                    if (senderType === 'lecturer' || reply.lecturer_name) return 'LECTURER';
+                    if (senderType === 'admin') return 'Admin';
+                    // For students, show STUDENT with registration number if available
+                    if (reply.leg_no) {
+                      return `STUDENT (${reply.leg_no})`;
+                    }
+                    return 'STUDENT';
                   };
 
                   return (
@@ -959,14 +1020,14 @@ export const Discussions = () => {
                       <div className="flex items-start gap-3 mb-2">
                         <Avatar className="h-8 w-8 flex-shrink-0">
                           <AvatarFallback className={getBadgeColor()}>
-                            {reply.lecturer_name?.charAt(0)?.toUpperCase() || reply.created_by?.charAt(0)?.toUpperCase() || '?'}
+                            {reply.lecturer_name?.charAt(0)?.toUpperCase() || reply.author?.charAt(0)?.toUpperCase() || '?'}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold text-sm">{getDisplayName()}</span>
                             <Badge className={`text-xs ${getBadgeColor()}`}>
-                              {senderType.charAt(0).toUpperCase() + senderType.slice(1)}
+                              {getBadgeLabel()}
                             </Badge>
                           </div>
                         </div>

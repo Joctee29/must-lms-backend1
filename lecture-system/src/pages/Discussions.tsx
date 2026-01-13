@@ -322,37 +322,30 @@ export const Discussions = () => {
         />
       </div>
 
-      {/* Category Tabs - Mobile Optimized */}
-      <div className="relative">
-        <div className="flex space-x-1.5 sm:space-x-2 overflow-x-auto pb-1 sm:pb-2 scrollbar-hide">
-          {categories.map((category) => (
-            <Button
-              key={category.id}
-              variant={activeTab === category.id ? "default" : "outline"}
-              onClick={() => setActiveTab(category.id)}
-              className="whitespace-nowrap flex-shrink-0 text-[10px] xs:text-xs sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1.5 h-auto"
-              size="sm"
-            >
-              <span className="hidden xs:inline">
-                {category.id === "all" ? "All" : 
-                 category.id === "help" ? "Help" :
-                 category.id === "study-group" ? "Groups" :
+      {/* Category Tabs - Responsive Layout */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+        {categories.map((category) => (
+          <Button
+            key={category.id}
+            variant={activeTab === category.id ? "default" : "outline"}
+            onClick={() => setActiveTab(category.id)}
+            className="whitespace-normal flex flex-col items-center justify-center text-xs sm:text-sm px-2 py-2 h-auto"
+            size="sm"
+          >
+            <div className="flex flex-col items-center gap-1">
+              <span className="font-medium text-center text-xs sm:text-sm">
+                {category.id === "all" ? "All Discussions" : 
+                 category.id === "help" ? "Help & Support" :
+                 category.id === "study-group" ? "Study Groups" :
                  category.id === "resources" ? "Resources" :
                  "General"}
               </span>
-              <span className="xs:hidden">
-                {category.id === "all" ? "All" : 
-                 category.id === "help" ? "Help" :
-                 category.id === "study-group" ? "Grp" :
-                 category.id === "resources" ? "Res" :
-                 "Gen"}
-              </span>
-              <Badge variant={activeTab === category.id ? "secondary" : "outline"} className="ml-1 text-[10px] sm:text-xs px-1 sm:px-1.5 py-0">
+              <Badge variant={activeTab === category.id ? "secondary" : "outline"} className="text-xs px-1.5 py-0">
                 {category.count}
               </Badge>
-            </Button>
-          ))}
-        </div>
+            </div>
+          </Button>
+        ))}
       </div>
 
 
@@ -398,105 +391,95 @@ export const Discussions = () => {
       )}
 
       {/* Discussions List */}
-      <div className="space-y-2 sm:space-y-3">
+      <div className="space-y-3 sm:space-y-4">
         {filteredDiscussions.map((discussion) => (
-          <Card 
-            key={discussion.id} 
-            className="hover:shadow-md transition-shadow cursor-pointer overflow-hidden"
-            onClick={() => handleViewReplies(discussion)}
-          >
+          <Card key={discussion.id} className="hover:shadow-md transition-shadow">
             <CardContent className="p-3 sm:p-4 md:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-start space-y-3 sm:space-y-0 sm:space-x-4">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
                 {/* Avatar */}
-                <Avatar className="hidden sm:block">
-                  <AvatarFallback className="bg-gradient-to-r from-primary to-secondary text-white">
+                <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 hidden sm:block">
+                  <AvatarFallback className="bg-gradient-to-r from-primary to-secondary text-white text-sm">
                     {discussion.authorInitials}
                   </AvatarFallback>
                 </Avatar>
 
                 {/* Content */}
-                <div className="flex-1 space-y-2 sm:space-y-3">
+                <div className="flex-1 space-y-2 sm:space-y-3 min-w-0">
                   {/* Header */}
-                  <div className="flex flex-col gap-2">
-                    <div className="space-y-1 flex-1">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                    <div className="space-y-1 flex-1 min-w-0">
                       <div className="flex items-start gap-2">
                         {discussion.isPinned && (
-                          <Pin className="h-4 w-4 text-yellow-500 flex-shrink-0 mt-1" />
+                          <Pin className="h-4 w-4 text-yellow-500 flex-shrink-0 mt-0.5" />
                         )}
                         <h3 className="font-semibold text-base sm:text-lg break-words">{discussion.title}</h3>
                       </div>
                       <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
-                        <span className="truncate max-w-[120px] sm:max-w-none">{discussion.author}</span>
+                        <span className="truncate">{discussion.author}</span>
                         <span className="hidden sm:inline">•</span>
-                        <span className="truncate max-w-[150px] sm:max-w-none">{discussion.course}</span>
+                        <span className="truncate">{discussion.program}</span>
                         <span className="hidden sm:inline">•</span>
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3 flex-shrink-0" />
-                          <span className="whitespace-nowrap">{formatTimeAgo(discussion.createdAt)}</span>
+                          <span>{formatTimeAgo(discussion.createdAt)}</span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5">
-                      <div className="flex items-start sm:items-center space-x-2">
-                        <div className={`${getCategoryColor(discussion.category)} text-[10px] xs:text-xs px-1.5 xs:px-2 py-0.5 rounded-full flex items-center space-x-1 flex-shrink-0`}>
-                          {getCategoryIcon(discussion.category)}
-                          <span className="hidden xs:inline">
-                            {discussion.category === 'study-group' ? 'Group' : 
-                             discussion.category === 'resources' ? 'Resource' : 
-                             discussion.category.charAt(0).toUpperCase() + discussion.category.slice(1)}
-                          </span>
-                        </div>
-                        <h3 className="font-medium text-sm sm:text-base leading-tight line-clamp-2">{discussion.title}</h3>
-                      </div>
-                      <div className="flex items-center justify-end sm:justify-start space-x-2 text-[10px] xs:text-xs text-muted-foreground">
-                        <span>{formatTimeAgo(discussion.created_at)}</span>
-                      </div>
-                    </div>
+                    <Badge className={`${getCategoryColor(discussion.category)} flex-shrink-0 text-xs sm:text-sm`}>
+                      {discussion.category}
+                    </Badge>
                   </div>
 
                   {/* Content */}
-                  <p className="text-sm sm:text-base text-muted-foreground line-clamp-2 sm:line-clamp-none">{discussion.content}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 sm:line-clamp-none">{discussion.content}</p>
 
                   {/* Study Group Info */}
                   {discussion.category === 'study-group' && discussion.groupName && (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded">
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded">
                       <div className="flex items-center gap-2 mb-1">
-                        <UserPlus className="h-4 w-4 text-green-600" />
-                        <span className="font-medium text-green-800">Study Group: {discussion.groupName}</span>
+                        <UserPlus className="h-4 w-4 text-blue-600" />
+                        <span className="font-medium text-blue-800">Study Group: {discussion.groupName}</span>
                       </div>
-                      <p className="text-sm text-green-700">Leader: {discussion.groupLeader}</p>
-                      {discussion.groupMembers && discussion.groupMembers.length > 0 && (
-                        <p className="text-sm text-green-700">Members: {discussion.groupMembers.length}</p>
-                      )}
+                      <p className="text-sm text-blue-700">Leader: {discussion.groupLeader}</p>
                     </div>
                   )}
 
                   {/* Stats and Actions */}
-                  <div className="flex flex-col gap-3">
-                    {/* Stats - Mobile Optimized Grid */}
-                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 text-xs text-muted-foreground">
+                  <div className="flex flex-col gap-2 sm:gap-3 pt-1">
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
-                        <MessageSquare className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span className="whitespace-nowrap">{discussion.replies}</span>
+                        <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span>{discussion.replies}</span>
                         <span className="hidden sm:inline">replies</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <ThumbsUp className="h-3.5 w-3.5 flex-shrink-0" />
+                        <ThumbsUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                         <span>{discussion.likes}</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Eye className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span className="whitespace-nowrap">{discussion.views}</span>
+                        <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span>{discussion.views}</span>
                         <span className="hidden sm:inline">views</span>
                       </div>
-                      <div className="flex items-center gap-1 col-span-2 sm:col-span-1">
-                        <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                         <span className="truncate">Last {formatTimeAgo(discussion.lastActivity)}</span>
                       </div>
                     </div>
 
-                    {/* Actions - Full Width on Mobile */}
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {/* Actions */}
+                    <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleViewReplies(discussion)}
+                        className="text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9"
+                      >
+                        <Reply className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        <span className="hidden xs:inline">View Replies</span>
+                        <span className="xs:hidden">{discussion.replies}</span>
+                      </Button>
                       {discussion.category === 'help' && (
                         <Button 
                           variant="ghost" 
@@ -506,21 +489,12 @@ export const Discussions = () => {
                             setSelectedDiscussion(discussion);
                             setShowReplyForm(true);
                           }}
-                          className="text-xs flex-1 sm:flex-none h-8"
+                          className="text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9"
                         >
-                          <Reply className="h-3.5 w-3.5 mr-1" />
+                          <Send className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                           Reply
                         </Button>
                       )}
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-xs flex-1 sm:flex-none h-8" 
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Pin className="h-3.5 w-3.5 mr-1" />
-                        {discussion.isPinned ? 'Unpin' : 'Pin'}
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -541,149 +515,139 @@ export const Discussions = () => {
         </div>
       )}
 
-      {/* Detailed Discussion View Modal */}
+      {/* Detailed Discussion View Modal - MATCHES STUDENT PORTAL STRUCTURE */}
       {showReplies && selectedDiscussion && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
-              <h3 className="text-lg sm:text-xl font-semibold">Discussion Details</h3>
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleDeleteDiscussion(selectedDiscussion.id)}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setShowReplies(false)}
-                >
-                  ✕
-                </Button>
-              </div>
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            {/* Close Button */}
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h3 className="text-lg sm:text-xl font-semibold">Discussion Replies</h3>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowReplies(false)}
+              >
+                ✕
+              </Button>
             </div>
 
             {/* Original Discussion */}
-            <div className="mb-6 p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border">
-              <div className="flex items-start gap-4">
-                <Avatar className="h-12 w-12">
-                  <AvatarFallback className="bg-green-600 text-white">
+            <div className="mb-6 p-4 sm:p-6 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-start gap-3 sm:gap-4">
+                <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0">
+                  <AvatarFallback className="bg-green-600 text-white font-semibold">
                     {selectedDiscussion.author?.charAt(0)?.toUpperCase() || 'S'}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h4 className="font-semibold text-lg">{selectedDiscussion.title}</h4>
-                    <Badge className={getCategoryColor(selectedDiscussion.category)}>
-                      <div className="mt-2 text-xs sm:text-sm text-muted-foreground line-clamp-2 leading-snug">
-                        {selectedDiscussion.content}
-                      </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start gap-2 mb-2 flex-wrap">
+                    <h4 className="font-semibold text-base sm:text-lg">{selectedDiscussion.title}</h4>
+                    <Badge className={getCategoryColor(selectedDiscussion.category)} variant="outline">
+                      {selectedDiscussion.category}
                     </Badge>
                   </div>
-                  <div className="mt-2 sm:mt-3 flex flex-col xs:flex-row xs:items-center justify-between text-[10px] xs:text-xs text-muted-foreground gap-1.5">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center space-x-1">
-                        <MessageSquare className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
-                        <span>{selectedDiscussion.replies || 0} {selectedDiscussion.replies === 1 ? 'reply' : 'replies'}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Eye className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
-                        <span>{selectedDiscussion.views || 0} views</span>
-                      </div>
-                    </div>
-                    <div className="text-right xs:text-left">
-                      <span className="text-[10px] xs:text-xs">Posted by {selectedDiscussion.author}</span>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground mb-2">
+                    <span>{selectedDiscussion.author}</span>
+                    <span className="hidden sm:inline">•</span>
+                    <span>{selectedDiscussion.program}</span>
+                    <span className="hidden sm:inline">•</span>
+                    <span>{formatTimeAgo(selectedDiscussion.createdAt)}</span>
                   </div>
-                  <p className="text-gray-700 mb-3">{selectedDiscussion.program}</p>
+                  <p className="text-xs sm:text-sm text-gray-700">{selectedDiscussion.content}</p>
                 </div>
               </div>
             </div>
 
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <MessageSquare className="h-5 w-5 text-green-600" />
-                  <span className="font-semibold text-green-800">Replies</span>
-                </div>
-                <p className="text-2xl font-bold text-green-700">{replies.length}</p>
-                <p className="text-sm text-green-600">Student responses</p>
-              </div>
-              
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <ThumbsUp className="h-5 w-5 text-green-600" />
-                  <span className="font-semibold text-green-800">Likes</span>
-                </div>
-                <p className="text-2xl font-bold text-green-700">{selectedDiscussion.likes || 0}</p>
-                <p className="text-sm text-green-600">Students liked this</p>
-              </div>
-              
-              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <Eye className="h-5 w-5 text-purple-600" />
-                  <span className="font-semibold text-purple-800">Views</span>
-                </div>
-                <p className="text-2xl font-bold text-purple-700">{selectedDiscussion.views || 0}</p>
-                <p className="text-sm text-purple-600">Total views</p>
-              </div>
-            </div>
-
-            {/* Student Replies */}
+            {/* Replies List */}
             <div className="mb-6">
-              <h4 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Student Replies ({replies.length})
-              </h4>
+              <h4 className="font-semibold text-base sm:text-lg mb-4">Replies ({replies.length})</h4>
               
               {replies.length === 0 ? (
                 <div className="text-center py-8 bg-gray-50 rounded-lg">
                   <MessageSquare className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                  <p className="text-gray-500">No replies yet. Students haven't responded to this discussion.</p>
+                  <p className="text-gray-500">No replies yet</p>
                 </div>
               ) : (
-                <div className="space-y-4 max-h-60 overflow-y-auto">
+                <div className="space-y-3 sm:space-y-4">
                   {replies.map((reply, index) => {
                     // Determine sender type and apply appropriate styling
-                    const senderType = reply.author_type === 'lecturer' ? 'lecturer' : 'student';
+                    const getSenderType = () => {
+                      if (reply.author_type === 'lecturer') return 'lecturer';
+                      if (reply.author_type === 'admin') return 'admin';
+                      return 'student';
+                    };
+
+                    const senderType = getSenderType();
                     
                     const getBgColor = () => {
-                      return senderType === 'lecturer' 
-                        ? 'bg-orange-50 border-orange-200' 
-                        : 'bg-blue-50 border-blue-200';
+                      switch (senderType) {
+                        case 'lecturer':
+                          return 'bg-orange-50 border-orange-300';
+                        case 'admin':
+                          return 'bg-purple-50 border-purple-300';
+                        default:
+                          return 'bg-blue-50 border-blue-300';
+                      }
                     };
 
                     const getBadgeColor = () => {
-                      return senderType === 'lecturer'
-                        ? 'bg-orange-100 text-orange-800'
-                        : 'bg-blue-100 text-blue-800';
+                      switch (senderType) {
+                        case 'lecturer':
+                          return 'bg-orange-100 text-orange-800';
+                        case 'admin':
+                          return 'bg-purple-100 text-purple-800';
+                        default:
+                          return 'bg-blue-100 text-blue-800';
+                      }
+                    };
+
+                    // Get display name with proper info
+                    const getDisplayName = () => {
+                      if (reply.lecturer_name) {
+                        return `${reply.lecturer_name}`;
+                      }
+                      if (senderType === 'lecturer' && reply.author) {
+                        return `${reply.author}`;
+                      }
+                      if (senderType === 'admin') {
+                        return `${reply.author || 'Admin'}`;
+                      }
+                      if (reply.leg_no) {
+                        return `${reply.author || 'Student'} (${reply.leg_no})`;
+                      }
+                      return reply.author || 'Student';
+                    };
+
+                    // Get badge label
+                    const getBadgeLabel = () => {
+                      if (senderType === 'lecturer' || reply.lecturer_name) return 'LECTURER';
+                      if (senderType === 'admin') return 'ADMIN';
+                      if (reply.leg_no) {
+                        return `STUDENT (${reply.leg_no})`;
+                      }
+                      return 'STUDENT';
                     };
 
                     return (
-                      <div key={reply.id || index} className={`p-4 border rounded-lg shadow-sm ${getBgColor()} transition-colors`}>
-                        <div className="flex items-start gap-3">
+                      <div key={reply.id || index} className={`p-4 border rounded-lg ${getBgColor()} transition-colors`}>
+                        <div className="flex items-start gap-3 mb-2">
                           <Avatar className="h-8 w-8 flex-shrink-0">
                             <AvatarFallback className={`text-sm font-semibold ${getBadgeColor()}`}>
-                              {reply.author?.charAt(0)?.toUpperCase() || 'S'}
+                              {reply.lecturer_name?.charAt(0)?.toUpperCase() || reply.author?.charAt(0)?.toUpperCase() || '?'}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="font-medium text-sm">{reply.author}</span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-sm">{getDisplayName()}</span>
                               <Badge className={`text-xs ${getBadgeColor()}`}>
-                                {reply.author_type === 'lecturer' ? 'Lecturer' : 'Student'}
+                                {getBadgeLabel()}
                               </Badge>
-                              <span className="text-xs text-gray-500">
-                                {formatTimeAgo(reply.created_at)}
-                              </span>
                             </div>
-                            <p className="text-sm text-gray-700">{reply.content}</p>
                           </div>
+                        </div>
+                        <p className="text-sm mb-2 text-gray-700">{reply.content}</p>
+                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                          <span>{formatTimeAgo(reply.created_at)}</span>
                         </div>
                       </div>
                     );
@@ -692,34 +656,29 @@ export const Discussions = () => {
               )}
             </div>
 
-            {/* Lecturer Reply Section */}
+            {/* Add Reply */}
             <div className="border-t pt-4 sm:pt-6">
-              <h4 className="font-semibold text-base sm:text-lg mb-3 sm:mb-4">Reply as Lecturer</h4>
-              <div className="space-y-3 sm:space-y-4">
-                <textarea
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  placeholder="Write your response to students..."
-                  className="w-full p-3 sm:p-4 border rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm sm:text-base"
-                  rows={4}
-                />
-                <div className="flex flex-col sm:flex-row justify-end gap-2">
-                  <Button 
-                    variant="outline"
-                    onClick={() => setShowReplies(false)}
-                    className="w-full sm:w-auto"
-                  >
-                    Close
-                  </Button>
-                  <Button 
-                    onClick={handleReplyToDiscussion}
-                    disabled={!replyContent.trim()}
-                    className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    Send Reply
-                  </Button>
-                </div>
+              <h4 className="font-semibold text-base sm:text-lg mb-3 sm:mb-4">Reply</h4>
+              <textarea
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                placeholder="Write your reply..."
+                className="w-full p-3 border rounded-lg resize-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                rows={3}
+              />
+              <div className="flex justify-end mt-3 gap-2">
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowReplies(false)}
+                >
+                  Close
+                </Button>
+                <Button 
+                  onClick={handleReplyToDiscussion}
+                  disabled={!replyContent.trim()}
+                >
+                  Add Reply
+                </Button>
               </div>
             </div>
           </div>

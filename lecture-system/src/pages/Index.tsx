@@ -54,9 +54,9 @@ const Index = () => {
     setActiveSection("dashboard");
   };
 
-  // Initialize session timeout - auto-logout after 10 minutes when outside app
+  // Initialize session timeout - auto-logout after 5 minutes when outside app
   useSessionTimeout({
-    timeoutMinutes: 10,
+    timeoutMinutes: 5,
     onTimeout: () => {
       console.log('🚪 Session timeout: Logging out due to inactivity');
       handleLogout();

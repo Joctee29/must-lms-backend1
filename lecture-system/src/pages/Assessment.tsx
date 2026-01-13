@@ -1551,23 +1551,23 @@ export const Assessment = () => {
 
   if (viewMode === 'create') {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => setViewMode('list')}>← Back</Button>
-          <h2 className="text-2xl font-bold">Create Assessment</h2>
+      <div className="space-y-4 sm:space-y-6 p-2 sm:p-0">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <Button variant="outline" onClick={() => setViewMode('list')} className="w-fit">← Back</Button>
+          <h2 className="text-xl sm:text-2xl font-bold">Create Assessment</h2>
         </div>
 
         <Card>
-          <CardHeader><CardTitle>Assessment Details</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg sm:text-xl">Assessment Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="text-sm font-medium">Title</label>
                 <Input placeholder="e.g., Midterm Exam" value={newAssessment.title} onChange={(e) => setNewAssessment(prev => ({ ...prev, title: e.target.value }))} />
               </div>
               <div>
                 <label className="text-sm font-medium">Program</label>
-                <select value={newAssessment.program} onChange={(e) => setNewAssessment(prev => ({ ...prev, program: e.target.value }))} className="w-full border rounded px-3 py-2 bg-white">
+                <select value={newAssessment.program} onChange={(e) => setNewAssessment(prev => ({ ...prev, program: e.target.value }))} className="w-full border rounded px-3 py-2 bg-white text-sm">
                   <option value="">Select Program</option>
                   {lecturerPrograms.map((program) => (
                     <option key={program.id || program.name} value={program.name || program}>
@@ -1581,18 +1581,18 @@ export const Assessment = () => {
               <label className="text-sm font-medium">Description</label>
               <Textarea placeholder="Assessment description..." value={newAssessment.description} onChange={(e) => setNewAssessment(prev => ({ ...prev, description: e.target.value }))} rows={3} />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="text-sm font-medium">Duration (minutes)</label>
                 <Input type="number" placeholder="60" value={newAssessment.duration} onChange={(e) => setNewAssessment(prev => ({ ...prev, duration: parseInt(e.target.value) }))} />
               </div>
               <div>
                 <label className="text-sm font-medium">Start Date & Time</label>
-                <Input type="datetime-local" value={newAssessment.startDate} onChange={(e) => setNewAssessment(prev => ({ ...prev, startDate: e.target.value }))} />
+                <Input type="datetime-local" value={newAssessment.startDate} onChange={(e) => setNewAssessment(prev => ({ ...prev, startDate: e.target.value }))} className="text-sm" />
               </div>
               <div>
                 <label className="text-sm font-medium">End Date & Time</label>
-                <Input type="datetime-local" value={newAssessment.endDate} onChange={(e) => setNewAssessment(prev => ({ ...prev, endDate: e.target.value }))} />
+                <Input type="datetime-local" value={newAssessment.endDate} onChange={(e) => setNewAssessment(prev => ({ ...prev, endDate: e.target.value }))} className="text-sm" />
               </div>
             </div>
             <div className="grid grid-cols-1 gap-4">
@@ -1649,14 +1649,14 @@ export const Assessment = () => {
             <div className="border-t pt-4">
               <div className="flex items-center gap-2 mb-4">
                 <CalendarClock className="h-5 w-5 text-blue-600" />
-                <h4 className="font-medium">Assessment Scheduling (Optional)</h4>
+                <h4 className="font-medium text-sm sm:text-base">Assessment Scheduling (Optional)</h4>
               </div>
-              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-700">
-                  <strong>Note:</strong> Scheduling is optional. If you don't set a schedule, the assessment will be available to students immediately after publishing.
+              <div className="mb-4 p-2 sm:p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-xs sm:text-sm text-green-700">
+                  <strong>Note:</strong> Scheduling is optional. If you don't set a schedule, the assessment will be available immediately after publishing.
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Schedule Date</label>
                   <Input 
@@ -1699,30 +1699,30 @@ export const Assessment = () => {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Questions ({newAssessment.questions?.length || 0})</CardTitle>
-              <Button onClick={() => setShowQuestionForm(true)}><Plus className="h-4 w-4 mr-2" />Add Question</Button>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <CardTitle className="text-lg">Questions ({newAssessment.questions?.length || 0})</CardTitle>
+              <Button onClick={() => setShowQuestionForm(true)} size="sm" className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />Add Question</Button>
             </div>
           </CardHeader>
           <CardContent>
             {newAssessment.questions && newAssessment.questions.length > 0 ? (
               <div className="space-y-4">
                 {newAssessment.questions.map((question, index) => (
-                  <div key={question.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">Q{index + 1}</Badge>
-                        <Badge variant="outline">{question.type}</Badge>
-                        <Badge variant="outline">{question.points} pts</Badge>
+                  <div key={question.id} className="border rounded-lg p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                      <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                        <Badge variant="outline" className="text-xs">Q{index + 1}</Badge>
+                        <Badge variant="outline" className="text-xs">{question.type}</Badge>
+                        <Badge variant="outline" className="text-xs">{question.points} pts</Badge>
                       </div>
                       
                       {/* QUESTION MANAGEMENT BUTTONS */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2">
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => handleEditQuestion(question, index)}
-                          className="text-green-600 hover:text-green-700"
+                          className="text-green-600 hover:text-green-700 h-8 w-8 p-0"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -1730,7 +1730,7 @@ export const Assessment = () => {
                           variant="outline" 
                           size="sm"
                           onClick={() => handleArchiveQuestion(question.id)}
-                          className="text-orange-600 hover:text-orange-700"
+                          className="text-orange-600 hover:text-orange-700 h-8 w-8 p-0"
                         >
                           <Archive className="h-4 w-4" />
                         </Button>
@@ -1738,13 +1738,13 @@ export const Assessment = () => {
                           variant="outline" 
                           size="sm"
                           onClick={() => handleDeleteQuestion(question.id)}
-                          className="text-red-600 hover:text-red-700"
+                          className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
-                    <p className="font-medium">{question.question}</p>
+                    <p className="font-medium text-sm sm:text-base">{question.question}</p>
                     
                     {/* Multiple Choice Options */}
                     {question.type === 'multiple-choice' && question.options && (
@@ -1806,11 +1806,11 @@ export const Assessment = () => {
         </Card>
 
         {showQuestionForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-              <CardHeader><CardTitle>Add Question</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+            <Card className="w-full max-w-2xl mx-2 sm:mx-4 max-h-[95vh] overflow-y-auto">
+              <CardHeader className="p-3 sm:p-6"><CardTitle className="text-lg sm:text-xl">Add Question</CardTitle></CardHeader>
+              <CardContent className="space-y-4 p-3 sm:p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium">Type</label>
                     <select value={newQuestion.type} onChange={(e) => setNewQuestion(prev => ({ ...prev, type: e.target.value as any }))} className="w-full border rounded px-3 py-2 bg-white">
@@ -1904,15 +1904,15 @@ export const Assessment = () => {
         )}
 
 
-        <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={() => setViewMode('list')}>Cancel</Button>
+        <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3">
+          <Button variant="outline" onClick={() => setViewMode('list')} className="w-full sm:w-auto">Cancel</Button>
           
           {/* DRAFT AND SEND OPTIONS */}
           <Button 
             onClick={handleSaveAsDraft} 
             disabled={!newAssessment.title || !newAssessment.program} 
             variant="outline"
-            className="text-orange-600 hover:text-orange-700 border-orange-600 hover:border-orange-700"
+            className="text-orange-600 hover:text-orange-700 border-orange-600 hover:border-orange-700 w-full sm:w-auto"
           >
             <Archive className="h-4 w-4 mr-2" />
             Save as Draft
@@ -1921,7 +1921,7 @@ export const Assessment = () => {
           <Button 
             onClick={handleSendAssessment} 
             disabled={!newAssessment.title || !newAssessment.program || !newAssessment.questions?.length} 
-            className="bg-green-600 hover:bg-green-700"
+            className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
           >
             <CheckCircle className="h-4 w-4 mr-2" />
             Send Assessment
@@ -1933,12 +1933,12 @@ export const Assessment = () => {
 
   if (viewMode === 'results' && selectedAssessment) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => setViewMode('list')}>← Back</Button>
+      <div className="space-y-4 sm:space-y-6 p-2 sm:p-0">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <Button variant="outline" onClick={() => setViewMode('list')} className="w-fit">← Back</Button>
           <div>
-            <h2 className="text-2xl font-bold">{selectedAssessment.title}</h2>
-            <p className="text-muted-foreground">Results - {selectedAssessment.course}</p>
+            <h2 className="text-xl sm:text-2xl font-bold">{selectedAssessment.title}</h2>
+            <p className="text-sm sm:text-base text-muted-foreground">Results - {selectedAssessment.course}</p>
           </div>
         </div>
 
@@ -1951,15 +1951,15 @@ export const Assessment = () => {
           if (!hasGradedSubmissions) {
             // BEFORE GRADING - Show basic info only
             return (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
                 <Card>
-                  <CardHeader><CardTitle className="text-sm">Total Submissions</CardTitle></CardHeader>
-                  <CardContent><div className="text-2xl font-bold">{selectedAssessment.submissions.length}</div></CardContent>
+                  <CardHeader className="p-3 sm:p-6 pb-2"><CardTitle className="text-xs sm:text-sm">Total Submissions</CardTitle></CardHeader>
+                  <CardContent className="p-3 sm:p-6 pt-0"><div className="text-xl sm:text-2xl font-bold">{selectedAssessment.submissions.length}</div></CardContent>
                 </Card>
                 <Card>
-                  <CardHeader><CardTitle className="text-sm">Grading Status</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="text-lg font-bold text-orange-600">
+                  <CardHeader className="p-3 sm:p-6 pb-2"><CardTitle className="text-xs sm:text-sm">Grading Status</CardTitle></CardHeader>
+                  <CardContent className="p-3 sm:p-6 pt-0">
+                    <div className="text-sm sm:text-lg font-bold text-orange-600">
                       {selectedAssessment.autoGrade ? 'Ready for Auto-Grading' : 'Ready for Manual Grading'}
                     </div>
                   </CardContent>
@@ -1969,45 +1969,46 @@ export const Assessment = () => {
           } else {
             // AFTER GRADING STARTS - Show full statistics
             return (
-              <div className="grid gap-4 md:grid-cols-4">
-                <Card><CardHeader><CardTitle className="text-sm">Submissions</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{selectedAssessment.submissions.length}</div></CardContent></Card>
-                <Card><CardHeader><CardTitle className="text-sm">Average</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{selectedAssessment.submissions.length > 0 ? Math.round(selectedAssessment.submissions.reduce((sum, s) => sum + s.percentage, 0) / selectedAssessment.submissions.length) : 0}%</div></CardContent></Card>
-                <Card><CardHeader><CardTitle className="text-sm">Pass Rate</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{selectedAssessment.submissions.length > 0 ? Math.round((selectedAssessment.submissions.filter(s => s.percentage >= 60).length / selectedAssessment.submissions.length) * 100) : 0}%</div></CardContent></Card>
-                <Card><CardHeader><CardTitle className="text-sm">Highest</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{selectedAssessment.submissions.length > 0 ? Math.max(...selectedAssessment.submissions.map(s => s.percentage)) : 0}%</div></CardContent></Card>
+              <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-4">
+                <Card><CardHeader className="p-3 sm:p-6 pb-2"><CardTitle className="text-xs sm:text-sm">Submissions</CardTitle></CardHeader><CardContent className="p-3 sm:p-6 pt-0"><div className="text-xl sm:text-2xl font-bold">{selectedAssessment.submissions.length}</div></CardContent></Card>
+                <Card><CardHeader className="p-3 sm:p-6 pb-2"><CardTitle className="text-xs sm:text-sm">Average</CardTitle></CardHeader><CardContent className="p-3 sm:p-6 pt-0"><div className="text-xl sm:text-2xl font-bold">{selectedAssessment.submissions.length > 0 ? Math.round(selectedAssessment.submissions.reduce((sum, s) => sum + s.percentage, 0) / selectedAssessment.submissions.length) : 0}%</div></CardContent></Card>
+                <Card><CardHeader className="p-3 sm:p-6 pb-2"><CardTitle className="text-xs sm:text-sm">Pass Rate</CardTitle></CardHeader><CardContent className="p-3 sm:p-6 pt-0"><div className="text-xl sm:text-2xl font-bold">{selectedAssessment.submissions.length > 0 ? Math.round((selectedAssessment.submissions.filter(s => s.percentage >= 60).length / selectedAssessment.submissions.length) * 100) : 0}%</div></CardContent></Card>
+                <Card><CardHeader className="p-3 sm:p-6 pb-2"><CardTitle className="text-xs sm:text-sm">Highest</CardTitle></CardHeader><CardContent className="p-3 sm:p-6 pt-0"><div className="text-xl sm:text-2xl font-bold">{selectedAssessment.submissions.length > 0 ? Math.max(...selectedAssessment.submissions.map(s => s.percentage)) : 0}%</div></CardContent></Card>
               </div>
             );
           }
         })()}
 
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
+          <CardHeader className="p-3 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
               <div>
-                <CardTitle>Student Results</CardTitle>
+                <CardTitle className="text-base sm:text-lg">Student Results</CardTitle>
                 <div className="flex items-center gap-2 mt-1">
                   {selectedAssessment.autoGrade ? (
-                    <Badge className="bg-blue-100 text-blue-800">
+                    <Badge className="bg-blue-100 text-blue-800 text-xs">
                       ⚡ Auto-Grade Mode
                     </Badge>
                   ) : (
-                    <Badge className="bg-orange-100 text-orange-800">
+                    <Badge className="bg-orange-100 text-orange-800 text-xs">
                       📝 Manual Grade Mode
                     </Badge>
                   )}
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {/* SMART GRADING SYSTEM - BASED ON ASSESSMENT CREATION */}
                 {selectedAssessment.autoGrade ? (
                   // AUTO-GRADE MODE: Assessment created with MC/True-False questions
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     
                     {/* MIXED MODE: If assessment has both auto and manual questions */}
                     {selectedAssessment.questions?.some(q => q.type === 'short-answer') && (
                       <Button 
                         onClick={() => handleMixedGrading(selectedAssessment.id)} 
                         variant="outline"
-                        className="text-green-600 hover:text-green-700"
+                        className="text-green-600 hover:text-green-700 text-xs sm:text-sm"
+                        size="sm"
                       >
                         <Edit className="h-4 w-4 mr-2" />
                         Mixed Grading
@@ -2016,43 +2017,43 @@ export const Assessment = () => {
                   </div>
                 ) : (
                   // MANUAL MODE: Assessment created with Short Answer questions only
-                  <div className="text-sm text-gray-600">
+                  <div className="text-xs sm:text-sm text-gray-600">
                     Manual grading mode - All questions require manual review
                   </div>
                 )}
                 
                 
                 {/* Results submission and reporting */}
-                <Button onClick={() => handleSubmitResultsToStudents(selectedAssessment.id)} className="bg-green-600 hover:bg-green-700">
-                  <Users className="h-4 w-4 mr-2" />
+                <Button onClick={() => handleSubmitResultsToStudents(selectedAssessment.id)} className="bg-green-600 hover:bg-green-700 text-xs sm:text-sm w-full sm:w-auto" size="sm">
+                  <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   DONE - Publish Results
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          <CardContent className="p-3 sm:p-6 pt-0">
+            <div className="space-y-3 sm:space-y-4">
               {selectedAssessment.submissions.map((submission) => (
-                <div key={submission.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                  <div className="flex items-center justify-between">
+                <div key={submission.id} className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <h4 className="font-semibold text-lg">{submission.studentName}</h4>
-                          <p className="text-sm text-muted-foreground">{submission.registrationNumber}</p>
-                          <p className="text-sm text-muted-foreground">{submission.program}</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-base sm:text-lg truncate">{submission.studentName}</h4>
+                          <p className="text-xs sm:text-sm text-muted-foreground">{submission.registrationNumber}</p>
+                          <p className="text-xs sm:text-sm text-muted-foreground truncate">{submission.program}</p>
                         </div>
-                        <div className="text-center">
+                        <div className="text-left sm:text-center">
                           {/* SHOW RESULTS BASED ON GRADING STATUS */}
                           {submission.status === 'submitted' ? (
                             <div>
-                              <div className="text-2xl font-bold text-orange-600">PENDING</div>
-                              <p className="text-sm text-orange-600">Awaiting Grading</p>
+                              <div className="text-xl sm:text-2xl font-bold text-orange-600">PENDING</div>
+                              <p className="text-xs sm:text-sm text-orange-600">Awaiting Grading</p>
                             </div>
                           ) : (
                             <div>
-                              <div className="text-3xl font-bold text-blue-600">{submission.percentage}%</div>
-                              <p className="text-sm text-muted-foreground">{submission.score}/{selectedAssessment.totalPoints} points</p>
+                              <div className="text-2xl sm:text-3xl font-bold text-blue-600">{submission.percentage}%</div>
+                              <p className="text-xs sm:text-sm text-muted-foreground">{submission.score}/{selectedAssessment.totalPoints} points</p>
                               {submission.status === 'manually-graded' && (
                                 <p className="text-xs text-green-600 font-medium">✅ Manually Graded</p>
                               )}
@@ -2063,27 +2064,27 @@ export const Assessment = () => {
                           )}
                         </div>
                       </div>
-                      <div className="mt-2 flex items-center gap-4">
-                        <p className="text-sm text-muted-foreground">Submitted: {new Date(submission.submittedAt).toLocaleString()}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 sm:gap-4">
+                        <p className="text-xs sm:text-sm text-muted-foreground">Submitted: {new Date(submission.submittedAt).toLocaleString()}</p>
                         {/* GRADING STATUS BADGES */}
                         {submission.status === 'submitted' ? (
-                          <Badge className="bg-orange-100 text-orange-800">PENDING GRADING</Badge>
+                          <Badge className="bg-orange-100 text-orange-800 text-xs">PENDING GRADING</Badge>
                         ) : submission.status === 'manually-graded' ? (
-                          <div className="flex gap-2">
-                            <Badge className="bg-green-100 text-green-800">✅ MANUALLY GRADED</Badge>
-                            <Badge className={submission.percentage >= 60 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                          <div className="flex flex-wrap gap-1 sm:gap-2">
+                            <Badge className="bg-green-100 text-green-800 text-xs">✅ MANUALLY GRADED</Badge>
+                            <Badge className={`${submission.percentage >= 60 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} text-xs`}>
                               {submission.percentage >= 60 ? 'PASS' : 'FAIL'}
                             </Badge>
                           </div>
                         ) : submission.status === 'auto-graded' ? (
-                          <div className="flex gap-2">
-                            <Badge className="bg-blue-100 text-blue-800">🤖 AUTO GRADED</Badge>
-                            <Badge className={submission.percentage >= 60 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                          <div className="flex flex-wrap gap-1 sm:gap-2">
+                            <Badge className="bg-blue-100 text-blue-800 text-xs">🤖 AUTO GRADED</Badge>
+                            <Badge className={`${submission.percentage >= 60 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} text-xs`}>
                               {submission.percentage >= 60 ? 'PASS' : 'FAIL'}
                             </Badge>
                           </div>
                         ) : (
-                          <Badge className={submission.percentage >= 60 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                          <Badge className={`${submission.percentage >= 60 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} text-xs`}>
                             {submission.percentage >= 60 ? 'PASS' : 'FAIL'}
                           </Badge>
                         )}
@@ -2092,11 +2093,11 @@ export const Assessment = () => {
                         {selectedAssessment.autoGrade ? (
                           // Auto-Grade Mode: Show specific status
                           submission.status === 'submitted' ? (
-                            <Badge className="bg-yellow-100 text-yellow-800">Awaiting Auto-Grade</Badge>
+                            <Badge className="bg-yellow-100 text-yellow-800 text-xs">Awaiting Auto-Grade</Badge>
                           ) : submission.status === 'partially-graded' ? (
-                            <Badge className="bg-blue-100 text-blue-800">Auto-Graded (Manual Pending)</Badge>
+                            <Badge className="bg-blue-100 text-blue-800 text-xs">Auto-Graded (Manual Pending)</Badge>
                           ) : submission.status === 'auto-graded' ? (
-                            <Badge className="bg-green-100 text-green-800">Fully Auto-Graded</Badge>
+                            <Badge className="bg-green-100 text-green-800 text-xs">Fully Auto-Graded</Badge>
                           ) : submission.status === 'manually-graded' ? (
                             <Badge className="bg-green-100 text-green-800">Manually Completed</Badge>
                           ) : (
@@ -2117,8 +2118,8 @@ export const Assessment = () => {
                     <div className="flex gap-2">
                       {/* Preview only available after manual grading is complete */}
                       {selectedAssessment.autoGrade || (!selectedAssessment.autoGrade && submission.status === 'manually-graded') ? (
-                        <Button variant="outline" size="sm" onClick={() => handleViewStudentSubmission(submission)}>
-                          <Eye className="h-4 w-4 mr-2" />Preview
+                        <Button variant="outline" size="sm" onClick={() => handleViewStudentSubmission(submission)} className="text-xs sm:text-sm">
+                          <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />Preview
                         </Button>
                       ) : null}
                       
@@ -2126,26 +2127,26 @@ export const Assessment = () => {
                       {!selectedAssessment.autoGrade ? (
                         // MANUAL MODE: All questions require manual grading
                         submission.status === 'submitted' && (
-                          <Button size="sm" className="bg-orange-600 hover:bg-orange-700" onClick={() => handleIndividualManualGrade(submission)}>
-                            <Edit className="h-4 w-4 mr-2" />Manual Grade
+                          <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-xs sm:text-sm" onClick={() => handleIndividualManualGrade(submission)}>
+                            <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />Manual Grade
                           </Button>
                         )
                       ) : (
                         // AUTO-GRADE MODE: Mixed questions - Individual options
-                        <div className="flex gap-1">
+                        <div className="flex flex-wrap gap-1">
                           {submission.status === 'submitted' && (
                             <>
-                              <Button size="sm" variant="outline" className="text-green-600 hover:text-green-700" onClick={() => handleIndividualAutoGrade(submission)}>
-                                <CheckCircle className="h-4 w-4 mr-1" />Auto
+                              <Button size="sm" variant="outline" className="text-green-600 hover:text-green-700 text-xs sm:text-sm" onClick={() => handleIndividualAutoGrade(submission)}>
+                                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />Auto
                               </Button>
-                              <Button size="sm" variant="outline" className="text-orange-600 hover:text-orange-700" onClick={() => handleIndividualManualGrade(submission)}>
-                                <Edit className="h-4 w-4 mr-1" />Manual
+                              <Button size="sm" variant="outline" className="text-orange-600 hover:text-orange-700 text-xs sm:text-sm" onClick={() => handleIndividualManualGrade(submission)}>
+                                <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />Manual
                               </Button>
                             </>
                           )}
                           {submission.status === 'partially-graded' && (
-                            <Button size="sm" className="bg-orange-600 hover:bg-orange-700" onClick={() => handleIndividualManualGrade(submission)}>
-                              <Edit className="h-4 w-4 mr-2" />Complete Manual
+                            <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-xs sm:text-sm" onClick={() => handleIndividualManualGrade(submission)}>
+                              <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />Complete Manual
                             </Button>
                           )}
                         </div>
@@ -2163,20 +2164,20 @@ export const Assessment = () => {
 
   if (viewMode === 'student-review' && selectedSubmission && selectedAssessment) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => setViewMode('results')}>← Back to Results</Button>
+      <div className="space-y-4 sm:space-y-6 p-2 sm:p-0">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <Button variant="outline" onClick={() => setViewMode('results')} className="w-fit">← Back to Results</Button>
           <div>
-            <h2 className="text-2xl font-bold">Student Submission Review</h2>
-            <p className="text-muted-foreground">{selectedSubmission.studentName} - {selectedAssessment.title}</p>
+            <h2 className="text-xl sm:text-2xl font-bold">Student Submission Review</h2>
+            <p className="text-sm sm:text-base text-muted-foreground">{selectedSubmission.studentName} - {selectedAssessment.title}</p>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
           <Card>
-            <CardHeader><CardTitle className="text-sm">Student Information</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-2">
+            <CardHeader className="p-3 sm:p-6 pb-2"><CardTitle className="text-xs sm:text-sm">Student Information</CardTitle></CardHeader>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
                 <div><span className="font-medium">Reg. No:</span> {selectedSubmission.registrationNumber || selectedSubmission.student_registration || 'N/A'}</div>
                 <div><span className="font-medium">Program:</span> {selectedSubmission.program || selectedSubmission.studentProgram || selectedSubmission.student_program || 'N/A'}</div>
                 <div><span className="font-medium">Submitted:</span> {selectedSubmission.submittedAt || selectedSubmission.submitted_at ? new Date(selectedSubmission.submittedAt || selectedSubmission.submitted_at).toLocaleString() : 'N/A'}</div>
@@ -2184,9 +2185,9 @@ export const Assessment = () => {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle className="text-sm">Score Breakdown</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-2">
+            <CardHeader className="p-3 sm:p-6 pb-2"><CardTitle className="text-xs sm:text-sm">Score Breakdown</CardTitle></CardHeader>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
                 {/* Show manual grades if available, otherwise show original scores */}
                 {(() => {
                   const manualTotalScore = Object.values(gradingScores).reduce((sum, score) => sum + score, 0);
@@ -2455,52 +2456,52 @@ export const Assessment = () => {
     const currentPercentage = totalPossiblePoints > 0 ? Math.round((currentTotalScore / totalPossiblePoints) * 100) : 0;
 
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => setViewMode('results')}>← Back to Results</Button>
+      <div className="space-y-4 sm:space-y-6 p-2 sm:p-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <Button variant="outline" onClick={() => setViewMode('results')} className="w-fit">← Back to Results</Button>
             <div>
-              <h2 className="text-2xl font-bold">Manual Grading</h2>
-              <p className="text-muted-foreground">{selectedSubmission.studentName} - {selectedAssessment.title}</p>
+              <h2 className="text-xl sm:text-2xl font-bold">Manual Grading</h2>
+              <p className="text-sm sm:text-base text-muted-foreground">{selectedSubmission.studentName} - {selectedAssessment.title}</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={handleSaveManualGrades} className="bg-green-600 hover:bg-green-700">
+            <Button onClick={handleSaveManualGrades} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">
               <Check className="h-4 w-4 mr-2" />Save Grades
             </Button>
           </div>
         </div>
 
         {/* Grading Summary */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-4">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Student</CardTitle></CardHeader>
-            <CardContent>
-              <div className="text-lg font-semibold">{selectedSubmission.studentName}</div>
-              <div className="text-sm text-muted-foreground">{selectedSubmission.registrationNumber}</div>
+            <CardHeader className="p-3 sm:p-6 pb-2"><CardTitle className="text-xs sm:text-sm">Student</CardTitle></CardHeader>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className="text-sm sm:text-lg font-semibold truncate">{selectedSubmission.studentName}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground truncate">{selectedSubmission.registrationNumber}</div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Current Score</CardTitle></CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{currentTotalScore}/{totalPossiblePoints}</div>
-              <div className="text-sm text-muted-foreground">{currentPercentage}%</div>
+            <CardHeader className="p-3 sm:p-6 pb-2"><CardTitle className="text-xs sm:text-sm">Current Score</CardTitle></CardHeader>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-blue-600">{currentTotalScore}/{totalPossiblePoints}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">{currentPercentage}%</div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Questions</CardTitle></CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{selectedAssessment.questions.length}</div>
-              <div className="text-sm text-muted-foreground">Total Questions</div>
+            <CardHeader className="p-3 sm:p-6 pb-2"><CardTitle className="text-xs sm:text-sm">Questions</CardTitle></CardHeader>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">{selectedAssessment.questions.length}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">Total Questions</div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Status</CardTitle></CardHeader>
-            <CardContent>
-              <Badge className={currentPercentage >= 60 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+            <CardHeader className="p-3 sm:p-6 pb-2"><CardTitle className="text-xs sm:text-sm">Status</CardTitle></CardHeader>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <Badge className={`${currentPercentage >= 60 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} text-xs`}>
                 {currentPercentage >= 60 ? 'PASS' : 'FAIL'}
               </Badge>
-              <div className="text-sm text-muted-foreground mt-1">
+              <div className="text-xs sm:text-sm text-muted-foreground mt-1">
                 {currentPercentage >= 80 ? 'A' : currentPercentage >= 70 ? 'B' : currentPercentage >= 60 ? 'C' : currentPercentage >= 50 ? 'D' : 'F'}
               </div>
             </CardContent>
@@ -2509,14 +2510,14 @@ export const Assessment = () => {
 
         {/* Questions Grading */}
         <Card>
-          <CardHeader>
-            <CardTitle>Grade Each Question</CardTitle>
-            <p className="text-sm text-muted-foreground">
+          <CardHeader className="p-3 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">Grade Each Question</CardTitle>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               {selectedAssessment.autoGrade ? 'Adjust auto-graded scores or grade short-answer questions manually' : 'Grade all questions manually'}
             </p>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
+          <CardContent className="p-3 sm:p-6 pt-0">
+            <div className="space-y-4 sm:space-y-6">
               {selectedAssessment.questions.map((question, index) => {
                 const studentAnswer = selectedSubmission.answers[question.id];
                 const currentScore = gradingScores[question.id] || 0;
@@ -2524,30 +2525,30 @@ export const Assessment = () => {
                 const isCorrect = isAutoGradable && studentAnswer === question.correctAnswer;
 
                 return (
-                  <div key={question.id} className="border rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-4">
+                  <div key={question.id} className="border rounded-lg p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 mb-3 sm:mb-4">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="outline">Question {index + 1}</Badge>
-                          <Badge variant="secondary">{question.points} points</Badge>
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-2">
+                          <Badge variant="outline" className="text-xs">Question {index + 1}</Badge>
+                          <Badge variant="secondary" className="text-xs">{question.points} points</Badge>
                           {/* Manual grading - no correct/incorrect badges */}
-                          <Badge variant="outline">{question.type}</Badge>
+                          <Badge variant="outline" className="text-xs">{question.type}</Badge>
                         </div>
-                        <h4 className="font-medium mb-2">{question.question}</h4>
+                        <h4 className="font-medium text-sm sm:text-base mb-2">{question.question}</h4>
                         
                         {/* Show student answer */}
-                        <div className="bg-gray-50 p-3 rounded mb-3">
-                          <p className="text-sm font-medium text-gray-700 mb-1">Student Answer:</p>
+                        <div className="bg-gray-50 p-2 sm:p-3 rounded mb-3">
+                          <p className="text-xs sm:text-sm font-medium text-gray-700 mb-1">Student Answer:</p>
                           {question.type === 'multiple-choice' && question.options && (
-                            <p className="text-sm">
+                            <p className="text-xs sm:text-sm">
                               {typeof studentAnswer === 'number' ? question.options[studentAnswer] : 'No answer'}
                             </p>
                           )}
                           {question.type === 'true-false' && (
-                            <p className="text-sm">{studentAnswer || 'No answer'}</p>
+                            <p className="text-xs sm:text-sm">{studentAnswer || 'No answer'}</p>
                           )}
                           {question.type === 'short-answer' && (
-                            <p className="text-sm">{studentAnswer || 'No answer provided'}</p>
+                            <p className="text-xs sm:text-sm">{studentAnswer || 'No answer provided'}</p>
                           )}
                         </div>
 
@@ -2555,9 +2556,9 @@ export const Assessment = () => {
                     </div>
 
                     {/* Grading Controls */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-3 sm:gap-4">
                       <div>
-                        <Label htmlFor={`score-${question.id}`}>Score (0-{question.points})</Label>
+                        <Label htmlFor={`score-${question.id}`} className="text-xs sm:text-sm">Score (0-{question.points})</Label>
                         <Input
                           id={`score-${question.id}`}
                           type="number"
@@ -2592,26 +2593,26 @@ export const Assessment = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 p-2 sm:p-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Assessments</h2>
-          <p className="text-muted-foreground">Create and manage course assessments</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Assessments</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Create and manage course assessments</p>
         </div>
-        <Button onClick={() => setViewMode('create')} className="bg-green-600 hover:bg-green-700"><Plus className="h-4 w-4 mr-2" />Create Assessment</Button>
+        <Button onClick={() => setViewMode('create')} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />Create Assessment</Button>
       </div>
 
       <div className="grid gap-4">
         {assessments.map((assessment) => (
           <Card key={assessment.id}>
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-green-600" />{assessment.title}</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">{assessment.course}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{assessment.description}</p>
+            <CardHeader className="p-3 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg"><FileText className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" /><span className="truncate">{assessment.title}</span></CardTitle>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">{assessment.course}</p>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{assessment.description}</p>
                   {(assessment.startDate || assessment.scheduledDate) && (
-                    <div className="flex items-center gap-4 mt-2 flex-wrap">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-2">
                       {assessment.scheduledDate && (
                         <p className="text-xs text-orange-600">
                           <CalendarClock className="h-3 w-3 inline mr-1" />
@@ -2634,15 +2635,15 @@ export const Assessment = () => {
                     </div>
                   )}
                 </div>
-                <Badge className={getStatusColor(assessment.status)}>{getStatusText(assessment.status)}</Badge>
+                <Badge className={`${getStatusColor(assessment.status)} flex-shrink-0 text-xs`}>{getStatusText(assessment.status)}</Badge>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{assessment.duration} min</span></div>
-                <div className="flex items-center gap-2"><Target className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{assessment.totalQuestions} questions</span></div>
-                <div className="flex items-center gap-2"><Award className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{assessment.totalPoints} points</span></div>
-                <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{assessment.submissions.length} submissions</span></div>
+            <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-3 sm:mb-4">
+                <div className="flex items-center gap-1 sm:gap-2"><Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" /><span className="text-xs sm:text-sm">{assessment.duration} min</span></div>
+                <div className="flex items-center gap-1 sm:gap-2"><Target className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" /><span className="text-xs sm:text-sm">{assessment.totalQuestions} questions</span></div>
+                <div className="flex items-center gap-1 sm:gap-2"><Award className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" /><span className="text-xs sm:text-sm">{assessment.totalPoints} points</span></div>
+                <div className="flex items-center gap-1 sm:gap-2"><Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" /><span className="text-xs sm:text-sm">{assessment.submissions.length} submissions</span></div>
               </div>
               <div className="flex gap-2 flex-wrap">
                 {assessment.status === 'draft' && (

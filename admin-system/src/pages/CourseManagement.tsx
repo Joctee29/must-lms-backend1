@@ -15,6 +15,7 @@ interface College {
   id: string;
   name: string;
   shortName: string;
+  short_name?: string;
   description: string;
   established: string;
 }
@@ -23,8 +24,10 @@ interface Department {
   id: string;
   name: string;
   collegeId: string;
+  college_id?: string;
   description: string;
   headOfDepartment: string;
+  head_of_department?: string;
 }
 
 interface Course {
@@ -32,9 +35,12 @@ interface Course {
   name: string;
   code: string;
   departmentId: string;
+  department_id?: string;
   duration: number;
   academicLevel: 'certificate' | 'diploma' | 'bachelor' | 'masters' | 'phd';
+  academic_level?: 'certificate' | 'diploma' | 'bachelor' | 'masters' | 'phd';
   yearOfStudy: number;
+  year_of_study?: number;
   description: string;
 }
 
@@ -42,9 +48,14 @@ interface Program {
   id: string;
   name: string;
   courseId: string;
+  course_id?: string;
   credits: number;
   totalSemesters: number;
+  total_semesters?: number;
   lecturerName: string;
+  lecturer_name?: string;
+  lecturerId?: string;
+  lecturer_id?: string;
   description: string;
 }
 
@@ -91,6 +102,9 @@ export const CourseManagement = () => {
 
   // Level filter state
   const [selectedLevel, setSelectedLevel] = useState<string>("all");
+
+  // Tab state for navigation
+  const [activeTab, setActiveTab] = useState<string>("colleges");
 
   useEffect(() => {
     const initData = async () => {
@@ -220,16 +234,19 @@ export const CourseManagement = () => {
     console.log('All Courses:', courses);
     console.log('All Programs:', programs);
     
-    const collegeDepartments = departments.filter(d => Number(d.collegeId) === Number(collegeId));
+    // Support both camelCase and snake_case field names from database
+    const collegeDepartments = departments.filter(d => 
+      Number(d.collegeId || d.college_id) === Number(collegeId)
+    );
     console.log('College Departments:', collegeDepartments);
     
     const collegeCourses = courses.filter(c => 
-      collegeDepartments.some(d => Number(d.id) === Number(c.departmentId))
+      collegeDepartments.some(d => Number(d.id) === Number(c.departmentId || c.department_id))
     );
     console.log('College Courses:', collegeCourses);
     
     const collegePrograms = programs.filter(p => 
-      collegeCourses.some(c => Number(c.id) === Number(p.courseId))
+      collegeCourses.some(c => Number(c.id) === Number(p.courseId || p.course_id))
     );
     console.log('College Programs:', collegePrograms);
     
@@ -250,14 +267,15 @@ export const CourseManagement = () => {
     const department = departments.find(d => Number(d.id) === Number(departmentId));
     console.log('Department Found:', department);
     
-    const college = colleges.find(c => Number(c.id) === Number(department?.collegeId));
+    // Support both camelCase and snake_case field names from database
+    const college = colleges.find(c => Number(c.id) === Number(department?.collegeId || department?.college_id));
     console.log('College Found:', college);
     
-    const departmentCourses = courses.filter(c => Number(c.departmentId) === Number(departmentId));
+    const departmentCourses = courses.filter(c => Number(c.departmentId || c.department_id) === Number(departmentId));
     console.log('Department Courses:', departmentCourses);
     
     const departmentPrograms = programs.filter(p => 
-      departmentCourses.some(c => Number(c.id) === Number(p.courseId))
+      departmentCourses.some(c => Number(c.id) === Number(p.courseId || p.course_id))
     );
     console.log('Department Programs:', departmentPrograms);
     
@@ -272,9 +290,10 @@ export const CourseManagement = () => {
 
   const getCourseStats = (courseId: number | string) => {
     const course = courses.find(c => Number(c.id) === Number(courseId));
-    const department = departments.find(d => Number(d.id) === Number(course?.departmentId));
-    const college = colleges.find(c => Number(c.id) === Number(department?.collegeId));
-    const coursePrograms = programs.filter(p => Number(p.courseId) === Number(courseId));
+    // Support both camelCase and snake_case field names from database
+    const department = departments.find(d => Number(d.id) === Number(course?.departmentId || course?.department_id));
+    const college = colleges.find(c => Number(c.id) === Number(department?.collegeId || department?.college_id));
+    const coursePrograms = programs.filter(p => Number(p.courseId || p.course_id) === Number(courseId));
     
     console.log(`Course ${courseId} stats: ${coursePrograms.length} programs`);
     
@@ -288,11 +307,12 @@ export const CourseManagement = () => {
 
   const getProgramStats = (programId: number | string) => {
     const program = programs.find(p => Number(p.id) === Number(programId));
-    const course = courses.find(c => Number(c.id) === Number(program?.courseId));
-    const department = departments.find(d => Number(d.id) === Number(course?.departmentId));
-    const college = colleges.find(c => Number(c.id) === Number(department?.collegeId));
+    // Support both camelCase and snake_case field names from database
+    const course = courses.find(c => Number(c.id) === Number(program?.courseId || program?.course_id));
+    const department = departments.find(d => Number(d.id) === Number(course?.departmentId || course?.department_id));
+    const college = colleges.find(c => Number(c.id) === Number(department?.collegeId || department?.college_id));
     const lecturer = lecturers.find(l => 
-      l.name === program?.lecturerName || Number(l.id) === Number(program?.lecturerId)
+      l.name === program?.lecturerName || l.name === program?.lecturer_name || Number(l.id) === Number(program?.lecturerId || program?.lecturer_id)
     );
     
     console.log(`Program ${programId} stats: lecturer ${lecturer?.name || 'Not assigned'}`);
@@ -531,6 +551,25 @@ export const CourseManagement = () => {
           <DetailedCollegeView 
             college={selectedCollege} 
             stats={getCollegeStats(selectedCollege.id)}
+            onNavigate={(action: string) => {
+              setShowDetailView(false);
+              if (action === 'departments') {
+                setActiveTab('departments');
+              } else if (action === 'courses') {
+                setActiveTab('courses');
+              } else if (action === 'programs') {
+                setActiveTab('programs');
+              } else if (action === 'edit-college') {
+                setActiveTab('colleges');
+                setEditingCollege(selectedCollege);
+                setCollegeForm({
+                  name: selectedCollege.name,
+                  shortName: selectedCollege.shortName || selectedCollege.short_name || "",
+                  established: selectedCollege.established || "",
+                  description: selectedCollege.description || ""
+                });
+              }
+            }}
           />
         )}
         
@@ -538,6 +577,23 @@ export const CourseManagement = () => {
           <DetailedDepartmentView 
             department={selectedDepartment} 
             stats={getDepartmentStats(selectedDepartment.id)}
+            onNavigate={(action: string) => {
+              setShowDetailView(false);
+              if (action === 'courses') {
+                setActiveTab('courses');
+              } else if (action === 'programs') {
+                setActiveTab('programs');
+              } else if (action === 'edit-department') {
+                setActiveTab('departments');
+                setEditingDepartment(selectedDepartment);
+                setDepartmentForm({
+                  name: selectedDepartment.name,
+                  collegeId: String(selectedDepartment.collegeId || selectedDepartment.college_id || ""),
+                  description: selectedDepartment.description || "",
+                  headOfDepartment: selectedDepartment.headOfDepartment || selectedDepartment.head_of_department || ""
+                });
+              }
+            }}
           />
         )}
         
@@ -555,7 +611,7 @@ export const CourseManagement = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="colleges" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="colleges">Colleges</TabsTrigger>
           <TabsTrigger value="departments">Departments</TabsTrigger>
@@ -635,62 +691,87 @@ export const CourseManagement = () => {
                 <CardTitle>Colleges ({colleges.length})</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {colleges.map((college) => {
                     const stats = getCollegeStats(college.id);
                     return (
-                      <Card 
+                      <div 
                         key={college.id} 
-                        className="hover:shadow-md transition-shadow"
+                        className="flex items-center gap-4 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
                       >
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-semibold">{college.name}</h3>
-                          </div>
-                          <div className="mt-2 flex justify-end">
-                            <div className="flex gap-1">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingCollege(college);
-                                  setCollegeForm({
-                                    name: college.name,
-                                    shortName: college.shortName || "",
-                                    established: college.established || "",
-                                    description: college.description || ""
-                                  });
-                                }}
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button 
-                                variant="destructive" 
-                                size="sm"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (confirm(`Are you sure you want to delete ${college.name}?`)) {
-                                    try {
-                                      setLoading(true);
-                                      await courseOperations.deleteCollege(college.id);
-                                      await loadData();
-                                      toast.success(`${college.name} deleted successfully!`);
-                                    } catch (error) {
-                                      console.error('Error deleting college:', error);
-                                      toast.error("Failed to delete college");
-                                    } finally {
-                                      setLoading(false);
-                                    }
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 truncate">{college.name}</h3>
+                          <p className="text-sm text-gray-500 truncate">{college.shortName || college.short_name || 'No short name'}</p>
+                        </div>
+                        
+                        {/* Stats Badges */}
+                        <div className="hidden md:flex items-center gap-2">
+                          <Badge variant="secondary" className="bg-blue-600 text-white text-xs">
+                            {stats.departments} Depts
+                          </Badge>
+                          <Badge variant="secondary" className="bg-emerald-600 text-white text-xs">
+                            {stats.courses} Courses
+                          </Badge>
+                        </div>
+                        
+                        {/* Established */}
+                        <div className="hidden lg:block text-sm text-gray-500 w-20">
+                          {college.established || 'N/A'}
+                        </div>
+                        
+                        {/* Actions */}
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                            onClick={() => handleCollegeClick(college)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingCollege(college);
+                              setCollegeForm({
+                                name: college.name,
+                                shortName: college.shortName || "",
+                                established: college.established || "",
+                                description: college.description || ""
+                              });
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-gray-100"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm(`Are you sure you want to delete ${college.name}?`)) {
+                                try {
+                                  setLoading(true);
+                                  await courseOperations.deleteCollege(college.id);
+                                  await loadData();
+                                  toast.success(`${college.name} deleted successfully!`);
+                                } catch (error) {
+                                  console.error('Error deleting college:', error);
+                                  toast.error("Failed to delete college");
+                                } finally {
+                                  setLoading(false);
+                                }
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -801,62 +882,89 @@ export const CourseManagement = () => {
                 <CardTitle>Departments ({departments.length})</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {departments.map((department) => {
                     const stats = getDepartmentStats(department.id);
                     return (
-                      <Card 
+                      <div 
                         key={department.id} 
-                        className="hover:shadow-md transition-shadow"
+                        className="flex items-center gap-4 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
                       >
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-semibold">{department.name}</h3>
-                          </div>
-                          <div className="mt-2 flex justify-end">
-                            <div className="flex gap-1">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingDepartment(department);
-                                  setDepartmentForm({
-                                    name: department.name,
-                                    collegeId: department.collegeId?.toString() || "",
-                                    headOfDepartment: department.headOfDepartment || "",
-                                    description: department.description || ""
-                                  });
-                                }}
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button 
-                                variant="destructive" 
-                                size="sm"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (confirm(`Are you sure you want to delete ${department.name}?`)) {
-                                    try {
-                                      setLoading(true);
-                                      await courseOperations.deleteDepartment(department.id);
-                                      await loadData();
-                                      toast.success(`${department.name} deleted successfully!`);
-                                    } catch (error) {
-                                      console.error('Error deleting department:', error);
-                                      toast.error("Failed to delete department");
-                                    } finally {
-                                      setLoading(false);
-                                    }
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 truncate">{department.name}</h3>
+                          <p className="text-sm text-gray-500 truncate">HOD: {department.headOfDepartment || department.head_of_department || 'Not assigned'}</p>
+                        </div>
+                        
+                        {/* College Badge */}
+                        <div className="hidden md:block">
+                          <Badge variant="secondary" className="bg-blue-600 text-white text-xs">
+                            {stats.college?.shortName || stats.college?.name?.substring(0, 10) || 'N/A'}
+                          </Badge>
+                        </div>
+                        
+                        {/* Stats */}
+                        <div className="hidden lg:flex items-center gap-2">
+                          <Badge variant="secondary" className="bg-emerald-600 text-white text-xs">
+                            {stats.courses} Courses
+                          </Badge>
+                          <Badge variant="secondary" className="bg-orange-600 text-white text-xs">
+                            {stats.programs} Programs
+                          </Badge>
+                        </div>
+                        
+                        {/* Actions */}
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                            onClick={() => handleDepartmentClick(department)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingDepartment(department);
+                              setDepartmentForm({
+                                name: department.name,
+                                collegeId: department.collegeId?.toString() || "",
+                                headOfDepartment: department.headOfDepartment || "",
+                                description: department.description || ""
+                              });
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-gray-100"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm(`Are you sure you want to delete ${department.name}?`)) {
+                                try {
+                                  setLoading(true);
+                                  await courseOperations.deleteDepartment(department.id);
+                                  await loadData();
+                                  toast.success(`${department.name} deleted successfully!`);
+                                } catch (error) {
+                                  console.error('Error deleting department:', error);
+                                  toast.error("Failed to delete department");
+                                } finally {
+                                  setLoading(false);
+                                }
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -1064,86 +1172,97 @@ export const CourseManagement = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {courses
                     .filter(course => selectedLevel === "all" || course.academic_level === selectedLevel || course.academicLevel === selectedLevel)
                     .map((course) => {
                     const stats = getCourseStats(course.id);
                     return (
-                      <Card 
+                      <div 
                         key={course.id} 
-                        className="hover:shadow-md transition-shadow"
+                        className="flex items-center gap-4 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
                       >
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold">{course.name}</h3>
-                              <Badge 
-                                variant={
-                                  (course.academic_level || course.academicLevel) === 'certificate' ? 'secondary' :
-                                  (course.academic_level || course.academicLevel) === 'diploma' ? 'outline' :
-                                  (course.academic_level || course.academicLevel) === 'bachelor' ? 'default' :
-                                  (course.academic_level || course.academicLevel) === 'masters' ? 'destructive' :
-                                  'secondary'
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 truncate">{course.name}</h3>
+                          <p className="text-sm text-gray-500 truncate">Code: {course.code} | Duration: {course.duration || 0} years</p>
+                        </div>
+                        
+                        {/* Level Badge */}
+                        <Badge 
+                          variant="secondary"
+                          className={`text-xs text-white ${
+                            (course.academic_level || course.academicLevel) === 'certificate' ? 'bg-gray-600' :
+                            (course.academic_level || course.academicLevel) === 'diploma' ? 'bg-yellow-600' :
+                            (course.academic_level || course.academicLevel) === 'bachelor' ? 'bg-blue-600' :
+                            (course.academic_level || course.academicLevel) === 'masters' ? 'bg-purple-600' :
+                            'bg-red-600'
+                          }`}
+                        >
+                          {(course.academic_level || course.academicLevel)?.toUpperCase() || 'BACHELOR'}
+                        </Badge>
+                        
+                        {/* Programs Count */}
+                        <div className="hidden md:block">
+                          <Badge variant="secondary" className="bg-emerald-600 text-white text-xs">
+                            {stats.programs} Programs
+                          </Badge>
+                        </div>
+                        
+                        {/* ID Badge */}
+                        <div className="hidden lg:block">
+                          <Badge variant="outline" className="text-xs font-mono text-gray-500 border-gray-300">
+                            ID: {course.id}
+                          </Badge>
+                        </div>
+                        
+                        {/* Actions */}
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingCourse(course);
+                              setCourseForm({
+                                name: course.name,
+                                code: course.code,
+                                departmentId: course.departmentId?.toString() || "",
+                                duration: course.duration || 0,
+                                academicLevel: course.academic_level || course.academicLevel || "bachelor",
+                                yearOfStudy: course.yearOfStudy || course.year_of_study || 1,
+                                description: course.description || ""
+                              });
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-gray-100"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm(`Are you sure you want to delete ${course.name}?`)) {
+                                try {
+                                  setLoading(true);
+                                  await courseOperations.deleteCourse(course.id);
+                                  await loadData();
+                                  toast.success(`${course.name} deleted successfully!`);
+                                } catch (error) {
+                                  console.error('Error deleting course:', error);
+                                  toast.error("Failed to delete course");
+                                } finally {
+                                  setLoading(false);
                                 }
-                                className="text-xs"
-                              >
-                                {(course.academic_level || course.academicLevel)?.toUpperCase() || 'BACHELOR'}
-                              </Badge>
-                              {course.id && (
-                                <Badge variant="outline" className="text-xs font-mono">
-                                  ID: {course.id}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          <div className="mt-2 flex justify-end">
-                            <div className="flex gap-1">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingCourse(course);
-                                  setCourseForm({
-                                    name: course.name,
-                                    code: course.code,
-                                    departmentId: course.departmentId?.toString() || "",
-                                    duration: course.duration || 0,
-                                    academicLevel: course.academic_level || course.academicLevel || "bachelor",
-                                    yearOfStudy: course.yearOfStudy || course.year_of_study || 1,
-                                    description: course.description || ""
-                                  });
-                                }}
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button 
-                                variant="destructive" 
-                                size="sm"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (confirm(`Are you sure you want to delete ${course.name}?`)) {
-                                    try {
-                                      setLoading(true);
-                                      await courseOperations.deleteCourse(course.id);
-                                      await loadData();
-                                      toast.success(`${course.name} deleted successfully!`);
-                                    } catch (error) {
-                                      console.error('Error deleting course:', error);
-                                      toast.error("Failed to delete course");
-                                    } finally {
-                                      setLoading(false);
-                                    }
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -1308,64 +1427,83 @@ export const CourseManagement = () => {
                 <CardTitle>Programs ({programs.length})</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-2">
                   {programs.map((program) => {
                     const stats = getProgramStats(program.id);
                     return (
-                      <Card 
+                      <div 
                         key={program.id} 
-                        className="hover:shadow-md transition-shadow"
+                        className="flex items-center gap-4 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
                       >
-                        <CardContent className="p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-medium text-sm">{program.name}</h4>
-                          </div>
-                          <div className="flex justify-end">
-                            <div className="flex gap-1">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingProgram(program);
-                                  setProgramForm({
-                                    name: program.name,
-                                    courseId: program.courseId?.toString() || "",
-                                    lecturerName: program.lecturerName || "",
-                                    credits: program.credits || 0,
-                                    totalSemesters: program.totalSemesters || 1,
-                                    description: program.description || ""
-                                  });
-                                }}
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button 
-                                variant="destructive" 
-                                size="sm"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (confirm(`Are you sure you want to delete ${program.name}?`)) {
-                                    try {
-                                      setLoading(true);
-                                      await courseOperations.deleteProgram(program.id);
-                                      await loadData();
-                                      toast.success(`${program.name} deleted successfully!`);
-                                    } catch (error) {
-                                      console.error('Error deleting program:', error);
-                                      toast.error("Failed to delete program");
-                                    } finally {
-                                      setLoading(false);
-                                    }
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 truncate">{program.name}</h3>
+                          <p className="text-sm text-gray-500 truncate">Lecturer: {program.lecturerName || 'Not assigned'}</p>
+                        </div>
+                        
+                        {/* Course Badge */}
+                        <div className="hidden md:block">
+                          <Badge variant="secondary" className="bg-blue-600 text-white text-xs">
+                            {stats.course?.name?.substring(0, 15) || 'N/A'}
+                          </Badge>
+                        </div>
+                        
+                        {/* Credits & Semesters */}
+                        <div className="hidden lg:flex items-center gap-2">
+                          <Badge variant="secondary" className="bg-emerald-600 text-white text-xs">
+                            {program.credits || 0} Credits
+                          </Badge>
+                          <Badge variant="secondary" className="bg-purple-600 text-white text-xs">
+                            {program.totalSemesters || 1} Sem
+                          </Badge>
+                        </div>
+                        
+                        {/* Actions */}
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingProgram(program);
+                              setProgramForm({
+                                name: program.name,
+                                courseId: program.courseId?.toString() || "",
+                                lecturerName: program.lecturerName || "",
+                                credits: program.credits || 0,
+                                totalSemesters: program.totalSemesters || 1,
+                                description: program.description || ""
+                              });
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-gray-100"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm(`Are you sure you want to delete ${program.name}?`)) {
+                                try {
+                                  setLoading(true);
+                                  await courseOperations.deleteProgram(program.id);
+                                  await loadData();
+                                  toast.success(`${program.name} deleted successfully!`);
+                                } catch (error) {
+                                  console.error('Error deleting program:', error);
+                                  toast.error("Failed to delete program");
+                                } finally {
+                                  setLoading(false);
+                                }
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -1379,7 +1517,7 @@ export const CourseManagement = () => {
 };
 
 // Enhanced detailed view components with complete information
-const DetailedCollegeView = ({ college, stats }: any) => (
+const DetailedCollegeView = ({ college, stats, onNavigate }: any) => (
   <div className="space-y-6">
     <Card>
       <CardHeader>
@@ -1388,13 +1526,13 @@ const DetailedCollegeView = ({ college, stats }: any) => (
           {college.name} - Complete College Details
         </CardTitle>
         <CardDescription>
-          Comprehensive overview of {college.shortName || college.name} with all departments, courses, and programs
+          Comprehensive overview of {college.shortName || college.short_name || college.name} with all departments, courses, and programs
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* College Basic Information */}
-          <Card className="border-l-4 border-l-blue-500">
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">College Information</CardTitle>
             </CardHeader>
@@ -1405,7 +1543,7 @@ const DetailedCollegeView = ({ college, stats }: any) => (
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Short Name</Label>
-                <p className="font-semibold">{college.shortName || "Not specified"}</p>
+                <p className="font-semibold">{college.shortName || college.short_name || "Not specified"}</p>
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Established</Label>
@@ -1419,7 +1557,7 @@ const DetailedCollegeView = ({ college, stats }: any) => (
           </Card>
 
           {/* Statistics Overview */}
-          <Card className="border-l-4 border-l-green-500">
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Statistics Overview</CardTitle>
             </CardHeader>
@@ -1446,24 +1584,24 @@ const DetailedCollegeView = ({ college, stats }: any) => (
           </Card>
 
           {/* Quick Actions */}
-          <Card className="border-l-4 border-l-orange-500">
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => onNavigate && onNavigate('departments')}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add New Department
               </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => onNavigate && onNavigate('courses')}>
                 <BookOpen className="mr-2 h-4 w-4" />
                 View All Courses
               </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => onNavigate && onNavigate('programs')}>
                 <GraduationCap className="mr-2 h-4 w-4" />
                 View All Programs
               </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => onNavigate && onNavigate('edit-college')}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit College Info
               </Button>
@@ -1479,43 +1617,37 @@ const DetailedCollegeView = ({ college, stats }: any) => (
         <CardHeader>
           <CardTitle className="flex items-center">
             <Building className="mr-2 h-5 w-5" />
-            Departments in {college.shortName || college.name} ({stats.departmentsList.length})
+            Departments in {college.shortName || college.short_name || college.name} ({stats.departmentsList.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-3">
             {stats.departmentsList.map((dept: any) => {
-              const deptCourses = stats.coursesList?.filter((c: any) => Number(c.departmentId) === Number(dept.id)) || [];
+              const deptCourses = stats.coursesList?.filter((c: any) => Number(c.departmentId || c.department_id) === Number(dept.id)) || [];
               const deptPrograms = stats.programsList?.filter((p: any) => 
-                deptCourses.some((c: any) => Number(c.id) === Number(p.courseId))
+                deptCourses.some((c: any) => Number(c.id) === Number(p.courseId || p.course_id))
               ) || [];
               
               return (
-                <Card key={dept.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">{dept.name}</CardTitle>
-                    <CardDescription>
-                      HOD: {dept.headOfDepartment || dept.head_of_department || 'Dr. ' + dept.name?.split(' ')[0] + ' Head'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Courses:</span>
-                        <Badge variant="outline">{deptCourses.length}</Badge>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Programs:</span>
-                        <Badge variant="outline">{deptPrograms.length}</Badge>
-                      </div>
-                      {dept.description && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {dept.description}
-                        </p>
-                      )}
+                <div key={dept.id} className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm">
+                  <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-full">
+                    <Building className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900">{dept.name}</h3>
+                    <p className="text-sm text-gray-500">HOD: {dept.headOfDepartment || dept.head_of_department || 'Not assigned'}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-center">
+                      <span className="text-sm text-gray-500">Courses:</span>
+                      <Badge variant="outline" className="ml-2">{deptCourses.length}</Badge>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="text-center">
+                      <span className="text-sm text-gray-500">Programs:</span>
+                      <Badge variant="outline" className="ml-2">{deptPrograms.length}</Badge>
+                    </div>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -1533,15 +1665,17 @@ const DetailedCollegeView = ({ college, stats }: any) => (
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-3">
             {stats.coursesList.map((course: any) => (
-              <Card key={course.id} className="p-3">
-                <div className="space-y-1">
-                  <h4 className="font-medium text-sm">{course.name}</h4>
-                  <p className="text-xs text-muted-foreground">Code: {course.code}</p>
-                  <p className="text-xs text-muted-foreground">Credits: {course.credits || 0}</p>
+              <div key={course.id} className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm">
+                <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
+                  <BookOpen className="h-5 w-5 text-blue-600" />
                 </div>
-              </Card>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-gray-900">{course.name}</h3>
+                  <p className="text-sm text-gray-500">Code: {course.code}</p>
+                </div>
+              </div>
             ))}
           </div>
         </CardContent>
@@ -1550,7 +1684,7 @@ const DetailedCollegeView = ({ college, stats }: any) => (
   </div>
 );
 
-const DetailedDepartmentView = ({ department, stats }: any) => (
+const DetailedDepartmentView = ({ department, stats, onNavigate }: any) => (
   <div className="space-y-6">
     <Card>
       <CardHeader>
@@ -1565,7 +1699,7 @@ const DetailedDepartmentView = ({ department, stats }: any) => (
       <CardContent>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* Department Basic Information */}
-          <Card className="border-l-4 border-l-green-500">
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Department Information</CardTitle>
             </CardHeader>
@@ -1580,7 +1714,7 @@ const DetailedDepartmentView = ({ department, stats }: any) => (
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Head of Department</Label>
-                <p className="font-semibold">{department.headOfDepartment || "Not assigned"}</p>
+                <p className="font-semibold">{department.headOfDepartment || department.head_of_department || "Not assigned"}</p>
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Description</Label>
@@ -1590,7 +1724,7 @@ const DetailedDepartmentView = ({ department, stats }: any) => (
           </Card>
 
           {/* Statistics Overview */}
-          <Card className="border-l-4 border-l-blue-500">
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Academic Statistics</CardTitle>
             </CardHeader>
@@ -1605,7 +1739,7 @@ const DetailedDepartmentView = ({ department, stats }: any) => (
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">College</span>
-                <Badge variant="outline" className="bg-purple-50">{stats.college?.shortName || "N/A"}</Badge>
+                <Badge variant="outline" className="bg-purple-50">{stats.college?.shortName || stats.college?.short_name || "N/A"}</Badge>
               </div>
               <div className="pt-2 border-t">
                 <p className="text-xs text-muted-foreground">
@@ -1617,24 +1751,24 @@ const DetailedDepartmentView = ({ department, stats }: any) => (
           </Card>
 
           {/* Quick Actions */}
-          <Card className="border-l-4 border-l-orange-500">
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => onNavigate && onNavigate('courses')}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add New Course
               </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => onNavigate && onNavigate('programs')}>
                 <GraduationCap className="mr-2 h-4 w-4" />
                 Add New Program
               </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => onNavigate && onNavigate('edit-department')}>
                 <Users className="mr-2 h-4 w-4" />
                 Assign HOD
               </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => onNavigate && onNavigate('edit-department')}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit Department
               </Button>
@@ -1654,49 +1788,26 @@ const DetailedDepartmentView = ({ department, stats }: any) => (
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-3">
             {stats.coursesList.map((course: any) => {
-              const coursePrograms = stats.programsList?.filter((p: any) => Number(p.courseId) === Number(course.id)) || [];
+              const coursePrograms = stats.programsList?.filter((p: any) => Number(p.courseId || p.course_id) === Number(course.id)) || [];
               
               return (
-                <Card key={course.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">{course.name}</CardTitle>
-                    <CardDescription>
-                      Code: {course.code} | Credits: {course.credits || 0}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Programs:</span>
-                        <Badge variant="outline">{coursePrograms.length}</Badge>
-                      </div>
-                      {course.description && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {course.description}
-                        </p>
-                      )}
-                      {coursePrograms.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Programs:</p>
-                          <div className="flex flex-wrap gap-1">
-                            {coursePrograms.slice(0, 2).map((program: any) => (
-                              <Badge key={program.id} variant="secondary" className="text-xs">
-                                {program.name}
-                              </Badge>
-                            ))}
-                            {coursePrograms.length > 2 && (
-                              <Badge variant="secondary" className="text-xs">
-                                +{coursePrograms.length - 2} more
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                <div key={course.id} className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm">
+                  <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
+                    <BookOpen className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900">{course.name}</h3>
+                    <p className="text-sm text-gray-500">Code: {course.code}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-center">
+                      <span className="text-sm text-gray-500">Programs:</span>
+                      <Badge variant="outline" className="ml-2">{coursePrograms.length}</Badge>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               );
             })}
           </div>

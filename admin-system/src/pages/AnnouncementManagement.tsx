@@ -96,8 +96,20 @@ export const AnnouncementManagement = () => {
   }, []);
 
   const handleCreateAnnouncement = async () => {
-    if (!newAnnouncement.title || !newAnnouncement.content) {
-      alert('Please fill in all required fields');
+    // Validation
+    if (!newAnnouncement.title?.trim()) {
+      alert('Please enter announcement title');
+      return;
+    }
+
+    if (!newAnnouncement.content?.trim()) {
+      alert('Please enter announcement content');
+      return;
+    }
+
+    // Validate target audience selection
+    if (newAnnouncement.target_type !== "all" && !newAnnouncement.target_value?.trim()) {
+      alert(`Please select a ${newAnnouncement.target_type}`);
       return;
     }
 
@@ -107,45 +119,66 @@ export const AnnouncementManagement = () => {
       // Check if file is selected - use FormData for multipart upload
       if (newAnnouncement.file) {
         const formData = new FormData();
-        formData.append('title', newAnnouncement.title);
-        formData.append('content', newAnnouncement.content);
+        formData.append('title', newAnnouncement.title.trim());
+        formData.append('content', newAnnouncement.content.trim());
         formData.append('target_type', newAnnouncement.target_type);
-        formData.append('target_value', newAnnouncement.target_value || '');
+        formData.append('target_value', newAnnouncement.target_value?.trim() || '');
         formData.append('created_by', currentUser.username || 'Admin');
         formData.append('created_by_id', currentUser.id || '');
         formData.append('created_by_type', 'admin');
         formData.append('file', newAnnouncement.file);
+
+        console.log('Creating announcement with PDF file...');
+        console.log('File name:', newAnnouncement.file.name);
+        console.log('File size:', newAnnouncement.file.size);
+        console.log('Target type:', newAnnouncement.target_type);
+        console.log('Target value:', newAnnouncement.target_value);
 
         const response = await fetch('https://must-lms-backend.onrender.com/api/announcements', {
           method: 'POST',
           body: formData
         });
 
+        const responseText = await response.text();
+        console.log('Response status:', response.status);
+        console.log('Response text:', responseText);
+
         if (response.ok) {
-          const result = await response.json();
-          setAnnouncements([result.data, ...announcements]);
-          
-          // Reset form
-          setNewAnnouncement({
-            title: "",
-            content: "",
-            target_type: "all",
-            target_value: "",
-            file: null
-          });
-          setShowCreateForm(false);
-          
-          alert('Announcement created successfully!');
+          try {
+            const result = JSON.parse(responseText);
+            setAnnouncements([result.data, ...announcements]);
+            
+            // Reset form
+            setNewAnnouncement({
+              title: "",
+              content: "",
+              target_type: "all",
+              target_value: "",
+              file: null
+            });
+            setShowCreateForm(false);
+            
+            alert('Announcement created successfully with PDF!');
+          } catch (parseError) {
+            console.error('Error parsing response:', parseError);
+            alert('Announcement created but could not parse response');
+          }
         } else {
-          alert('Failed to create announcement');
+          console.error('Backend error response:', responseText);
+          try {
+            const errorData = JSON.parse(responseText);
+            alert(`Failed to create announcement: ${errorData.error || 'Unknown error'}`);
+          } catch {
+            alert(`Failed to create announcement: ${response.statusText || 'Server error'}`);
+          }
         }
       } else {
-        // No file - use JSON
+        // No file - use JSON endpoint
         const announcementData = {
-          title: newAnnouncement.title,
-          content: newAnnouncement.content,
+          title: newAnnouncement.title.trim(),
+          content: newAnnouncement.content.trim(),
           target_type: newAnnouncement.target_type,
-          target_value: newAnnouncement.target_value || null,
+          target_value: newAnnouncement.target_value?.trim() || null,
           created_by: currentUser.username || 'Admin',
           created_by_id: currentUser.id || null,
           created_by_type: 'admin',
@@ -153,34 +186,51 @@ export const AnnouncementManagement = () => {
           file_name: null
         };
 
-        const response = await fetch('https://must-lms-backend.onrender.com/api/announcements', {
+        console.log('Creating announcement without file...', announcementData);
+
+        const response = await fetch('https://must-lms-backend.onrender.com/api/announcements/json', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(announcementData)
         });
 
+        const responseText = await response.text();
+        console.log('Response status:', response.status);
+        console.log('Response text:', responseText);
+
         if (response.ok) {
-          const result = await response.json();
-          setAnnouncements([result.data, ...announcements]);
-          
-          // Reset form
-          setNewAnnouncement({
-            title: "",
-            content: "",
-            target_type: "all",
-            target_value: "",
-            file: null
-          });
-          setShowCreateForm(false);
-          
-          alert('Announcement created successfully!');
+          try {
+            const result = JSON.parse(responseText);
+            setAnnouncements([result.data, ...announcements]);
+            
+            // Reset form
+            setNewAnnouncement({
+              title: "",
+              content: "",
+              target_type: "all",
+              target_value: "",
+              file: null
+            });
+            setShowCreateForm(false);
+            
+            alert('Announcement created successfully!');
+          } catch (parseError) {
+            console.error('Error parsing response:', parseError);
+            alert('Announcement created but could not parse response');
+          }
         } else {
-          alert('Failed to create announcement');
+          console.error('Backend error response:', responseText);
+          try {
+            const errorData = JSON.parse(responseText);
+            alert(`Failed to create announcement: ${errorData.error || 'Unknown error'}`);
+          } catch {
+            alert(`Failed to create announcement: ${response.statusText || 'Server error'}`);
+          }
         }
       }
     } catch (error) {
       console.error('Error creating announcement:', error);
-      alert('Failed to create announcement');
+      alert(`Failed to create announcement: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -361,16 +411,57 @@ export const AnnouncementManagement = () => {
 
             <div>
               <Label htmlFor="file">PDF Attachment (Optional)</Label>
-              <Input
-                id="file"
-                type="file"
-                accept=".pdf"
-                onChange={(e) => setNewAnnouncement({...newAnnouncement, file: e.target.files?.[0] || null})}
-              />
+              <div className="flex flex-col gap-2">
+                <Input
+                  id="file"
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setNewAnnouncement({...newAnnouncement, file});
+                    if (file) {
+                      console.log('File selected:', {
+                        name: file.name,
+                        size: file.size,
+                        type: file.type
+                      });
+                    }
+                  }}
+                />
+                {newAnnouncement.file && (
+                  <div className="p-2 bg-blue-50 border border-blue-200 rounded-md text-sm">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-blue-600" />
+                      <div className="flex-1">
+                        <p className="font-medium text-blue-900">{newAnnouncement.file.name}</p>
+                        <p className="text-xs text-blue-700">Size: {(newAnnouncement.file.size / 1024).toFixed(2)} KB</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setNewAnnouncement({...newAnnouncement, file: null})}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex gap-2">
-              <Button onClick={handleCreateAnnouncement}>Create Announcement</Button>
+              <Button 
+                onClick={handleCreateAnnouncement}
+                disabled={
+                  !newAnnouncement.title?.trim() || 
+                  !newAnnouncement.content?.trim() ||
+                  (newAnnouncement.target_type !== "all" && !newAnnouncement.target_value?.trim())
+                }
+              >
+                Create Announcement
+              </Button>
               <Button variant="outline" onClick={() => setShowCreateForm(false)}>Cancel</Button>
             </div>
           </CardContent>

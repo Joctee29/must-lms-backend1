@@ -125,27 +125,25 @@ export const Announcements = () => {
       // CRITICAL FIX: Ensure exact program name is used for targeting
       const selectedProgram = lecturerPrograms.find(p => p.name === newAnnouncement.program);
       
-      const announcementData = {
-        title: newAnnouncement.title,
-        content: newAnnouncement.content,
-        target_type: 'program',
-        target_value: newAnnouncement.program, // This must match EXACTLY with student's program names
-        created_by: currentUser.username || 'Lecturer',
-        created_by_id: currentUser.id || null,
-        created_by_type: 'lecturer',
-        file_url: null,
-        file_name: null
-      };
+      // Use FormData for multipart/form-data (required by backend)
+      const formData = new FormData();
+      formData.append('title', newAnnouncement.title);
+      formData.append('content', newAnnouncement.content);
+      formData.append('target_type', 'program');
+      formData.append('target_value', newAnnouncement.program);
+      formData.append('created_by', currentUser.username || 'Lecturer');
+      formData.append('created_by_id', currentUser.id ? currentUser.id.toString() : '');
+      formData.append('created_by_type', 'lecturer');
 
       console.log('=== CREATING LECTURER ANNOUNCEMENT ===');
-      console.log('Announcement Data:', announcementData);
+      console.log('Title:', newAnnouncement.title);
+      console.log('Content:', newAnnouncement.content);
+      console.log('Target Program:', newAnnouncement.program);
       console.log('Selected Program:', selectedProgram);
-      console.log('IMPORTANT: This announcement will ONLY be visible to students enrolled in program:', announcementData.target_value);
 
       const response = await fetch('https://must-lms-backend.onrender.com/api/announcements', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(announcementData)
+        body: formData
       });
 
       if (response.ok) {
@@ -164,7 +162,7 @@ export const Announcements = () => {
         });
         setShowCreateForm(false);
         
-        alert(`✅ Announcement sent successfully!\n\nThis announcement will ONLY be visible to students enrolled in:\n"${announcementData.target_value}"\n\nOther students will NOT see this announcement.`);
+        alert(`✅ Announcement sent successfully!\n\nThis announcement will ONLY be visible to students enrolled in:\n"${newAnnouncement.program}"\n\nOther students will NOT see this announcement.`);
       } else {
         const errorText = await response.text();
         console.error('Failed to create announcement:', errorText);

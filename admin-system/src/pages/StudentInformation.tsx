@@ -749,88 +749,91 @@ export const StudentInformation = () => {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {filteredStudents.map((student) => (
-              <Card key={student.id} className="">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-3 flex-1">
-                      {/* Student Basic Info */}
-                      <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
-                          <User className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-lg">{student.name}</h3>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant="secondary">{student.registrationNumber}</Badge>
-                            <Badge variant="outline">
-                              Semester {student.currentSemester}
-                            </Badge>
-                            <Badge variant="default" className="bg-blue-600">
-                              Year {student.yearOfStudy || 1}
-                            </Badge>
-                            <Badge 
-                              variant={
-                                student.academicLevel === 'certificate' ? 'secondary' :
-                                student.academicLevel === 'diploma' ? 'outline' :
-                                student.academicLevel === 'bachelor' ? 'default' :
-                                student.academicLevel === 'masters' ? 'destructive' :
-                                'secondary'
-                              }
-                              className="text-xs font-medium"
-                            >
-                              {student.academicLevel?.toUpperCase() || 'BACHELOR'}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Academic Information - Real Data */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <BookOpen className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">Course:</span>
-                          </div>
-                          <p className="text-muted-foreground ml-6">{student.course}</p>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Building className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">College:</span>
-                          </div>
-                          <p className="text-muted-foreground ml-6">{student.college}</p>
-                        </div>
-                      </div>
-
-                      {/* Contact Information */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">{student.email}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">{student.phone}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setSelectedStudent(student)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Details
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div 
+                key={student.id} 
+                className="flex items-center gap-4 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                {/* Avatar */}
+                <div className="flex-shrink-0 w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                  {student.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                </div>
+                
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-gray-900 truncate">{student.name}</h3>
+                  <p className="text-sm text-gray-500 truncate">{student.email}</p>
+                </div>
+                
+                {/* Phone */}
+                <div className="hidden md:block text-sm text-gray-500 w-28">
+                  {student.phone || 'N/A'}
+                </div>
+                
+                {/* Level Badge */}
+                <Badge 
+                  variant="secondary"
+                  className={`text-xs text-white ${
+                    student.academicLevel === 'certificate' ? 'bg-gray-600' :
+                    student.academicLevel === 'diploma' ? 'bg-yellow-600' :
+                    student.academicLevel === 'bachelor' ? 'bg-blue-600' :
+                    student.academicLevel === 'masters' ? 'bg-purple-600' :
+                    'bg-red-600'
+                  }`}
+                >
+                  {student.academicLevel?.toUpperCase() || 'BACHELOR'}
+                </Badge>
+                
+                {/* Status Badge */}
+                <Badge 
+                  variant="secondary"
+                  className={`text-xs text-white ${
+                    student.status === 'Active' ? 'bg-emerald-600' :
+                    student.status === 'Inactive' ? 'bg-gray-600' :
+                    student.status === 'Graduated' ? 'bg-blue-600' :
+                    'bg-red-600'
+                  }`}
+                >
+                  {student.status}
+                </Badge>
+                
+                {/* Year & Semester */}
+                <div className="hidden lg:flex items-center gap-2">
+                  <Badge variant="secondary" className="bg-blue-600 text-white text-xs">
+                    Year {student.yearOfStudy || 1}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs text-gray-500 border-gray-300">
+                    Sem {student.currentSemester}
+                  </Badge>
+                </div>
+                
+                {/* Registration Number */}
+                <div className="hidden xl:block">
+                  <Badge variant="outline" className="text-xs font-mono text-gray-500 border-gray-300">
+                    {student.registrationNumber}
+                  </Badge>
+                </div>
+                
+                {/* Actions */}
+                <div className="flex items-center gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-8 w-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                    onClick={() => setSelectedStudent(student)}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-8 w-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
               ))}
             </div>
           )}

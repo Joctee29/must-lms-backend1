@@ -360,9 +360,9 @@ const Index = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Session timeout hook: Logs out user after 10 minutes of inactivity when OUTSIDE app
+  // Session timeout hook: Logs out user after 5 minutes of inactivity when OUTSIDE app
   useSessionTimeout({
-    timeoutMinutes: 10,
+    timeoutMinutes: 5,
     onTimeout: () => {
       console.log('🚪 Session timeout: Logging out due to inactivity');
       handleLogout();

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Papa from "papaparse";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,13 +19,6 @@ import {
   AlertCircle,
   BookOpen
 } from "lucide-react";
-import { courseOperations, initializeDatabase } from "@/lib/database";
-
-interface Course {
-  id: string;
-  name: string;
-  code: string;
-}
 
 interface UploadResult {
   successful: Array<{ row: number; data: any }>;
@@ -34,25 +27,18 @@ interface UploadResult {
 
 export const BulkUpload = () => {
   const [activeTab, setActiveTab] = useState("students");
-  const [courses, setCourses] = useState<Course[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
 
-  useEffect(() => {
-    const loadCourses = async () => {
-      try {
-        await initializeDatabase();
-        const coursesData = await courseOperations.getAllCourses();
-        setCourses(coursesData || []);
-      } catch (error) {
-        console.error('Error loading courses:', error);
-        toast.error("Failed to load courses");
-      }
-    };
-    loadCourses();
-  }, []);
+  // Clear file and results when changing tabs
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    setSelectedFile(null);
+    setUploadResult(null);
+    setUploadProgress(0);
+  };
 
   // Generate CSV template for students
   const downloadStudentTemplate = () => {
@@ -177,21 +163,26 @@ export const BulkUpload = () => {
       skipEmptyLines: true,
       complete: async (results) => {
         try {
+          console.log('=== PARSING CSV FOR STUDENTS ===');
+          console.log('Raw CSV data:', results.data);
+          
           const students = results.data
-            .map((row: any) => {
-              // Validate required fields - skip rows without registration number
-              if (!row.registrationNumber?.trim()) {
-                console.warn(`Skipping row without registration number for student: ${row.name || 'Unknown'}`);
+            .map((row: any, index: number) => {
+              console.log(`Row ${index + 1}:`, row);
+              
+              // Validate required fields - name, email, courseId are required by backend
+              if (!row.name?.trim() || !row.email?.trim() || !row.courseId?.trim()) {
+                console.warn(`Row ${index + 1}: Missing required fields (name, email, or courseId)`);
                 return null;
               }
 
               return {
-                name: row.name?.trim(),
-                email: row.email?.trim(),
+                name: row.name.trim(),
+                email: row.email.trim(),
                 phone: row.phone?.trim() || null,
-                registrationNumber: row.registrationNumber.trim(), // Required
+                registrationNumber: row.registrationNumber?.trim() || null,
                 academicYear: row.academicYear?.trim() || new Date().getFullYear().toString(),
-                courseId: row.courseId?.trim() ? (isNaN(parseInt(row.courseId)) ? row.courseId.trim() : parseInt(row.courseId)) : null,
+                courseId: isNaN(parseInt(row.courseId)) ? row.courseId.trim() : parseInt(row.courseId),
                 currentSemester: parseInt(row.currentSemester) || 1,
                 yearOfStudy: parseInt(row.yearOfStudy) || 1,
                 academicLevel: row.academicLevel?.trim() || 'bachelor',
@@ -199,6 +190,14 @@ export const BulkUpload = () => {
               };
             })
             .filter((student: any) => student !== null);
+
+          console.log('Processed students to upload:', students);
+
+          if (students.length === 0) {
+            toast.error("No valid students found in CSV. Make sure name, email, and courseId columns are filled.");
+            setUploading(false);
+            return;
+          }
 
           setUploadProgress(30);
 
@@ -212,6 +211,15 @@ export const BulkUpload = () => {
 
           setUploadProgress(70);
 
+          // Check if response is ok before parsing
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Server error:', response.status, errorText);
+            toast.error(`Server error: ${response.status} - ${errorText || 'Unknown error'}`);
+            setUploading(false);
+            return;
+          }
+
           const result = await response.json();
 
           setUploadProgress(100);
@@ -224,7 +232,7 @@ export const BulkUpload = () => {
           }
         } catch (error) {
           console.error('Error uploading students:', error);
-          toast.error("Failed to upload students");
+          toast.error("Failed to upload students: " + (error instanceof Error ? error.message : 'Unknown error'));
         } finally {
           setUploading(false);
         }
@@ -252,9 +260,17 @@ export const BulkUpload = () => {
       skipEmptyLines: true,
       complete: async (results) => {
         try {
+          console.log('=== PARSING CSV FOR COURSE MANAGEMENT ===');
+          console.log('Raw CSV data:', results.data);
+          console.log('CSV headers:', Object.keys(results.data[0] || {}));
+          
           const records = results.data
-            .map((row: any) => {
+            .map((row: any, index: number) => {
+              console.log(`Row ${index + 1}:`, row);
+              
+              // At least one entity must be present
               if (!row.collegeName && !row.departmentName && !row.courseName && !row.programName) {
+                console.warn(`Row ${index + 1}: No valid entity found (collegeName, departmentName, courseName, or programName)`);
                 return null;
               }
 
@@ -282,14 +298,18 @@ export const BulkUpload = () => {
             })
             .filter((record: any) => record !== null);
 
+          console.log('Processed records to upload:', records);
+
           if (records.length === 0) {
-            toast.error("CSV file is empty or has invalid rows");
+            toast.error("CSV file is empty or has invalid rows. Make sure at least one of: collegeName, departmentName, courseName, or programName is filled.");
             setUploading(false);
             return;
           }
 
           setUploadProgress(30);
 
+          console.log('Sending to backend:', { records });
+          
           const response = await fetch('https://must-lms-backend.onrender.com/api/course-management/bulk-upload', {
             method: 'POST',
             headers: {
@@ -297,8 +317,19 @@ export const BulkUpload = () => {
             },
             body: JSON.stringify({ records })
           });
+          
+          console.log('Response status:', response.status);
 
           setUploadProgress(70);
+
+          // Check if response is ok before parsing
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Server error:', response.status, errorText);
+            toast.error(`Server error: ${response.status} - ${errorText || 'Unknown error'}`);
+            setUploading(false);
+            return;
+          }
 
           const result = await response.json();
 
@@ -312,7 +343,7 @@ export const BulkUpload = () => {
           }
         } catch (error) {
           console.error('Error uploading course management data:', error);
-          toast.error("Failed to upload course management data");
+          toast.error("Failed to upload course management data: " + (error instanceof Error ? error.message : 'Unknown error'));
         } finally {
           setUploading(false);
         }
@@ -340,14 +371,37 @@ export const BulkUpload = () => {
       skipEmptyLines: true,
       complete: async (results) => {
         try {
-          const lecturers = results.data.map((row: any) => ({
-            name: row.name?.trim(),
-            email: row.email?.trim(),
-            phone: row.phone?.trim() || null,
-            employeeId: row.employeeId?.trim(),
-            specialization: row.specialization?.trim() || null,
-            password: row.password?.trim() || 'lecturer123'
-          }));
+          console.log('=== PARSING CSV FOR LECTURERS ===');
+          console.log('Raw CSV data:', results.data);
+          
+          const lecturers = results.data
+            .map((row: any, index: number) => {
+              console.log(`Row ${index + 1}:`, row);
+              
+              // Validate required fields - name, email, employeeId are required by backend
+              if (!row.name?.trim() || !row.email?.trim() || !row.employeeId?.trim()) {
+                console.warn(`Row ${index + 1}: Missing required fields (name, email, or employeeId)`);
+                return null;
+              }
+              
+              return {
+                name: row.name.trim(),
+                email: row.email.trim(),
+                phone: row.phone?.trim() || null,
+                employeeId: row.employeeId.trim(),
+                specialization: row.specialization?.trim() || null,
+                password: row.password?.trim() || 'lecturer123'
+              };
+            })
+            .filter((lecturer: any) => lecturer !== null);
+
+          console.log('Processed lecturers to upload:', lecturers);
+
+          if (lecturers.length === 0) {
+            toast.error("No valid lecturers found in CSV. Make sure name, email, and employeeId columns are filled.");
+            setUploading(false);
+            return;
+          }
 
           setUploadProgress(30);
 
@@ -361,6 +415,15 @@ export const BulkUpload = () => {
 
           setUploadProgress(70);
 
+          // Check if response is ok before parsing
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Server error:', response.status, errorText);
+            toast.error(`Server error: ${response.status} - ${errorText || 'Unknown error'}`);
+            setUploading(false);
+            return;
+          }
+
           const result = await response.json();
 
           setUploadProgress(100);
@@ -373,7 +436,7 @@ export const BulkUpload = () => {
           }
         } catch (error) {
           console.error('Error uploading lecturers:', error);
-          toast.error("Failed to upload lecturers");
+          toast.error("Failed to upload lecturers: " + (error instanceof Error ? error.message : 'Unknown error'));
         } finally {
           setUploading(false);
         }
@@ -399,7 +462,7 @@ export const BulkUpload = () => {
         </Badge>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList className="grid w-full max-w-md grid-cols-3">
           <TabsTrigger value="students" className="flex items-center gap-2">
             <GraduationCap className="h-4 w-4" />
@@ -450,6 +513,7 @@ export const BulkUpload = () => {
                 <Label htmlFor="student-csv">Select CSV File</Label>
                 <Input
                   id="student-csv"
+                  key={`student-csv-${activeTab}`}
                   type="file"
                   accept=".csv"
                   onChange={handleFileSelect}
@@ -612,6 +676,7 @@ export const BulkUpload = () => {
                 <Label htmlFor="lecturer-csv">Select CSV File</Label>
                 <Input
                   id="lecturer-csv"
+                  key={`lecturer-csv-${activeTab}`}
                   type="file"
                   accept=".csv"
                   onChange={handleFileSelect}
@@ -767,6 +832,7 @@ export const BulkUpload = () => {
                 <Label htmlFor="course-management-csv">Select CSV File</Label>
                 <Input
                   id="course-management-csv"
+                  key={`course-management-csv-${activeTab}`}
                   type="file"
                   accept=".csv"
                   onChange={handleFileSelect}

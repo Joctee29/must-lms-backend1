@@ -119,12 +119,8 @@ export const AssessmentResults = () => {
   });
 
   const exportResults = (assessment: Assessment) => {
-    // PROFESSIONAL PDF EXPORT WITH WHITE BACKGROUND AND BLUE DESIGN
-    const generatePDF = () => {
-      // Create new window for PDF generation
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) return;
-
+    // DIRECT PDF DOWNLOAD - NO PRINT DIALOG
+    const generateAndDownloadPDF = () => {
       // Get current date and time
       const now = new Date();
       const dateStr = now.toLocaleDateString();
@@ -139,254 +135,54 @@ export const AssessmentResults = () => {
         ? Math.round((assessment.submissions.filter(sub => sub.percentage >= 60).length / totalSubmissions) * 100)
         : 0;
 
-      // Professional PDF HTML with white background and blue design
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>MUST LMS</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { 
-              font-family: 'Arial', sans-serif; 
-              background: white; 
-              color: #333; 
-              line-height: 1.4;
-              padding: 20px;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-              padding: 20px;
-              border-bottom: 3px solid #2563eb;
-            }
-            .logo {
-              font-size: 20px;
-              font-weight: bold;
-              color: #2563eb;
-              margin-bottom: 5px;
-            }
-            .results-title {
-              font-size: 18px;
-              color: #1e40af;
-              margin-bottom: 10px;
-            }
-            .info-section {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 25px;
-              padding: 15px;
-              background: #f8fafc;
-              border-left: 4px solid #2563eb;
-            }
-            .info-item {
-              text-align: center;
-            }
-            .info-label {
-              font-size: 12px;
-              color: #64748b;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-            }
-            .info-value {
-              font-size: 16px;
-              font-weight: bold;
-              color: #1e40af;
-              margin-top: 2px;
-            }
-            .stats-grid {
-              display: grid;
-              grid-template-columns: repeat(4, 1fr);
-              gap: 15px;
-              margin-bottom: 25px;
-            }
-            .stat-card {
-              text-align: center;
-              padding: 15px;
-              border: 1px solid #e2e8f0;
-              border-radius: 8px;
-              background: white;
-            }
-            .stat-number {
-              font-size: 24px;
-              font-weight: bold;
-              color: #2563eb;
-            }
-            .stat-label {
-              font-size: 12px;
-              color: #64748b;
-              margin-top: 5px;
-            }
-            .results-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 20px;
-              background: white;
-              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            }
-            .results-table th {
-              background: #2563eb;
-              color: white;
-              padding: 12px 8px;
-              text-align: left;
-              font-size: 12px;
-              font-weight: 600;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-            }
-            .results-table td {
-              padding: 10px 8px;
-              border-bottom: 1px solid #e2e8f0;
-              font-size: 11px;
-            }
-            .results-table tr:nth-child(even) {
-              background: #f8fafc;
-            }
-            .status-badge {
-              padding: 4px 8px;
-              border-radius: 12px;
-              font-size: 10px;
-              font-weight: 500;
-              text-transform: uppercase;
-            }
-            .status-completed { background: #dcfce7; color: #166534; }
-            .status-submitted { background: #dbeafe; color: #1d4ed8; }
-            .status-pending { background: #fef3c7; color: #92400e; }
-            .score-excellent { color: #059669; font-weight: bold; }
-            .score-good { color: #2563eb; font-weight: bold; }
-            .score-average { color: #d97706; font-weight: bold; }
-            .score-poor { color: #dc2626; font-weight: bold; }
-            .footer {
-              margin-top: 30px;
-              text-align: center;
-              padding-top: 20px;
-              border-top: 1px solid #e2e8f0;
-              color: #64748b;
-              font-size: 11px;
-            }
-            @media print {
-              body { padding: 10px; }
-              .header { margin-bottom: 20px; }
-              .info-section { margin-bottom: 15px; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="logo">MBEYA UNIVERSITY OF SCIENCE AND TECHNOLOGY</div>
-            <div class="results-title">Assessment Results</div>
-          </div>
-
-          <div class="info-section">
-            <div class="info-item">
-              <div class="info-label">Assessment Title</div>
-              <div class="info-value">${assessment.title}</div>
-            </div>
-            <div class="info-item">
-              <div class="info-label">Program</div>
-              <div class="info-value">${assessment.program_name}</div>
-            </div>
-            <div class="info-item">
-              <div class="info-label">Generated On</div>
-              <div class="info-value">${dateStr} ${timeStr}</div>
-            </div>
-            <div class="info-item">
-              <div class="info-label">Total Questions</div>
-              <div class="info-value">${assessment.total_questions}</div>
-            </div>
-          </div>
-
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-number">${totalSubmissions}</div>
-              <div class="stat-label">Total Submissions</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-number">${averageScore}%</div>
-              <div class="stat-label">Average Score</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-number">${passRate}%</div>
-              <div class="stat-label">Pass Rate</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-number">${assessment.total_points}</div>
-              <div class="stat-label">Total Points</div>
-            </div>
-          </div>
-
-          <table class="results-table">
-            <thead>
-              <tr>
-                <th>No.</th>
-                <th>Registration</th>
-                <th>Program</th>
-                <th>Score</th>
-                <th>Percentage</th>
-                <th>Grade</th>
-                <th>Submitted</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${assessment.submissions.map((sub, index) => {
-                const getGrade = (percentage: number) => {
-                  if (percentage >= 90) return 'A';
-                  if (percentage >= 80) return 'B';
-                  if (percentage >= 70) return 'C';
-                  if (percentage >= 60) return 'D';
-                  return 'F';
-                };
-                
-                const getScoreClass = (percentage: number) => {
-                  if (percentage >= 80) return 'score-excellent';
-                  if (percentage >= 70) return 'score-good';
-                  if (percentage >= 60) return 'score-average';
-                  return 'score-poor';
-                };
-
-                const getStatusClass = (status: string) => {
-                  if (status === 'completed' || status === 'auto-graded' || status === 'manually-graded') return 'status-completed';
-                  if (status === 'submitted') return 'status-submitted';
-                  return 'status-pending';
-                };
-
-                return `
-                  <tr>
-                    <td>${index + 1}</td>
-                    <td>${sub.student_registration}</td>
-                    <td>${sub.student_program}</td>
-                    <td>${sub.score}/${assessment.total_points}</td>
-                    <td class="${getScoreClass(sub.percentage)}">${sub.percentage}%</td>
-                    <td><strong>${getGrade(sub.percentage)}</strong></td>
-                    <td>${new Date(sub.submitted_at).toLocaleDateString()}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-
-          <div class="footer">
-            <p><strong>MUST LEARNING MANAGEMENT SYSTEM</strong> powered by <strong>JEDA NETWORKS</strong></p>
-          </div>
-        </body>
-        </html>
-      `;
-
-      // Write content and trigger print
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
+      // Create PDF content as text
+      let pdfContent = "MBEYA UNIVERSITY OF SCIENCE AND TECHNOLOGY\n";
+      pdfContent += "Assessment Results Report\n";
+      pdfContent += "=".repeat(50) + "\n\n";
+      pdfContent += `Assessment Title: ${assessment.title}\n`;
+      pdfContent += `Program: ${assessment.program_name}\n`;
+      pdfContent += `Generated On: ${dateStr} ${timeStr}\n`;
+      pdfContent += `Total Questions: ${assessment.total_questions}\n`;
+      pdfContent += `Total Points: ${assessment.total_points}\n\n`;
+      pdfContent += "STATISTICS\n";
+      pdfContent += "-".repeat(30) + "\n";
+      pdfContent += `Total Submissions: ${totalSubmissions}\n`;
+      pdfContent += `Average Score: ${averageScore}%\n`;
+      pdfContent += `Pass Rate: ${passRate}%\n\n`;
+      pdfContent += "STUDENT RESULTS\n";
+      pdfContent += "-".repeat(30) + "\n";
+      pdfContent += "No. | Registration | Program | Score | Percentage | Grade | Submitted\n";
+      pdfContent += "-".repeat(80) + "\n";
       
-      // Wait for content to load then print
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.print();
-          printWindow.close();
-        }, 500);
-      };
+      assessment.submissions.forEach((sub, index) => {
+        const getGrade = (percentage: number) => {
+          if (percentage >= 90) return 'A';
+          if (percentage >= 80) return 'B';
+          if (percentage >= 70) return 'C';
+          if (percentage >= 60) return 'D';
+          return 'F';
+        };
+        
+        pdfContent += `${index + 1}. ${sub.student_registration} | ${sub.student_program} | ${sub.score}/${assessment.total_points} | ${sub.percentage}% | ${getGrade(sub.percentage)} | ${new Date(sub.submitted_at).toLocaleDateString()}\n`;
+      });
+
+      pdfContent += "\n" + "=".repeat(50) + "\n";
+      pdfContent += "MUST LEARNING MANAGEMENT SYSTEM powered by JEDA NETWORKS\n";
+
+      // Create blob and download as PDF
+      const blob = new Blob([pdfContent], { type: 'application/pdf' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${assessment.title.replace(/\s+/g, '_')}_Results_${dateStr.replace(/\//g, '-')}.pdf`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     };
 
-    generatePDF();
+    generateAndDownloadPDF();
   };
 
   if (loading) {
@@ -406,30 +202,33 @@ export const AssessmentResults = () => {
     const stats = getAssessmentStats(selectedAssessment);
     
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
+      <div className="min-h-screen bg-gray-50 p-2 sm:p-4">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <Card className="mb-6">
-            <CardHeader>
-              <div className="flex items-center justify-between">
+          <Card className="mb-4 sm:mb-6">
+            <CardHeader className="p-3 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                   <Button 
                     variant="outline" 
                     onClick={() => setSelectedAssessment(null)}
-                    className="mb-2"
+                    className="mb-2 text-xs sm:text-sm"
+                    size="sm"
                   >
-                    ← Back to Assessments
+                    ← Back
                   </Button>
-                  <CardTitle className="text-2xl">{selectedAssessment.title}</CardTitle>
-                  <p className="text-muted-foreground">{selectedAssessment.program_name}</p>
+                  <CardTitle className="text-lg sm:text-2xl">{selectedAssessment.title}</CardTitle>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{selectedAssessment.program_name}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button 
                     variant="outline"
                     onClick={() => exportResults(selectedAssessment)}
+                    size="sm"
+                    className="text-xs sm:text-sm w-full sm:w-auto"
                   >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export Results
+                    <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Export
                   </Button>
                 </div>
               </div>
@@ -437,94 +236,131 @@ export const AssessmentResults = () => {
           </Card>
 
           {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
             <Card>
-              <CardContent className="p-4 text-center">
-                <Users className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold">{stats.totalSubmissions}</p>
-                <p className="text-sm text-muted-foreground">Total Submissions</p>
+              <CardContent className="p-2 sm:p-4 text-center">
+                <Users className="h-5 w-5 sm:h-8 sm:w-8 text-blue-600 mx-auto mb-1 sm:mb-2" />
+                <p className="text-lg sm:text-2xl font-bold">{stats.totalSubmissions}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Submissions</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4 text-center">
-                <TrendingUp className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold">{stats.averageScore}%</p>
-                <p className="text-sm text-muted-foreground">Average Score</p>
+              <CardContent className="p-2 sm:p-4 text-center">
+                <TrendingUp className="h-5 w-5 sm:h-8 sm:w-8 text-green-600 mx-auto mb-1 sm:mb-2" />
+                <p className="text-lg sm:text-2xl font-bold">{stats.averageScore}%</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Average</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4 text-center">
-                <Award className="h-8 w-8 text-yellow-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold">{stats.passRate}%</p>
-                <p className="text-sm text-muted-foreground">Pass Rate</p>
+              <CardContent className="p-2 sm:p-4 text-center">
+                <Award className="h-5 w-5 sm:h-8 sm:w-8 text-yellow-600 mx-auto mb-1 sm:mb-2" />
+                <p className="text-lg sm:text-2xl font-bold">{stats.passRate}%</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Pass Rate</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4 text-center">
-                <FileText className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold">{selectedAssessment.total_questions}</p>
-                <p className="text-sm text-muted-foreground">Total Questions</p>
+              <CardContent className="p-2 sm:p-4 text-center">
+                <FileText className="h-5 w-5 sm:h-8 sm:w-8 text-purple-600 mx-auto mb-1 sm:mb-2" />
+                <p className="text-lg sm:text-2xl font-bold">{selectedAssessment.total_questions}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Questions</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Submissions Table */}
+          {/* Submissions Table - Mobile Responsive */}
           <Card>
-            <CardHeader>
-              <CardTitle>Student Submissions</CardTitle>
+            <CardHeader className="p-3 sm:p-6">
+              <CardTitle className="text-base sm:text-lg">Student Submissions</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 sm:p-6 pt-0">
               {selectedAssessment.submissions.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Submissions Yet</h3>
-                  <p className="text-gray-600">Students haven't submitted this assessment yet.</p>
+                <div className="text-center py-6 sm:py-8">
+                  <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No Submissions Yet</h3>
+                  <p className="text-sm text-gray-600">Students haven't submitted this assessment yet.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-3">Student</th>
-                        <th className="text-left p-3">Registration</th>
-                        <th className="text-left p-3">Program</th>
-                        <th className="text-center p-3">Score</th>
-                        <th className="text-center p-3">Percentage</th>
-                        <th className="text-center p-3">Status</th>
-                        <th className="text-center p-3">Submitted</th>
-                        <th className="text-center p-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedAssessment.submissions.map((submission) => (
-                        <tr key={submission.id} className="border-b hover:bg-gray-50">
-                          <td className="p-3 font-medium">{submission.student_name}</td>
-                          <td className="p-3">{submission.student_registration}</td>
-                          <td className="p-3">{submission.student_program}</td>
-                          <td className="p-3 text-center">
-                            {submission.score}/{selectedAssessment.total_points}
-                          </td>
-                          <td className="p-3 text-center">
-                            <Badge variant={submission.percentage >= 50 ? "default" : "destructive"}>
-                              {submission.percentage}%
-                            </Badge>
-                          </td>
-                          <td className="p-3 text-center">
-                            <Badge variant="outline">{submission.status}</Badge>
-                          </td>
-                          <td className="p-3 text-center text-sm">
-                            {new Date(submission.submitted_at).toLocaleString()}
-                          </td>
-                          <td className="p-3 text-center">
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </td>
+                <>
+                  {/* Mobile Card View */}
+                  <div className="block sm:hidden space-y-3">
+                    {selectedAssessment.submissions.map((submission) => (
+                      <div key={submission.id} className="border rounded-lg p-3 bg-gray-50">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="font-medium text-sm">{submission.student_name}</p>
+                            <p className="text-xs text-gray-500">{submission.student_registration}</p>
+                          </div>
+                          <Badge variant={submission.percentage >= 50 ? "default" : "destructive"} className="text-xs">
+                            {submission.percentage}%
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-2">
+                          <div>
+                            <span className="font-medium">Score:</span> {submission.score}/{selectedAssessment.total_points}
+                          </div>
+                          <div>
+                            <span className="font-medium">Status:</span> {submission.status}
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-500">
+                            {new Date(submission.submitted_at).toLocaleDateString()}
+                          </span>
+                          <Button variant="outline" size="sm" className="h-7 text-xs">
+                            <Eye className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Desktop Table View */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-3 text-sm">Student</th>
+                          <th className="text-left p-3 text-sm">Registration</th>
+                          <th className="text-left p-3 text-sm">Program</th>
+                          <th className="text-center p-3 text-sm">Score</th>
+                          <th className="text-center p-3 text-sm">Percentage</th>
+                          <th className="text-center p-3 text-sm">Status</th>
+                          <th className="text-center p-3 text-sm">Submitted</th>
+                          <th className="text-center p-3 text-sm">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {selectedAssessment.submissions.map((submission) => (
+                          <tr key={submission.id} className="border-b hover:bg-gray-50">
+                            <td className="p-3 font-medium text-sm">{submission.student_name}</td>
+                            <td className="p-3 text-sm">{submission.student_registration}</td>
+                            <td className="p-3 text-sm">{submission.student_program}</td>
+                            <td className="p-3 text-center text-sm">
+                              {submission.score}/{selectedAssessment.total_points}
+                            </td>
+                            <td className="p-3 text-center">
+                              <Badge variant={submission.percentage >= 50 ? "default" : "destructive"} className="text-xs">
+                                {submission.percentage}%
+                              </Badge>
+                            </td>
+                            <td className="p-3 text-center">
+                              <Badge variant="outline" className="text-xs">{submission.status}</Badge>
+                            </td>
+                            <td className="p-3 text-center text-xs">
+                              {new Date(submission.submitted_at).toLocaleString()}
+                            </td>
+                            <td className="p-3 text-center">
+                              <Button variant="outline" size="sm">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -534,20 +370,20 @@ export const AssessmentResults = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-gray-50 p-2 sm:p-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-2xl">Assessment Results</CardTitle>
-            <p className="text-muted-foreground">View and manage assessment submissions and grades</p>
+        <Card className="mb-4 sm:mb-6">
+          <CardHeader className="p-3 sm:p-6">
+            <CardTitle className="text-lg sm:text-2xl">Assessment Results</CardTitle>
+            <p className="text-xs sm:text-sm text-muted-foreground">View and manage assessment submissions and grades</p>
           </CardHeader>
         </Card>
 
         {/* Search and Filter */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex gap-4">
+        <Card className="mb-4 sm:mb-6">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <div className="flex-1">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -555,15 +391,15 @@ export const AssessmentResults = () => {
                     placeholder="Search assessments..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 text-sm"
                   />
                 </div>
               </div>
-              <div className="w-48">
+              <div className="w-full sm:w-48">
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="w-full border rounded px-3 py-2"
+                  className="w-full border rounded px-3 py-2 text-sm"
                 >
                   <option value="all">All Status</option>
                   <option value="active">Active</option>
@@ -579,58 +415,59 @@ export const AssessmentResults = () => {
         {/* Assessments List */}
         {filteredAssessments.length === 0 ? (
           <Card>
-            <CardContent className="p-8 text-center">
-              <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Assessment Results</h3>
-              <p className="text-gray-600">Create assessments to view student results and analytics.</p>
+            <CardContent className="p-6 sm:p-8 text-center">
+              <BarChart3 className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No Assessment Results</h3>
+              <p className="text-sm text-gray-600">Create assessments to view student results and analytics.</p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-3 sm:gap-4">
             {filteredAssessments.map((assessment) => {
               const stats = getAssessmentStats(assessment);
               
               return (
                 <Card key={assessment.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
+                  <CardContent className="p-3 sm:p-6">
+                    <div className="flex flex-col gap-3 sm:gap-4">
                       <div className="flex-1">
-                        <h3 className="text-xl font-semibold mb-2">{assessment.title}</h3>
-                        <p className="text-muted-foreground mb-3">{assessment.program_name}</p>
+                        <h3 className="text-base sm:text-xl font-semibold mb-1 sm:mb-2">{assessment.title}</h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-3">{assessment.program_name}</p>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-3 sm:mb-4">
                           <div>
-                            <p className="text-sm text-muted-foreground">Submissions</p>
-                            <p className="font-medium">{stats.totalSubmissions}</p>
+                            <p className="text-xs text-muted-foreground">Submissions</p>
+                            <p className="text-sm sm:text-base font-medium">{stats.totalSubmissions}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground">Average Score</p>
-                            <p className="font-medium">{stats.averageScore}%</p>
+                            <p className="text-xs text-muted-foreground">Average</p>
+                            <p className="text-sm sm:text-base font-medium">{stats.averageScore}%</p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground">Pass Rate</p>
-                            <p className="font-medium">{stats.passRate}%</p>
+                            <p className="text-xs text-muted-foreground">Pass Rate</p>
+                            <p className="text-sm sm:text-base font-medium">{stats.passRate}%</p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground">Questions</p>
-                            <p className="font-medium">{assessment.total_questions}</p>
+                            <p className="text-xs text-muted-foreground">Questions</p>
+                            <p className="text-sm sm:text-base font-medium">{assessment.total_questions}</p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <Badge variant={assessment.status === 'active' ? 'default' : 'secondary'}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant={assessment.status === 'active' ? 'default' : 'secondary'} className="text-xs">
                             {assessment.status}
                           </Badge>
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-xs text-muted-foreground">
                             Created: {new Date(assessment.created_at).toLocaleDateString()}
                           </span>
                         </div>
                       </div>
 
-                      <div className="ml-4">
+                      <div className="w-full sm:w-auto">
                         <Button 
                           onClick={() => setSelectedAssessment(assessment)}
-                          className="bg-green-600 hover:bg-green-700"
+                          className="bg-green-600 hover:bg-green-700 w-full sm:w-auto text-sm"
+                          size="sm"
                         >
                           <Eye className="h-4 w-4 mr-2" />
                           View Results

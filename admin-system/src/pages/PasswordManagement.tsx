@@ -205,11 +205,18 @@ export const PasswordManagement = () => {
 
       if (result.success) {
         // Update user in local state
-        setUsers(users.map(user => 
+        const updatedUsers = users.map(user => 
           user.id === userId 
             ? { ...user, status: "active" as const }
             : user
-        ));
+        );
+        setUsers(updatedUsers);
+        
+        // Update selected user to reflect the change
+        if (selectedUser.id === userId) {
+          setSelectedUser(prev => prev ? { ...prev, status: "active" as const } : null);
+        }
+        
         alert(`Account unlocked for ${result.data.userName}`);
       } else {
         alert(`Error: ${result.error}`);
@@ -240,11 +247,18 @@ export const PasswordManagement = () => {
 
       if (result.success) {
         // Update user in local state
-        setUsers(users.map(user => 
+        const updatedUsers = users.map(user => 
           user.id === userId 
             ? { ...user, status: "locked" as const }
             : user
-        ));
+        );
+        setUsers(updatedUsers);
+        
+        // Update selected user to reflect the change
+        if (selectedUser.id === userId) {
+          setSelectedUser(prev => prev ? { ...prev, status: "locked" as const } : null);
+        }
+        
         alert(`Account locked for ${result.data.userName}`);
       } else {
         alert(`Error: ${result.error}`);
