@@ -55,43 +55,23 @@ export const StudentLiveClass = ({ classId, onLeaveClass }: LiveClassViewerProps
         return;
       }
       
-      // Get live classes for student's program
-      const liveClassResponse = await fetch('https://must-lms-backend.onrender.com/api/live-classes');
+      // FIXED: Use backend filtering with student_username parameter
+      // Backend will handle both regular programs AND short-term programs filtering
+      const liveClassResponse = await fetch(`https://must-lms-backend.onrender.com/api/live-classes?student_username=${encodeURIComponent(currentUser.username)}`);
       const liveClassResult = await liveClassResponse.json();
       
-      // Get student's programs (both regular and short-term) - pass authorization parameters
-      const programsResponse = await fetch(`https://must-lms-backend.onrender.com/api/programs?user_type=student&student_id=${currentStudent.id}`);
-      const programsResult = await programsResponse.json();
-      
-      // Backend already filters by student's course
-      const studentPrograms = programsResult.data || [];
-      
       console.log('=== LIVE CLASS FILTERING DEBUG ===');
-      console.log('All Live Classes:', liveClassResult.data);
       console.log('Current Student:', currentStudent);
       console.log('Student Course:', currentStudent.course_name);
-      console.log('Student Programs:', studentPrograms.map(p => p.name));
+      console.log('Live Classes from Backend (already filtered):', liveClassResult.data?.length || 0);
       
-      // Filter live classes to show only those for student's programs
-      const studentClasses = liveClassResult.data?.filter(liveClass => {
-        console.log(`\n--- Checking Live Class: ${liveClass.title} ---`);
-        console.log('Class Program:', liveClass.program_name);
-        
-        // Check if live class program matches any of student's programs
-        const matches = studentPrograms.some(studentProgram => {
-          const programMatch = studentProgram.name.toLowerCase() === liveClass.program_name.toLowerCase();
-          console.log(`Comparing: "${studentProgram.name}" === "${liveClass.program_name}" => ${programMatch}`);
-          return programMatch;
-        });
-        
-        console.log(`✅ Match Result: ${matches ? 'SHOW' : 'HIDE'}`);
-        return matches;
-      }) || [];
+      // Backend already filters by student's programs (regular + short-term)
+      // No need for frontend filtering - backend handles everything
+      const studentClasses = liveClassResult.data || [];
       
-      console.log('\n=== FINAL FILTERED CLASSES ===');
-      console.log('Total Classes:', liveClassResult.data?.length || 0);
-      console.log('Student Classes:', studentClasses.length);
-      console.log('Classes:', studentClasses.map(c => c.title));
+      console.log('\n=== FINAL CLASSES ===');
+      console.log('Total Classes:', studentClasses.length);
+      console.log('Classes:', studentClasses.map(c => `${c.title} (${c.program_name})`));
       
       setLiveClasses(studentClasses);
       setLoading(false);

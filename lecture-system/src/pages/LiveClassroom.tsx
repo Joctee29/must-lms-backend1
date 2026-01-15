@@ -117,12 +117,13 @@ export const LiveClassroom = () => {
       const response = await fetch('https://must-lms-backend.onrender.com/api/live-classes');
       const result = await response.json();
       
-      // Filter for current lecturer's active classes
+      // Filter for current lecturer's active classes (case-insensitive comparison)
       const lecturerClasses = result.data?.filter(liveClass => 
-        liveClass.lecturer_name === currentUser.username &&
+        liveClass.lecturer_name?.toLowerCase().trim() === currentUser.username?.toLowerCase().trim() &&
         (liveClass.status === 'live' || liveClass.status === 'scheduled')
       ) || [];
       
+      console.log('Active live classes for lecturer:', lecturerClasses.length);
       setActiveLiveClasses(lecturerClasses);
     } catch (error) {
       console.error('Error loading active live classes:', error);
