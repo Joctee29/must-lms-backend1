@@ -15,6 +15,7 @@ import {
   Clock,
   UserPlus,
   Upload,
+  Award,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ export const Navigation = ({ activeSection, onSectionChange }: NavigationProps) 
     { id: "courses", label: "Course Management", icon: BookOpen },
     { id: "database", label: "Lecturer Information", icon: Database },
     { id: "students", label: "Student Information", icon: GraduationCap },
+    { id: "class-representatives", label: "Class Representatives", icon: Award },
     { id: "short-term-programs", label: "Short-Term Programs", icon: Clock },
     { id: "announcements", label: "Announcements", icon: Megaphone },
     { id: "security", label: "Password Management", icon: Shield },

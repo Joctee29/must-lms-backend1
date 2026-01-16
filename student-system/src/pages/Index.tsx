@@ -13,6 +13,7 @@ import { AnnouncementsNews } from "./AnnouncementsNews";
 import { TakeAssessment } from "./TakeAssessment";
 import { AssessmentResults } from "./AssessmentResults";
 import { Games } from "./Games";
+import { LibraryPage } from "./Library";
 import { JedaNetworksCredit } from "@/components/JedaNetworksCredit";
 import { StudentLiveClass } from "@/pages/StudentLiveClass";
 import Timetable from "@/pages/Timetable";
@@ -493,6 +494,8 @@ const Index = () => {
         return <AssessmentResults />;
       case "games":
         return <Games />;
+      case "library":
+        return <LibraryPage />;
       case "settings":
         return (
           <div className="p-6 space-y-6">

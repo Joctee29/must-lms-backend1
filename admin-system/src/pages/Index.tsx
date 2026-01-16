@@ -16,6 +16,7 @@ import { AnnouncementManagement } from "@/pages/AnnouncementManagement";
 import { ShortTermPrograms } from "@/pages/ShortTermPrograms";
 import TimetableManagement from "@/pages/TimetableManagement";
 import { BulkUpload } from "@/pages/BulkUpload";
+import { ClassRepresentativeManagement } from "@/pages/ClassRepresentativeManagement";
 import { JedaNetworksCredit } from "@/components/JedaNetworksCredit";
 
 const Index = () => {
@@ -33,6 +34,8 @@ const Index = () => {
         return <StudentInformation />;
       case "courses":
         return <CourseManagement />;
+      case "class-representatives":
+        return <ClassRepresentativeManagement />;
       case "reports":
         return <Reports />;
       case "system":

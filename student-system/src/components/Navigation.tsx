@@ -18,6 +18,7 @@ import {
   CheckCircle,
   Megaphone,
   Video,
+  Library,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ export const Navigation = ({ activeSection, onSectionChange, isMobileMenuOpen = 
     { id: "materials", label: "Materials", icon: FolderOpen },
     { id: "discussions", label: "Discussions", icon: MessageSquare },
     { id: "announcements", label: "Announcements & News", icon: Megaphone },
+    { id: "library", label: "MUST Library", icon: Library },
     { id: "games", label: "Programming Games", icon: Gamepad2 },
     { id: "settings", label: "Settings", icon: Settings },
   ];

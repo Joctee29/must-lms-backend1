@@ -23,7 +23,13 @@ import {
   CheckCircle,
   AlertCircle,
   Send,
-  Trash2
+  Trash2,
+  Paperclip,
+  Image,
+  Mic,
+  X,
+  FileText,
+  Download
 } from "lucide-react";
 
 export const Discussions = () => {
@@ -42,6 +48,12 @@ export const Discussions = () => {
   // Reply functionality states
   const [replies, setReplies] = useState([]);
   const [showReplies, setShowReplies] = useState(false);
+  
+  // File upload states
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [audioChunks, setAudioChunks] = useState([]);
 
   // Fetch real data from database
   useEffect(() => {
@@ -144,8 +156,8 @@ export const Discussions = () => {
 
 
   const handleReplyToDiscussion = async () => {
-    if (!replyContent.trim()) {
-      alert("Please enter your reply");
+    if (!replyContent.trim() && !selectedFile) {
+      alert("Please enter your reply or attach a file");
       return;
     }
 
@@ -153,22 +165,22 @@ export const Discussions = () => {
       // Get current lecturer info
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       
-      // Prepare reply data
-      const replyData = {
-        discussion_id: selectedDiscussion.id,
-        content: replyContent,
-        author: currentUser.username || 'Lecturer',
-        author_id: currentUser.id || null,
-        author_type: 'lecturer'
-      };
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('discussion_id', selectedDiscussion.id);
+      formData.append('content', replyContent);
+      formData.append('author', currentUser.username || 'Lecturer');
+      formData.append('author_id', currentUser.id || '');
+      formData.append('author_type', 'lecturer');
+      
+      if (selectedFile) {
+        formData.append('file', selectedFile);
+      }
       
       // Save reply to database
       const response = await fetch('https://must-lms-backend.onrender.com/api/discussion-replies', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(replyData)
+        body: formData // Don't set Content-Type header - browser will set it with boundary
       });
       
       if (response.ok) {
@@ -181,6 +193,7 @@ export const Discussions = () => {
         
         alert("Reply sent successfully!");
         setReplyContent("");
+        setSelectedFile(null);
         setShowReplyForm(false);
         setSelectedDiscussion(null);
       } else {
@@ -190,6 +203,62 @@ export const Discussions = () => {
       console.error('Error sending reply:', error);
       alert('Failed to send reply. Please check your connection.');
     }
+  };
+  
+  // Handle file selection
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Check file size (max 50MB)
+      if (file.size > 50 * 1024 * 1024) {
+        alert('File size must be less than 50MB');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+  
+  // Start voice recording
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+      
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+      
+      recorder.onstop = () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        const audioFile = new File([audioBlob], `voice-note-${Date.now()}.webm`, { type: 'audio/webm' });
+        setSelectedFile(audioFile);
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+      setAudioChunks(chunks);
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      alert('Could not access microphone. Please check permissions.');
+    }
+  };
+  
+  // Stop voice recording
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+    }
+  };
+  
+  // Remove selected file
+  const removeFile = () => {
+    setSelectedFile(null);
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -646,6 +715,62 @@ export const Discussions = () => {
                           </div>
                         </div>
                         <p className="text-sm mb-2 text-gray-700">{reply.content}</p>
+                        
+                        {/* File Attachment Display */}
+                        {reply.file_url && (
+                          <div className="mt-2 mb-2">
+                            {reply.file_type === 'image' ? (
+                              <div className="relative inline-block">
+                                <img 
+                                  src={`https://must-lms-backend.onrender.com${reply.file_url}`}
+                                  alt={reply.file_name || 'Attached image'}
+                                  className="max-w-xs max-h-64 rounded border cursor-pointer hover:opacity-90"
+                                  onClick={() => window.open(`https://must-lms-backend.onrender.com${reply.file_url}`, '_blank')}
+                                />
+                                <a
+                                  href={`https://must-lms-backend.onrender.com${reply.file_url}`}
+                                  download={reply.file_name}
+                                  className="absolute top-2 right-2 p-1 bg-white rounded-full shadow hover:bg-gray-100"
+                                  title="Download image"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </a>
+                              </div>
+                            ) : reply.file_type === 'audio' ? (
+                              <div className="flex items-center gap-2 p-3 bg-white border rounded">
+                                <Mic className="h-5 w-5 text-blue-600" />
+                                <audio controls className="flex-1">
+                                  <source src={`https://must-lms-backend.onrender.com${reply.file_url}`} type="audio/webm" />
+                                  <source src={`https://must-lms-backend.onrender.com${reply.file_url}`} type="audio/mpeg" />
+                                  Your browser does not support audio playback.
+                                </audio>
+                                <a
+                                  href={`https://must-lms-backend.onrender.com${reply.file_url}`}
+                                  download={reply.file_name}
+                                  className="p-1 hover:bg-gray-100 rounded"
+                                  title="Download audio"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </a>
+                              </div>
+                            ) : (
+                              <a
+                                href={`https://must-lms-backend.onrender.com${reply.file_url}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 p-3 bg-white border rounded hover:bg-gray-50"
+                              >
+                                <FileText className="h-5 w-5 text-blue-600" />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{reply.file_name || 'Attached file'}</p>
+                                  <p className="text-xs text-gray-500">Click to view/download</p>
+                                </div>
+                                <Download className="h-4 w-4 text-gray-400" />
+                              </a>
+                            )}
+                          </div>
+                        )}
+                        
                         <div className="flex items-center gap-4 text-xs text-gray-500">
                           <span>{formatTimeAgo(reply.created_at)}</span>
                         </div>
@@ -666,16 +791,98 @@ export const Discussions = () => {
                 className="w-full p-3 border rounded-lg resize-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 rows={3}
               />
+              
+              {/* File Upload Section */}
+              <div className="mt-3 space-y-2">
+                {/* Selected File Preview */}
+                {selectedFile && (
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                    {selectedFile.type.startsWith('image/') ? (
+                      <Image className="h-4 w-4 text-blue-600" />
+                    ) : selectedFile.type.startsWith('audio/') ? (
+                      <Mic className="h-4 w-4 text-blue-600" />
+                    ) : (
+                      <FileText className="h-4 w-4 text-blue-600" />
+                    )}
+                    <span className="text-sm flex-1 truncate">{selectedFile.name}</span>
+                    <span className="text-xs text-gray-500">
+                      {(selectedFile.size / 1024).toFixed(1)} KB
+                    </span>
+                    <button
+                      onClick={removeFile}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+                
+                {/* File Upload Buttons */}
+                <div className="flex gap-2 flex-wrap">
+                  <input
+                    type="file"
+                    id="file-upload-lecturer"
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx,.txt"
+                    onChange={handleFileSelect}
+                  />
+                  <label
+                    htmlFor="file-upload-lecturer"
+                    className="flex items-center gap-2 px-3 py-2 text-sm border rounded-lg cursor-pointer hover:bg-gray-50"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                    <span>Attach File</span>
+                  </label>
+                  
+                  <input
+                    type="file"
+                    id="image-upload-lecturer"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                  />
+                  <label
+                    htmlFor="image-upload-lecturer"
+                    className="flex items-center gap-2 px-3 py-2 text-sm border rounded-lg cursor-pointer hover:bg-gray-50"
+                  >
+                    <Image className="h-4 w-4" />
+                    <span>Image</span>
+                  </label>
+                  
+                  {!isRecording ? (
+                    <button
+                      onClick={startRecording}
+                      className="flex items-center gap-2 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"
+                    >
+                      <Mic className="h-4 w-4" />
+                      <span>Record Voice</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={stopRecording}
+                      className="flex items-center gap-2 px-3 py-2 text-sm border rounded-lg bg-red-50 text-red-600 hover:bg-red-100 animate-pulse"
+                    >
+                      <Mic className="h-4 w-4" />
+                      <span>Stop Recording</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+              
               <div className="flex justify-end mt-3 gap-2">
                 <Button 
                   variant="outline"
-                  onClick={() => setShowReplies(false)}
+                  onClick={() => {
+                    setShowReplies(false);
+                    setReplyContent("");
+                    setSelectedFile(null);
+                  }}
                 >
                   Close
                 </Button>
                 <Button 
                   onClick={handleReplyToDiscussion}
-                  disabled={!replyContent.trim()}
+                  disabled={!replyContent.trim() && !selectedFile}
                 >
                   Add Reply
                 </Button>

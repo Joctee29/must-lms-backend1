@@ -41,6 +41,7 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
   const [lecturerData, setLecturerData] = useState<any>(null);
   const [shortTermPrograms, setShortTermPrograms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [programCRs, setProgramCRs] = useState<{[key: number]: any}>({});
 
   useEffect(() => {
     const user = localStorage.getItem('currentUser');
@@ -117,6 +118,30 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
         setPrograms(allPrograms);
         console.log('Total Regular Programs (filtered):', allPrograms.length);
         console.log('Total Short-Term Programs:', shortTermPrograms.length)
+
+        // Fetch CR info for each program
+        const crPromises = allPrograms.map(async (program: any) => {
+          try {
+            const crResponse = await fetch(`${API_BASE_URL}/class-representatives/by-program/${program.id}`);
+            const crResult = await crResponse.json();
+            if (crResult.success && crResult.data) {
+              return { programId: program.id, cr: crResult.data };
+            }
+          } catch (error) {
+            console.error(`Error fetching CR for program ${program.id}:`, error);
+          }
+          return { programId: program.id, cr: null };
+        });
+        
+        const crResults = await Promise.all(crPromises);
+        const crMap: {[key: number]: any} = {};
+        crResults.forEach(result => {
+          if (result.cr) {
+            crMap[result.programId] = result.cr;
+          }
+        });
+        setProgramCRs(crMap);
+        console.log('CRs loaded for programs:', Object.keys(crMap).length);
 
         // Fetch courses
         const coursesResponse = await fetch(`${API_BASE_URL}/courses`);
@@ -379,7 +404,7 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
           ) : (
             <div className="space-y-6">
               {programs.map((program) => program && (
-                <div key={program.id} className="space-y-4">
+                <div key={program.id} className="space-y-4 border-l-4 border-l-blue-600 pl-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold">{program?.name || 'Unknown Program'}</h3>
                     <Badge variant="default">Available</Badge>
@@ -389,6 +414,31 @@ export const MyCourses = ({ onNavigate }: MyCoursesProps = {}) => {
                   <p className="text-sm text-muted-foreground">
                     Course: {getCourseName(program?.course_id)} • {program?.totalSemesters || program?.total_semesters || 1} Semesters • Students: {getStudentCount(program?.id)} • College: {getCollegeName(program?.course_id) || "Unknown College"}
                   </p>
+                  
+                  {/* CR Information */}
+                  {programCRs[program.id] ? (
+                    <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <Users className="h-4 w-4 text-green-600" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-green-900">
+                          Class Representative: {programCRs[program.id].name}
+                        </p>
+                        <p className="text-xs text-green-700">
+                          Reg No: {programCRs[program.id].registration_number} • {programCRs[program.id].email}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+                        CR
+                      </Badge>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                      <Users className="h-4 w-4 text-gray-400" />
+                      <p className="text-sm text-gray-600">
+                        No Class Representative assigned yet
+                      </p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

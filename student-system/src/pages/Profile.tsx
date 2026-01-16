@@ -340,6 +340,32 @@ export const Profile = () => {
               <span className="font-medium">Current Semester:</span>
               <Badge variant="outline">{studentData.current_semester || studentData.currentSemester || 1}</Badge>
             </div>
+            
+            {/* CR Status Display */}
+            {studentData.is_cr && (
+              <div className="mt-4 p-3 bg-green-50 border-2 border-green-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <User className="h-5 w-5 text-green-600" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-green-900">Class Representative</p>
+                    <p className="text-sm text-green-700">
+                      You are a Class Representative for your course
+                    </p>
+                    {studentData.cr_activated_at && (
+                      <p className="text-xs text-green-600 mt-1">
+                        Activated: {new Date(studentData.cr_activated_at).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                  <Badge className="bg-green-600 hover:bg-green-700">CR</Badge>
+                </div>
+                <div className="mt-2 text-xs text-green-700 space-y-1">
+                  <p>✓ Can create General Discussions</p>
+                  <p>✓ Visible to lecturers on program cards</p>
+                  <p>✓ Facilitates student-lecturer communication</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
