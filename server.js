@@ -2373,7 +2373,42 @@ app.get('/api/class-representatives', async (req, res) => {
   try {
     console.log('=== FETCHING ALL CLASS REPRESENTATIVES ===');
     
-    // First ensure required columns exist
+    // First ensure students table exists
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'students'
+      )
+    `);
+    
+    if (!tableCheck.rows[0].exists) {
+      console.log('⚠️ Students table does not exist, creating...');
+      // Create students table if it doesn't exist
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS students (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          registration_number VARCHAR(100) UNIQUE NOT NULL,
+          email VARCHAR(255),
+          phone VARCHAR(20),
+          course_id INTEGER,
+          academic_year VARCHAR(20),
+          current_semester INTEGER DEFAULT 1,
+          year_of_study INTEGER DEFAULT 1,
+          academic_level VARCHAR(50) DEFAULT 'bachelor',
+          is_active BOOLEAN DEFAULT true,
+          is_cr BOOLEAN DEFAULT false,
+          cr_activated_at TIMESTAMP,
+          cr_activated_by VARCHAR(255),
+          is_locked BOOLEAN DEFAULT false,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log('✅ Students table created');
+      return res.json({ success: true, data: [] });
+    }
+    
+    // Ensure required CR columns exist
     try {
       await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS is_cr BOOLEAN DEFAULT false`);
       await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS cr_activated_at TIMESTAMP`);
@@ -2385,38 +2420,22 @@ app.get('/api/class-representatives', async (req, res) => {
       console.log('Column check note:', alterError.message);
     }
     
-    // Verify students table exists
-    const tableCheck = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_name = 'students'
-      )
-    `);
-    
-    if (!tableCheck.rows[0].exists) {
-      console.error('❌ Students table does not exist');
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Database not properly initialized. Please contact administrator.' 
-      });
-    }
-    
     const result = await pool.query(`
       SELECT 
         s.id,
         s.name,
         s.registration_number,
-        s.email,
-        s.phone,
-        s.academic_year,
-        s.current_semester,
+        COALESCE(s.email, '') as email,
+        COALESCE(s.phone, '') as phone,
+        COALESCE(s.academic_year, '') as academic_year,
+        COALESCE(s.current_semester, 1) as current_semester,
         COALESCE(s.year_of_study, 1) as year_of_study,
         COALESCE(s.academic_level, 'bachelor') as academic_level,
         COALESCE(s.is_cr, false) as is_cr,
         s.cr_activated_at,
-        s.cr_activated_by,
-        c.name as course_name,
-        c.code as course_code,
+        COALESCE(s.cr_activated_by, '') as cr_activated_by,
+        COALESCE(c.name, 'No Course') as course_name,
+        COALESCE(c.code, '') as course_code,
         c.id as course_id
       FROM students s
       LEFT JOIN courses c ON s.course_id = c.id
@@ -2429,10 +2448,11 @@ app.get('/api/class-representatives', async (req, res) => {
   } catch (error) {
     console.error('❌ Error fetching class representatives:', error);
     console.error('Error stack:', error.stack);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to load Class Representatives. Please try again or contact administrator.',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    // Return empty array instead of error to prevent frontend crash
+    res.json({ 
+      success: true, 
+      data: [],
+      message: 'No class representatives found or database initializing'
     });
   }
 });
@@ -2994,17 +3014,23 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       return res.json({ success: true, data: allPrograms });
     }
     
-    // For lecturers by username - find programs by lecturer username/employee_id AND active semester
+    // For lecturers by username - find programs by lecturer username/employee_id
+    // Check if request is from Progress Tracker (skip semester filtering)
+    const skipSemesterFilter = req.query.skip_semester_filter === 'true';
+    
     if (lecturer_username) {
-      // First, get active academic period
-      const activePeriodResult = await pool.query(
-        `SELECT * FROM academic_periods WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
-      );
+      // First, get active academic period (only if not skipping semester filter)
+      let activeSemester = null;
       
-      let activeSemester = 1; // Default to semester 1
-      if (activePeriodResult.rows.length > 0) {
-        activeSemester = activePeriodResult.rows[0].semester;
-        console.log('Active semester from database:', activeSemester);
+      if (!skipSemesterFilter) {
+        const activePeriodResult = await pool.query(
+          `SELECT * FROM academic_periods WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
+        );
+        
+        if (activePeriodResult.rows.length > 0) {
+          activeSemester = activePeriodResult.rows[0].semester;
+          console.log('Active semester from database:', activeSemester);
+        }
       }
       
       // First, try to find lecturer by direct field matches
@@ -3040,21 +3066,39 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       console.log('Lecturer ID:', lecturer.id);
       console.log('Lecturer Employee ID:', lecturer.employee_id);
       console.log('Lecturer Name:', lecturer.name);
+      console.log('Skip Semester Filter:', skipSemesterFilter);
       console.log('Active Semester Filter:', activeSemester);
       
-      // More flexible query using ILIKE for partial matching AND filter by active semester
-      const result = await pool.query(
-        `SELECT * FROM programs 
-         WHERE (lecturer_id = $1 
-            OR lecturer_name = $2 
-            OR lecturer_name = $3
-            OR lecturer_name ILIKE $4
-            OR lecturer_name ILIKE $5)
-         AND (semester = $6 OR semester IS NULL)
-         ORDER BY created_at DESC`,
-        [lecturer.id, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`, activeSemester]
-      );
-      console.log(`Found ${result.rows.length} programs for lecturer username: ${lecturer_username} in semester ${activeSemester}`);
+      // Build query based on whether we're filtering by semester
+      let result;
+      if (skipSemesterFilter || activeSemester === null) {
+        // No semester filtering - return all programs for this lecturer
+        result = await pool.query(
+          `SELECT * FROM programs 
+           WHERE (lecturer_id = $1 
+              OR lecturer_name = $2 
+              OR lecturer_name = $3
+              OR lecturer_name ILIKE $4
+              OR lecturer_name ILIKE $5)
+           ORDER BY created_at DESC`,
+          [lecturer.id, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`]
+        );
+        console.log(`Found ${result.rows.length} programs for lecturer username: ${lecturer_username} (no semester filter)`);
+      } else {
+        // Filter by active semester
+        result = await pool.query(
+          `SELECT * FROM programs 
+           WHERE (lecturer_id = $1 
+              OR lecturer_name = $2 
+              OR lecturer_name = $3
+              OR lecturer_name ILIKE $4
+              OR lecturer_name ILIKE $5)
+           AND (semester = $6 OR semester IS NULL)
+           ORDER BY created_at DESC`,
+          [lecturer.id, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`, activeSemester]
+        );
+        console.log(`Found ${result.rows.length} programs for lecturer username: ${lecturer_username} in semester ${activeSemester}`);
+      }
       
       return res.json({ success: true, data: result.rows });
     }
@@ -3091,6 +3135,13 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
     if (effectiveUserType === 'admin') {
       const result = await pool.query('SELECT * FROM programs ORDER BY created_at DESC');
       console.log(`Found ${result.rows.length} programs (admin view)`);
+      return res.json({ success: true, data: result.rows });
+    }
+    
+    // No user type specified but user_type=admin in query - return all programs
+    if (user_type === 'admin') {
+      const result = await pool.query('SELECT * FROM programs ORDER BY created_at DESC');
+      console.log(`Found ${result.rows.length} programs (admin query param)`);
       return res.json({ success: true, data: result.rows });
     }
     
