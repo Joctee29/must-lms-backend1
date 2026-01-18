@@ -993,32 +993,6 @@ const initializeDatabase = async () => {
 
     // Ensure only one active period logically enforced by updates (no unique constraint errors on old data)
 
-    // Create enrollments table for persistent student-program relationships
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS enrollments (
-        id SERIAL PRIMARY KEY,
-        student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-        program_id INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
-        enrollment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        status VARCHAR(20) DEFAULT 'active',
-        UNIQUE(student_id, program_id)
-      )
-    `);
-    console.log('✅ Enrollments table created/verified');
-
-    // Create lecturer_assignments table for persistent lecturer-program relationships
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS lecturer_assignments (
-        id SERIAL PRIMARY KEY,
-        lecturer_id INTEGER NOT NULL REFERENCES lecturers(id) ON DELETE CASCADE,
-        program_id INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
-        assignment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        status VARCHAR(20) DEFAULT 'active',
-        UNIQUE(lecturer_id, program_id)
-      )
-    `);
-    console.log('✅ Lecturer assignments table created/verified');
-
     // Create passwords table for password management
     await pool.query(`
       CREATE TABLE IF NOT EXISTS password_records (
@@ -2893,6 +2867,19 @@ app.post('/api/courses', async (req, res) => {
   }
 });
 
+// Get all courses list (for bulk upload reference)
+app.get('/api/courses/list', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, code, name, academic_level FROM courses ORDER BY code ASC'
+    );
+    res.json({ success: true, courses: result.rows });
+  } catch (error) {
+    console.error('Error fetching courses list:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.get('/api/courses', async (req, res) => {
   try {
     const { academic_level, year_of_study } = req.query;
@@ -2923,23 +2910,6 @@ app.get('/api/courses', async (req, res) => {
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching courses:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get simplified course list for bulk upload helper
-app.get('/api/courses/list', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT id, code, name, academic_level FROM courses ORDER BY code ASC'
-    );
-    
-    res.json({ 
-      success: true, 
-      courses: result.rows 
-    });
-  } catch (error) {
-    console.error('Error fetching course list:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -10964,74 +10934,45 @@ app.post('/api/students/bulk-upload', async (req, res) => {
           continue;
         }
 
-        // ENHANCED: Resolve courseId to actual database ID with case-insensitive matching
-        // Accept course ID (number), course code (text), or course name (text)
-        let actualCourseId = null;
-        let resolutionMethod = null;
+        // Resolve courseId - can be numeric ID, course code, or course name
+        let resolvedCourseId = null;
+        const courseIdValue = student.courseId;
         
-        // Step 1: Try numeric ID first
-        if (!isNaN(parseInt(student.courseId))) {
+        // Check if it's a numeric ID
+        if (!isNaN(courseIdValue) && Number.isInteger(Number(courseIdValue))) {
+          // It's a numeric ID, verify it exists
           const courseCheck = await pool.query(
-            'SELECT id, code, name FROM courses WHERE id = $1',
-            [parseInt(student.courseId)]
+            'SELECT id FROM courses WHERE id = $1',
+            [parseInt(courseIdValue)]
           );
           
           if (courseCheck.rows.length > 0) {
-            actualCourseId = courseCheck.rows[0].id;
-            resolutionMethod = 'ID';
-            console.log(`✅ Resolved course by ID: ${student.courseId} → ${courseCheck.rows[0].code} (${courseCheck.rows[0].name})`);
+            resolvedCourseId = courseCheck.rows[0].id;
+          } else {
+            results.failed.push({
+              row: i + 1,
+              data: student,
+              error: `Course with ID ${courseIdValue} not found`
+            });
+            continue;
           }
-        }
-        
-        // Step 2: Try course code (case-insensitive)
-        if (!actualCourseId) {
-          const courseByCode = await pool.query(
-            'SELECT id, code, name FROM courses WHERE LOWER(code) = LOWER($1)',
-            [student.courseId.toString().trim()]
+        } else {
+          // It's a string - try to find by code first, then by name
+          const courseCheck = await pool.query(
+            'SELECT id FROM courses WHERE code = $1 OR name = $1',
+            [courseIdValue]
           );
           
-          if (courseByCode.rows.length > 0) {
-            actualCourseId = courseByCode.rows[0].id;
-            resolutionMethod = 'code';
-            console.log(`✅ Resolved course by code: "${student.courseId}" → ${courseByCode.rows[0].code} (${courseByCode.rows[0].name})`);
+          if (courseCheck.rows.length > 0) {
+            resolvedCourseId = courseCheck.rows[0].id;
+          } else {
+            results.failed.push({
+              row: i + 1,
+              data: student,
+              error: `Course with code or name "${courseIdValue}" not found. Please check the course code/name.`
+            });
+            continue;
           }
-        }
-        
-        // Step 3: Try course name (case-insensitive)
-        if (!actualCourseId) {
-          const courseByName = await pool.query(
-            'SELECT id, code, name FROM courses WHERE LOWER(name) = LOWER($1)',
-            [student.courseId.toString().trim()]
-          );
-          
-          if (courseByName.rows.length > 0) {
-            actualCourseId = courseByName.rows[0].id;
-            resolutionMethod = 'name';
-            
-            if (courseByName.rows.length > 1) {
-              console.warn(`⚠️ Multiple courses found with name "${student.courseId}". Using first match: ${courseByName.rows[0].code}`);
-            }
-            
-            console.log(`✅ Resolved course by name: "${student.courseId}" → ${courseByName.rows[0].code} (${courseByName.rows[0].name})`);
-          }
-        }
-        
-        // Step 4: Handle not found with helpful error message
-        if (!actualCourseId) {
-          // Fetch sample course codes for suggestions
-          const availableCourses = await pool.query(
-            'SELECT code FROM courses ORDER BY code LIMIT 5'
-          );
-          const suggestions = availableCourses.rows.length > 0 
-            ? availableCourses.rows.map(c => c.code).join(', ')
-            : 'No courses available';
-          
-          results.failed.push({
-            row: i + 1,
-            data: student,
-            error: `Course not found: "${student.courseId}". Please check the course code, name, or ID. Available courses include: ${suggestions}. Download the CSV template to see the correct format.`
-          });
-          continue;
         }
 
         // Check if email already exists
@@ -11077,7 +11018,7 @@ app.post('/api/students/bulk-upload', async (req, res) => {
             student.name,
             registrationNumber,
             student.academicYear || new Date().getFullYear().toString(),
-            actualCourseId,
+            resolvedCourseId,
             student.currentSemester || 1,
             student.email,
             student.phone || null,
@@ -11093,28 +11034,6 @@ app.post('/api/students/bulk-upload', async (req, res) => {
            VALUES ('student', $1, $2, $3)`,
           [result.rows[0].id, registrationNumber, student.password || 'student123']
         );
-
-        // AUTO-ENROLL: Automatically enroll student in all programs for their course
-        try {
-          const programsResult = await pool.query(
-            'SELECT id FROM programs WHERE course_id = $1',
-            [actualCourseId]
-          );
-          
-          if (programsResult.rows.length > 0) {
-            for (const program of programsResult.rows) {
-              await pool.query(
-                `INSERT INTO enrollments (student_id, program_id, status) 
-                 VALUES ($1, $2, 'active') 
-                 ON CONFLICT (student_id, program_id) DO NOTHING`,
-                [result.rows[0].id, program.id]
-              );
-            }
-            console.log(`✅ Auto-enrolled student ${result.rows[0].id} in ${programsResult.rows.length} programs`);
-          }
-        } catch (enrollError) {
-          console.log(`⚠️ Could not auto-enroll student ${result.rows[0].id}:`, enrollError.message);
-        }
 
         results.successful.push({
           row: i + 1,
@@ -11625,87 +11544,30 @@ app.get('/api/progress/students', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Program name is required' });
     }
     
-    // IMPROVED: Multi-strategy student fetching with auto-enrollment
-    let students = [];
-    
-    // Strategy 1: Get students via enrollments table
-    let studentsResult = await pool.query(`
+    // Get all students enrolled in this program
+    const studentsResult = await pool.query(`
       SELECT DISTINCT s.id, s.name, s.registration_number, s.email
       FROM students s
       JOIN enrollments e ON s.id = e.student_id
       JOIN programs p ON e.program_id = p.id
-      WHERE p.name = $1 AND e.status = 'active'
+      WHERE p.name = $1
       ORDER BY s.name
     `, [program_name]);
     
-    if (studentsResult.rows.length > 0) {
-      students = studentsResult.rows;
-      console.log(`✅ Found ${students.length} students via enrollments`);
-    }
+    let students = studentsResult.rows;
     
-    // Strategy 2: Get students by course_id match (most common scenario)
+    // If no enrollments found, try to get students by program_name directly
     if (students.length === 0) {
-      console.log('📋 No enrollments found, trying course_id match...');
-      const courseBasedResult = await pool.query(`
+      const directStudentsResult = await pool.query(`
         SELECT DISTINCT s.id, s.name, s.registration_number, s.email
         FROM students s
-        JOIN programs p ON s.course_id = p.course_id
-        WHERE p.name = $1
+        WHERE s.program_name = $1
         ORDER BY s.name
       `, [program_name]);
-      students = courseBasedResult.rows;
-      
-      if (students.length > 0) {
-        console.log(`✅ Found ${students.length} students via course_id match`);
-        
-        // AUTO-ENROLL: Create enrollments for these students
-        const programResult = await pool.query('SELECT id FROM programs WHERE name = $1 LIMIT 1', [program_name]);
-        if (programResult.rows.length > 0) {
-          const programId = programResult.rows[0].id;
-          console.log(`🔄 Auto-enrolling students in program ${program_name} (ID: ${programId})...`);
-          
-          for (const student of students) {
-            try {
-              await pool.query(
-                `INSERT INTO enrollments (student_id, program_id, status) 
-                 VALUES ($1, $2, 'active') 
-                 ON CONFLICT (student_id, program_id) DO UPDATE SET status = 'active'`,
-                [student.id, programId]
-              );
-            } catch (err) {
-              // Silently ignore if enrollment already exists
-            }
-          }
-          console.log(`✅ Auto-enrolled ${students.length} students`);
-        }
-      }
+      students = directStudentsResult.rows;
     }
     
-    // Strategy 3: Get students via submission activity
-    if (students.length === 0) {
-      console.log('📋 No course match, trying activity-based match...');
-      const activityBasedResult = await pool.query(`
-        SELECT DISTINCT s.id, s.name, s.registration_number, s.email
-        FROM students s
-        WHERE s.id IN (
-          SELECT DISTINCT student_id FROM assessment_submissions WHERE student_program = $1
-          UNION
-          SELECT DISTINCT student_id FROM assignment_submissions WHERE student_program = $1
-          UNION
-          SELECT DISTINCT lcp.student_id FROM live_class_participants lcp
-          JOIN live_classes lc ON lcp.class_id = lc.id
-          WHERE lc.program_name = $1
-        )
-        ORDER BY s.name
-      `, [program_name]);
-      students = activityBasedResult.rows;
-      
-      if (students.length > 0) {
-        console.log(`✅ Found ${students.length} students via activity tracking`);
-      }
-    }
-    
-    console.log(`📊 Final count: ${students.length} students for program: ${program_name}`);
+    console.log(`Found ${students.length} students for program: ${program_name}`);
     
     const progressList = [];
     
@@ -11820,198 +11682,6 @@ app.get('/api/progress/students', async (req, res) => {
     res.json({ success: true, data: progressList });
   } catch (error) {
     console.error('Error fetching students progress:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Enrollment management endpoints
-// Get all enrollments
-app.get('/api/enrollments', async (req, res) => {
-  try {
-    const { student_id, program_id, program_name } = req.query;
-    
-    let query = `
-      SELECT e.*, s.name as student_name, s.registration_number, p.name as program_name
-      FROM enrollments e
-      JOIN students s ON e.student_id = s.id
-      JOIN programs p ON e.program_id = p.id
-      WHERE 1=1
-    `;
-    const params = [];
-    
-    if (student_id) {
-      params.push(student_id);
-      query += ` AND e.student_id = $${params.length}`;
-    }
-    
-    if (program_id) {
-      params.push(program_id);
-      query += ` AND e.program_id = $${params.length}`;
-    }
-    
-    if (program_name) {
-      params.push(program_name);
-      query += ` AND p.name = $${params.length}`;
-    }
-    
-    query += ' ORDER BY e.enrollment_date DESC';
-    
-    const result = await pool.query(query, params);
-    res.json({ success: true, data: result.rows });
-  } catch (error) {
-    console.error('Error fetching enrollments:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Create enrollment
-app.post('/api/enrollments', async (req, res) => {
-  try {
-    const { student_id, program_id } = req.body;
-    
-    if (!student_id || !program_id) {
-      return res.status(400).json({
-        success: false,
-        error: 'Student ID and Program ID are required'
-      });
-    }
-    
-    const result = await pool.query(
-      `INSERT INTO enrollments (student_id, program_id, status) 
-       VALUES ($1, $2, 'active') 
-       ON CONFLICT (student_id, program_id) 
-       DO UPDATE SET status = 'active', enrollment_date = CURRENT_TIMESTAMP
-       RETURNING *`,
-      [student_id, program_id]
-    );
-    
-    res.json({
-      success: true,
-      data: result.rows[0],
-      message: 'Student enrolled successfully'
-    });
-  } catch (error) {
-    console.error('Error creating enrollment:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Bulk enroll students in a program
-app.post('/api/enrollments/bulk', async (req, res) => {
-  try {
-    const { program_id, course_id } = req.body;
-    
-    if (!program_id) {
-      return res.status(400).json({
-        success: false,
-        error: 'Program ID is required'
-      });
-    }
-    
-    // Get students to enroll (either by course_id or all active students)
-    let students;
-    if (course_id) {
-      const result = await pool.query(
-        'SELECT id FROM students WHERE course_id = $1 AND is_active = true',
-        [course_id]
-      );
-      students = result.rows;
-    } else {
-      const result = await pool.query(
-        'SELECT id FROM students WHERE is_active = true'
-      );
-      students = result.rows;
-    }
-    
-    let enrolledCount = 0;
-    for (const student of students) {
-      try {
-        await pool.query(
-          `INSERT INTO enrollments (student_id, program_id, status) 
-           VALUES ($1, $2, 'active') 
-           ON CONFLICT (student_id, program_id) DO NOTHING`,
-          [student.id, program_id]
-        );
-        enrolledCount++;
-      } catch (err) {
-        // Skip if already enrolled
-      }
-    }
-    
-    res.json({
-      success: true,
-      message: `Successfully enrolled ${enrolledCount} students`,
-      enrolled_count: enrolledCount
-    });
-  } catch (error) {
-    console.error('Error bulk enrolling students:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Sync/Auto-enroll all students who should be in programs but aren't enrolled yet
-app.post('/api/enrollments/sync-all', async (req, res) => {
-  try {
-    console.log('=== SYNCING ALL ENROLLMENTS ===');
-    
-    // Get all programs
-    const programsResult = await pool.query('SELECT id, name, course_id FROM programs');
-    const programs = programsResult.rows;
-    
-    let totalEnrolled = 0;
-    const syncResults = [];
-    
-    for (const program of programs) {
-      if (!program.course_id) continue;
-      
-      // Get students in this program's course who aren't enrolled yet
-      const studentsResult = await pool.query(`
-        SELECT s.id FROM students s
-        WHERE s.course_id = $1 
-          AND s.is_active = true
-          AND NOT EXISTS (
-            SELECT 1 FROM enrollments e 
-            WHERE e.student_id = s.id AND e.program_id = $2
-          )
-      `, [program.course_id, program.id]);
-      
-      let programEnrolled = 0;
-      for (const student of studentsResult.rows) {
-        try {
-          await pool.query(
-            `INSERT INTO enrollments (student_id, program_id, status) 
-             VALUES ($1, $2, 'active') 
-             ON CONFLICT (student_id, program_id) DO NOTHING`,
-            [student.id, program.id]
-          );
-          programEnrolled++;
-          totalEnrolled++;
-        } catch (err) {
-          console.log(`Failed to enroll student ${student.id} in program ${program.id}`);
-        }
-      }
-      
-      if (programEnrolled > 0) {
-        syncResults.push({
-          program_id: program.id,
-          program_name: program.name,
-          enrolled: programEnrolled
-        });
-        console.log(`✅ Enrolled ${programEnrolled} students in ${program.name}`);
-      }
-    }
-    
-    console.log(`✅ Total students enrolled: ${totalEnrolled}`);
-    
-    res.json({
-      success: true,
-      message: `Successfully synchronized ${totalEnrolled} enrollments across ${syncResults.length} programs`,
-      total_enrolled: totalEnrolled,
-      programs_updated: syncResults.length,
-      details: syncResults
-    });
-  } catch (error) {
-    console.error('Error syncing enrollments:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
