@@ -2927,6 +2927,23 @@ app.get('/api/courses', async (req, res) => {
   }
 });
 
+// Get simplified course list for bulk upload helper
+app.get('/api/courses/list', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, code, name, academic_level FROM courses ORDER BY code ASC'
+    );
+    
+    res.json({ 
+      success: true, 
+      courses: result.rows 
+    });
+  } catch (error) {
+    console.error('Error fetching course list:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.post('/api/programs', async (req, res) => {
   try {
     const { name, courseId, lecturerName, credits, totalSemesters, duration, description, semester } = req.body;
@@ -10947,6 +10964,76 @@ app.post('/api/students/bulk-upload', async (req, res) => {
           continue;
         }
 
+        // ENHANCED: Resolve courseId to actual database ID with case-insensitive matching
+        // Accept course ID (number), course code (text), or course name (text)
+        let actualCourseId = null;
+        let resolutionMethod = null;
+        
+        // Step 1: Try numeric ID first
+        if (!isNaN(parseInt(student.courseId))) {
+          const courseCheck = await pool.query(
+            'SELECT id, code, name FROM courses WHERE id = $1',
+            [parseInt(student.courseId)]
+          );
+          
+          if (courseCheck.rows.length > 0) {
+            actualCourseId = courseCheck.rows[0].id;
+            resolutionMethod = 'ID';
+            console.log(`✅ Resolved course by ID: ${student.courseId} → ${courseCheck.rows[0].code} (${courseCheck.rows[0].name})`);
+          }
+        }
+        
+        // Step 2: Try course code (case-insensitive)
+        if (!actualCourseId) {
+          const courseByCode = await pool.query(
+            'SELECT id, code, name FROM courses WHERE LOWER(code) = LOWER($1)',
+            [student.courseId.toString().trim()]
+          );
+          
+          if (courseByCode.rows.length > 0) {
+            actualCourseId = courseByCode.rows[0].id;
+            resolutionMethod = 'code';
+            console.log(`✅ Resolved course by code: "${student.courseId}" → ${courseByCode.rows[0].code} (${courseByCode.rows[0].name})`);
+          }
+        }
+        
+        // Step 3: Try course name (case-insensitive)
+        if (!actualCourseId) {
+          const courseByName = await pool.query(
+            'SELECT id, code, name FROM courses WHERE LOWER(name) = LOWER($1)',
+            [student.courseId.toString().trim()]
+          );
+          
+          if (courseByName.rows.length > 0) {
+            actualCourseId = courseByName.rows[0].id;
+            resolutionMethod = 'name';
+            
+            if (courseByName.rows.length > 1) {
+              console.warn(`⚠️ Multiple courses found with name "${student.courseId}". Using first match: ${courseByName.rows[0].code}`);
+            }
+            
+            console.log(`✅ Resolved course by name: "${student.courseId}" → ${courseByName.rows[0].code} (${courseByName.rows[0].name})`);
+          }
+        }
+        
+        // Step 4: Handle not found with helpful error message
+        if (!actualCourseId) {
+          // Fetch sample course codes for suggestions
+          const availableCourses = await pool.query(
+            'SELECT code FROM courses ORDER BY code LIMIT 5'
+          );
+          const suggestions = availableCourses.rows.length > 0 
+            ? availableCourses.rows.map(c => c.code).join(', ')
+            : 'No courses available';
+          
+          results.failed.push({
+            row: i + 1,
+            data: student,
+            error: `Course not found: "${student.courseId}". Please check the course code, name, or ID. Available courses include: ${suggestions}. Download the CSV template to see the correct format.`
+          });
+          continue;
+        }
+
         // Check if email already exists
         const existingEmail = await pool.query(
           'SELECT id FROM students WHERE email = $1',
@@ -10990,7 +11077,7 @@ app.post('/api/students/bulk-upload', async (req, res) => {
             student.name,
             registrationNumber,
             student.academicYear || new Date().getFullYear().toString(),
-            student.courseId,
+            actualCourseId,
             student.currentSemester || 1,
             student.email,
             student.phone || null,
@@ -11006,6 +11093,28 @@ app.post('/api/students/bulk-upload', async (req, res) => {
            VALUES ('student', $1, $2, $3)`,
           [result.rows[0].id, registrationNumber, student.password || 'student123']
         );
+
+        // AUTO-ENROLL: Automatically enroll student in all programs for their course
+        try {
+          const programsResult = await pool.query(
+            'SELECT id FROM programs WHERE course_id = $1',
+            [actualCourseId]
+          );
+          
+          if (programsResult.rows.length > 0) {
+            for (const program of programsResult.rows) {
+              await pool.query(
+                `INSERT INTO enrollments (student_id, program_id, status) 
+                 VALUES ($1, $2, 'active') 
+                 ON CONFLICT (student_id, program_id) DO NOTHING`,
+                [result.rows[0].id, program.id]
+              );
+            }
+            console.log(`✅ Auto-enrolled student ${result.rows[0].id} in ${programsResult.rows.length} programs`);
+          }
+        } catch (enrollError) {
+          console.log(`⚠️ Could not auto-enroll student ${result.rows[0].id}:`, enrollError.message);
+        }
 
         results.successful.push({
           row: i + 1,
