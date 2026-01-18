@@ -11528,7 +11528,7 @@ app.get('/api/progress/student/:student_id', async (req, res) => {
     
     // Get student's assessment submissions for this program
     const submittedAssessmentsResult = await pool.query(`
-      SELECT COUNT(*) as submitted, AVG(COALESCE(score, 0)) as avg_score
+      SELECT COUNT(*) as submitted, AVG(COALESCE(percentage, 0)) as avg_score
       FROM assessment_submissions 
       WHERE student_id = $1 AND student_program = $2
     `, [student_id, program_name]);
@@ -11551,11 +11551,17 @@ app.get('/api/progress/student/:student_id', async (req, res) => {
     const totalAssignmentsResult = await pool.query(assignmentQuery, assignmentParams);
     const totalAssignments = parseInt(totalAssignmentsResult.rows[0].total) || 0;
     
-    // Get student's assignment submissions
+    // Get student's assignment submissions with percentage calculation
     const submittedAssignmentsResult = await pool.query(`
-      SELECT COUNT(*) as submitted, AVG(COALESCE(points_awarded, 0)) as avg_grade
-      FROM assignment_submissions 
-      WHERE student_id = $1 AND student_program = $2
+      SELECT 
+        COUNT(*) as submitted, 
+        AVG(CASE 
+          WHEN a.max_points > 0 THEN (COALESCE(asub.points_awarded, 0)::float / a.max_points * 100)
+          ELSE 0 
+        END) as avg_grade
+      FROM assignment_submissions asub
+      JOIN assignments a ON asub.assignment_id = a.id
+      WHERE asub.student_id = $1 AND asub.student_program = $2
     `, [student_id, program_name]);
     
     const submittedAssignments = parseInt(submittedAssignmentsResult.rows[0].submitted) || 0;
@@ -11576,12 +11582,13 @@ app.get('/api/progress/student/:student_id', async (req, res) => {
     const totalLiveClassesResult = await pool.query(liveClassQuery, liveClassParams);
     const totalLiveClasses = parseInt(totalLiveClassesResult.rows[0].total) || 0;
     
-    // Get student's live class attendance
+    // Get student's live class attendance for this program
     const attendedLiveClassesResult = await pool.query(`
-      SELECT COUNT(DISTINCT class_id) as attended
-      FROM live_class_participants 
-      WHERE student_id = $1
-    `, [student_id]);
+      SELECT COUNT(DISTINCT lcp.class_id) as attended
+      FROM live_class_participants lcp
+      JOIN live_classes lc ON lcp.class_id = lc.id
+      WHERE lcp.student_id = $1 AND lc.program_name = $2
+    `, [student_id, program_name]);
     
     const attendedLiveClasses = parseInt(attendedLiveClassesResult.rows[0].attended) || 0;
     
@@ -11719,7 +11726,7 @@ app.get('/api/progress/students', async (req, res) => {
     for (const student of students) {
       // Get student's assessment submissions
       const submittedAssessmentsResult = await pool.query(`
-        SELECT COUNT(*) as submitted, AVG(COALESCE(score, 0)) as avg_score
+        SELECT COUNT(*) as submitted, AVG(COALESCE(percentage, 0)) as avg_score
         FROM assessment_submissions 
         WHERE student_id = $1 AND student_program = $2
       `, [student.id, program_name]);
@@ -11727,22 +11734,29 @@ app.get('/api/progress/students', async (req, res) => {
       const submittedAssessments = parseInt(submittedAssessmentsResult.rows[0].submitted) || 0;
       const avgAssessmentScore = parseFloat(submittedAssessmentsResult.rows[0].avg_score) || 0;
       
-      // Get student's assignment submissions
+      // Get student's assignment submissions with percentage calculation
       const submittedAssignmentsResult = await pool.query(`
-        SELECT COUNT(*) as submitted, AVG(COALESCE(points_awarded, 0)) as avg_grade
-        FROM assignment_submissions 
-        WHERE student_id = $1 AND student_program = $2
+        SELECT 
+          COUNT(*) as submitted, 
+          AVG(CASE 
+            WHEN a.max_points > 0 THEN (COALESCE(asub.points_awarded, 0)::float / a.max_points * 100)
+            ELSE 0 
+          END) as avg_grade
+        FROM assignment_submissions asub
+        JOIN assignments a ON asub.assignment_id = a.id
+        WHERE asub.student_id = $1 AND asub.student_program = $2
       `, [student.id, program_name]);
       
       const submittedAssignments = parseInt(submittedAssignmentsResult.rows[0].submitted) || 0;
       const avgAssignmentGrade = parseFloat(submittedAssignmentsResult.rows[0].avg_grade) || 0;
       
-      // Get student's live class attendance
+      // Get student's live class attendance for this program
       const attendedLiveClassesResult = await pool.query(`
-        SELECT COUNT(DISTINCT class_id) as attended
-        FROM live_class_participants 
-        WHERE student_id = $1
-      `, [student.id]);
+        SELECT COUNT(DISTINCT lcp.class_id) as attended
+        FROM live_class_participants lcp
+        JOIN live_classes lc ON lcp.class_id = lc.id
+        WHERE lcp.student_id = $1 AND lc.program_name = $2
+      `, [student.id, program_name]);
       
       const attendedLiveClasses = parseInt(attendedLiveClassesResult.rows[0].attended) || 0;
       
