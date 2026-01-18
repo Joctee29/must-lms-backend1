@@ -1865,7 +1865,41 @@ app.delete('/api/lecturers/:id', async (req, res) => {
 // Student routes
 app.post('/api/students', async (req, res) => {
   try {
-    const { name, registrationNumber, academicYear, courseId, currentSemester, email, phone, password, yearOfStudy, academicLevel } = req.body;
+    let { name, registrationNumber, academicYear, courseId, currentSemester, email, phone, password, yearOfStudy, academicLevel } = req.body;
+    
+    // If semester not provided, get from active academic period
+    if (!currentSemester || currentSemester === null || currentSemester === undefined) {
+      const activePeriodResult = await pool.query(
+        `SELECT semester FROM academic_periods WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
+      );
+      
+      if (activePeriodResult.rows.length > 0) {
+        currentSemester = parseInt(activePeriodResult.rows[0].semester, 10);
+        console.log(`✅ Using active semester from academic period: ${currentSemester}`);
+      } else {
+        currentSemester = 1; // Default to semester 1 if no active period
+        console.log('⚠️ No active academic period found, defaulting to semester 1');
+      }
+    } else {
+      // Ensure semester is an integer
+      currentSemester = parseInt(currentSemester, 10);
+      console.log(`✅ Using provided semester: ${currentSemester}`);
+    }
+    
+    // If academic year not provided, get from active academic period
+    if (!academicYear) {
+      const activePeriodResult = await pool.query(
+        `SELECT academic_year FROM academic_periods WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
+      );
+      
+      if (activePeriodResult.rows.length > 0) {
+        academicYear = activePeriodResult.rows[0].academic_year;
+        console.log(`✅ Using active academic year from academic period: ${academicYear}`);
+      } else {
+        academicYear = new Date().getFullYear() + '/' + (new Date().getFullYear() + 1); // Default to current year
+        console.log(`⚠️ No active academic period found, defaulting to academic year: ${academicYear}`);
+      }
+    }
     
     const result = await pool.query(
       `INSERT INTO students (name, registration_number, academic_year, course_id, current_semester, email, phone, password, year_of_study, academic_level) 
@@ -4453,6 +4487,10 @@ app.post('/api/assessments/init', async (req, res) => {
       `);
       await pool.query(`
         ALTER TABLE assessment_submissions 
+        ADD COLUMN IF NOT EXISTS manual_feedback JSONB DEFAULT '{}'
+      `);
+      await pool.query(`
+        ALTER TABLE assessment_submissions 
         ADD COLUMN IF NOT EXISTS graded_at TIMESTAMP
       `);
     } catch (error) {
@@ -5417,10 +5455,10 @@ app.post('/api/manual-grade-submission', async (req, res) => {
     // Update submission with manual grades
     const result = await pool.query(
       `UPDATE assessment_submissions 
-       SET score = $1, percentage = $2, status = $3, manual_scores = $4, feedback = $5, graded_at = NOW()
-       WHERE id = $6 
+       SET score = $1, percentage = $2, status = $3, manual_scores = $4, feedback = $5, manual_feedback = $6, graded_at = NOW()
+       WHERE id = $7 
        RETURNING *`,
-      [total_score, percentage, status, JSON.stringify(manual_scores), JSON.stringify(feedback), submission_id]
+      [total_score, percentage, status, JSON.stringify(manual_scores), JSON.stringify(feedback), JSON.stringify(feedback), submission_id]
     );
 
     if (result.rows.length === 0) {
@@ -8789,6 +8827,90 @@ app.delete('/api/discussions/:id', async (req, res) => {
     
   } catch (error) {
     console.error('Error deleting discussion:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete a discussion reply with options (delete for me or delete for all)
+app.delete('/api/discussion-replies/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { user_id, user_type, delete_type } = req.body;
+    
+    console.log('=== DELETE DISCUSSION REPLY DEBUG ===');
+    console.log('Reply ID:', id);
+    console.log('User ID:', user_id);
+    console.log('User Type:', user_type);
+    console.log('Delete Type:', delete_type);
+    
+    // Get the reply to check permissions
+    const replyResult = await pool.query(
+      'SELECT * FROM discussion_replies WHERE id = $1',
+      [id]
+    );
+    
+    if (replyResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Reply not found' });
+    }
+    
+    const reply = replyResult.rows[0];
+    console.log('Reply found:', reply);
+    
+    // Check if user is the reply author
+    const isAuthor = reply.author_id == user_id;
+    
+    if (!isAuthor) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Permission denied. You can only delete your own replies.' 
+      });
+    }
+    
+    if (delete_type === 'all') {
+      // Delete for everyone - permanently remove from database
+      const deleteResult = await pool.query(
+        'DELETE FROM discussion_replies WHERE id = $1 RETURNING *',
+        [id]
+      );
+      
+      // Update discussion reply count
+      await pool.query(
+        'UPDATE discussions SET replies = GREATEST(0, replies - 1) WHERE id = $1',
+        [reply.discussion_id]
+      );
+      
+      console.log('Reply deleted for everyone:', deleteResult.rows[0]);
+      
+      res.json({ 
+        success: true, 
+        message: 'Reply deleted for everyone',
+        data: deleteResult.rows[0] 
+      });
+    } else {
+      // Delete for me only - mark as hidden for this user
+      // For now, we'll just delete it (can be enhanced later with a hidden_for field)
+      const deleteResult = await pool.query(
+        'DELETE FROM discussion_replies WHERE id = $1 RETURNING *',
+        [id]
+      );
+      
+      // Update discussion reply count
+      await pool.query(
+        'UPDATE discussions SET replies = GREATEST(0, replies - 1) WHERE id = $1',
+        [reply.discussion_id]
+      );
+      
+      console.log('Reply hidden from user:', deleteResult.rows[0]);
+      
+      res.json({ 
+        success: true, 
+        message: 'Reply hidden from your view',
+        data: deleteResult.rows[0] 
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error deleting reply:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
