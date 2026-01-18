@@ -11673,7 +11673,11 @@ app.get('/api/progress/students', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Program name is required' });
     }
     
-    // Get all students enrolled in this program
+    // Get all students enrolled in this program - FIXED QUERY
+    let students = [];
+    
+    // Try multiple approaches to find students
+    // 1. Try enrollments table first
     const studentsResult = await pool.query(`
       SELECT DISTINCT s.id, s.name, s.registration_number, s.email
       FROM students s
@@ -11683,9 +11687,9 @@ app.get('/api/progress/students', async (req, res) => {
       ORDER BY s.name
     `, [program_name]);
     
-    let students = studentsResult.rows;
+    students = studentsResult.rows;
     
-    // If no enrollments found, try to get students by program_name directly
+    // 2. If no enrollments found, try to get students by program_name directly
     if (students.length === 0) {
       const directStudentsResult = await pool.query(`
         SELECT DISTINCT s.id, s.name, s.registration_number, s.email
@@ -11694,9 +11698,22 @@ app.get('/api/progress/students', async (req, res) => {
         ORDER BY s.name
       `, [program_name]);
       students = directStudentsResult.rows;
+      console.log(`Found ${students.length} students by program_name field`);
     }
     
-    console.log(`Found ${students.length} students for program: ${program_name}`);
+    // 3. If still no students, try case-insensitive search
+    if (students.length === 0) {
+      const caseInsensitiveResult = await pool.query(`
+        SELECT DISTINCT s.id, s.name, s.registration_number, s.email
+        FROM students s
+        WHERE LOWER(s.program_name) = LOWER($1)
+        ORDER BY s.name
+      `, [program_name]);
+      students = caseInsensitiveResult.rows;
+      console.log(`Found ${students.length} students by case-insensitive search`);
+    }
+    
+    console.log(`✅ Found ${students.length} students for program: ${program_name}`);
     
     const progressList = [];
     
