@@ -11715,6 +11715,12 @@ app.get('/api/progress/students', async (req, res) => {
     
     console.log(`✅ Found ${students.length} students for program: ${program_name}`);
     
+    // If still no students found, return empty array with success
+    if (students.length === 0) {
+      console.log('⚠️ No students found for this program');
+      return res.json({ success: true, data: [] });
+    }
+    
     const progressList = [];
     
     // Get totals for this program (created by lecturer if specified)
