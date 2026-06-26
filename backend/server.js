@@ -707,19 +707,21 @@ pool.on('release', (client) => {
 });
 
 // Helper function to retry queries on connection errors
-const queryWithRetry = async (text, params, retries = 3) => {
+const queryWithRetry = async (text, params, retries = 5) => {
   let attempts = 0;
   while (attempts < retries) {
     try {
+      console.log(`🔍 Running query (attempt ${attempts+1}/${retries}) (backend)`);
       return await pool.query(text, params);
     } catch (err) {
       attempts++;
-      console.error(`Query failed (attempt ${attempts}/${retries}):`, err.message);
+      console.error(`❌ Query failed (attempt ${attempts}/${retries}) (backend):`, err.message);
       if (attempts >= retries) {
         throw err;
       }
-      // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, attempts * 1000));
+      // Wait before retrying (2 seconds per attempt)
+      console.log(`⏳ Waiting ${attempts * 2000}ms before retry... (backend)`);
+      await new Promise(resolve => setTimeout(resolve, attempts * 2000));
     }
   }
 };
@@ -729,15 +731,7 @@ pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
 });
 
-// Test database connection
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('Error connecting to database:', err);
-  } else {
-    console.log('Connected to PostgreSQL database: LMS_MUST_DB_ORG');
-    release();
-  }
-});
+
 
 // Initialize database tables
 const initializeDatabase = async () => {
