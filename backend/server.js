@@ -692,7 +692,7 @@ const queryWithRetry = async (text, params, retries = 3) => {
   let attempts = 0;
   while (attempts < retries) {
     try {
-      return await queryWithRetry(text, params);
+      return await pool.query(text, params);
     } catch (err) {
       attempts++;
       console.error(`Query failed (attempt ${attempts}/${retries}):`, err.message);
