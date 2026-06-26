@@ -666,21 +666,15 @@ app.get('/api/files/:filename', async (req, res) => {
   }
 });
 
-// PostgreSQL connection - Use environment variables for production
+// PostgreSQL connection - Use minimal Render-recommended config
 const poolConfig = process.env.DATABASE_URL 
   ? {
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
-      connectionTimeoutMillis: 20000, 
-      idleTimeoutMillis: 60000, 
-      max: 10,
-      min: 0, 
-      keepAlive: true,
-      keepAliveInitialDelayMillis: 30000,
-      allowExitOnIdle: false, 
-      maxUses: 5000,
-      statement_timeout: 30000,
-      idle_in_transaction_session_timeout: 60000
+      connectionTimeoutMillis: 30000,
+      idleTimeoutMillis: 30000,
+      max: 5,
+      allowExitOnIdle: true
     }
   : {
       user: process.env.DB_USER || 'postgres',
@@ -688,15 +682,28 @@ const poolConfig = process.env.DATABASE_URL
       database: process.env.DB_NAME || 'LMS_MUST_DB_ORG',
       password: process.env.DB_PASSWORD || '@Jctnftr01',
       port: process.env.DB_PORT || 5432,
-      keepAlive: true,
-      keepAliveInitialDelayMillis: 30000,
-      allowExitOnIdle: false,
-      maxUses: 5000,
-      max: 10,
-      min:0
+      max: 5
     };
 
 const pool = new Pool(poolConfig);
+
+// Helper function to retry queries on connection errors
+const queryWithRetry = async (text, params, retries = 3) => {
+  let attempts = 0;
+  while (attempts < retries) {
+    try {
+      return await pool.query(text, params);
+    } catch (err) {
+      attempts++;
+      console.error(`Query failed (attempt ${attempts}/${retries}):`, err.message);
+      if (attempts >= retries) {
+        throw err;
+      }
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, attempts * 1000));
+    }
+  }
+};
 
 // Handle pool errors
 pool.on('error', (err) => {
