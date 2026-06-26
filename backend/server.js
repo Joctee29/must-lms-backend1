@@ -10,6 +10,9 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
+// Trust proxy for express-rate-limit to work correctly behind reverse proxies (like Render)
+app.set('trust proxy', 1);
+
 // JWT Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'must-lms-secret-key-change-in-production-2024';
 const JWT_EXPIRES_IN = '24h';
@@ -667,7 +670,12 @@ app.get('/api/files/:filename', async (req, res) => {
 const poolConfig = process.env.DATABASE_URL 
   ? {
       connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false }
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
+      max: 20,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
     }
   : {
       user: process.env.DB_USER || 'postgres',
@@ -675,9 +683,17 @@ const poolConfig = process.env.DATABASE_URL
       database: process.env.DB_NAME || 'LMS_MUST_DB_ORG',
       password: process.env.DB_PASSWORD || '@Jctnftr01',
       port: process.env.DB_PORT || 5432,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
     };
 
 const pool = new Pool(poolConfig);
+
+// Handle pool errors
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});
 
 // Test database connection
 pool.connect((err, client, release) => {
@@ -1865,7 +1881,41 @@ app.delete('/api/lecturers/:id', async (req, res) => {
 // Student routes
 app.post('/api/students', async (req, res) => {
   try {
-    const { name, registrationNumber, academicYear, courseId, currentSemester, email, phone, password, yearOfStudy, academicLevel } = req.body;
+    let { name, registrationNumber, academicYear, courseId, currentSemester, email, phone, password, yearOfStudy, academicLevel } = req.body;
+    
+    // If semester not provided, get from active academic period
+    if (!currentSemester || currentSemester === null || currentSemester === undefined) {
+      const activePeriodResult = await pool.query(
+        `SELECT semester FROM academic_periods WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
+      );
+      
+      if (activePeriodResult.rows.length > 0) {
+        currentSemester = parseInt(activePeriodResult.rows[0].semester, 10);
+        console.log(`✅ Using active semester from academic period: ${currentSemester}`);
+      } else {
+        currentSemester = 1; // Default to semester 1 if no active period
+        console.log('⚠️ No active academic period found, defaulting to semester 1');
+      }
+    } else {
+      // Ensure semester is an integer
+      currentSemester = parseInt(currentSemester, 10);
+      console.log(`✅ Using provided semester: ${currentSemester}`);
+    }
+    
+    // If academic year not provided, get from active academic period
+    if (!academicYear) {
+      const activePeriodResult = await pool.query(
+        `SELECT academic_year FROM academic_periods WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
+      );
+      
+      if (activePeriodResult.rows.length > 0) {
+        academicYear = activePeriodResult.rows[0].academic_year;
+        console.log(`✅ Using active academic year from academic period: ${academicYear}`);
+      } else {
+        academicYear = new Date().getFullYear() + '/' + (new Date().getFullYear() + 1); // Default to current year
+        console.log(`⚠️ No active academic period found, defaulting to academic year: ${academicYear}`);
+      }
+    }
     
     const result = await pool.query(
       `INSERT INTO students (name, registration_number, academic_year, course_id, current_semester, email, phone, password, year_of_study, academic_level) 
@@ -2863,6 +2913,19 @@ app.post('/api/courses', async (req, res) => {
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Error creating course:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get all courses list (for bulk upload reference)
+app.get('/api/courses/list', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, code, name, academic_level FROM courses ORDER BY code ASC'
+    );
+    res.json({ success: true, courses: result.rows });
+  } catch (error) {
+    console.error('Error fetching courses list:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -4440,6 +4503,10 @@ app.post('/api/assessments/init', async (req, res) => {
       `);
       await pool.query(`
         ALTER TABLE assessment_submissions 
+        ADD COLUMN IF NOT EXISTS manual_feedback JSONB DEFAULT '{}'
+      `);
+      await pool.query(`
+        ALTER TABLE assessment_submissions 
         ADD COLUMN IF NOT EXISTS graded_at TIMESTAMP
       `);
     } catch (error) {
@@ -5404,10 +5471,10 @@ app.post('/api/manual-grade-submission', async (req, res) => {
     // Update submission with manual grades
     const result = await pool.query(
       `UPDATE assessment_submissions 
-       SET score = $1, percentage = $2, status = $3, manual_scores = $4, feedback = $5, graded_at = NOW()
-       WHERE id = $6 
+       SET score = $1, percentage = $2, status = $3, manual_scores = $4, feedback = $5, manual_feedback = $6, graded_at = NOW()
+       WHERE id = $7 
        RETURNING *`,
-      [total_score, percentage, status, JSON.stringify(manual_scores), JSON.stringify(feedback), submission_id]
+      [total_score, percentage, status, JSON.stringify(manual_scores), JSON.stringify(feedback), JSON.stringify(feedback), submission_id]
     );
 
     if (result.rows.length === 0) {
@@ -8780,6 +8847,90 @@ app.delete('/api/discussions/:id', async (req, res) => {
   }
 });
 
+// Delete a discussion reply with options (delete for me or delete for all)
+app.delete('/api/discussion-replies/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { user_id, user_type, delete_type } = req.body;
+    
+    console.log('=== DELETE DISCUSSION REPLY DEBUG ===');
+    console.log('Reply ID:', id);
+    console.log('User ID:', user_id);
+    console.log('User Type:', user_type);
+    console.log('Delete Type:', delete_type);
+    
+    // Get the reply to check permissions
+    const replyResult = await pool.query(
+      'SELECT * FROM discussion_replies WHERE id = $1',
+      [id]
+    );
+    
+    if (replyResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Reply not found' });
+    }
+    
+    const reply = replyResult.rows[0];
+    console.log('Reply found:', reply);
+    
+    // Check if user is the reply author
+    const isAuthor = reply.author_id == user_id;
+    
+    if (!isAuthor) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Permission denied. You can only delete your own replies.' 
+      });
+    }
+    
+    if (delete_type === 'all') {
+      // Delete for everyone - permanently remove from database
+      const deleteResult = await pool.query(
+        'DELETE FROM discussion_replies WHERE id = $1 RETURNING *',
+        [id]
+      );
+      
+      // Update discussion reply count
+      await pool.query(
+        'UPDATE discussions SET replies = GREATEST(0, replies - 1) WHERE id = $1',
+        [reply.discussion_id]
+      );
+      
+      console.log('Reply deleted for everyone:', deleteResult.rows[0]);
+      
+      res.json({ 
+        success: true, 
+        message: 'Reply deleted for everyone',
+        data: deleteResult.rows[0] 
+      });
+    } else {
+      // Delete for me only - mark as hidden for this user
+      // For now, we'll just delete it (can be enhanced later with a hidden_for field)
+      const deleteResult = await pool.query(
+        'DELETE FROM discussion_replies WHERE id = $1 RETURNING *',
+        [id]
+      );
+      
+      // Update discussion reply count
+      await pool.query(
+        'UPDATE discussions SET replies = GREATEST(0, replies - 1) WHERE id = $1',
+        [reply.discussion_id]
+      );
+      
+      console.log('Reply hidden from user:', deleteResult.rows[0]);
+      
+      res.json({ 
+        success: true, 
+        message: 'Reply hidden from your view',
+        data: deleteResult.rows[0] 
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error deleting reply:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Initialize announcements table
 const initializeAnnouncementsTable = async () => {
   try {
@@ -10921,6 +11072,47 @@ app.post('/api/students/bulk-upload', async (req, res) => {
           continue;
         }
 
+        // Resolve courseId - can be numeric ID, course code, or course name
+        let resolvedCourseId = null;
+        const courseIdValue = student.courseId;
+        
+        // Check if it's a numeric ID
+        if (!isNaN(courseIdValue) && Number.isInteger(Number(courseIdValue))) {
+          // It's a numeric ID, verify it exists
+          const courseCheck = await pool.query(
+            'SELECT id FROM courses WHERE id = $1',
+            [parseInt(courseIdValue)]
+          );
+          
+          if (courseCheck.rows.length > 0) {
+            resolvedCourseId = courseCheck.rows[0].id;
+          } else {
+            results.failed.push({
+              row: i + 1,
+              data: student,
+              error: `Course with ID ${courseIdValue} not found`
+            });
+            continue;
+          }
+        } else {
+          // It's a string - try to find by code first, then by name
+          const courseCheck = await pool.query(
+            'SELECT id FROM courses WHERE code = $1 OR name = $1',
+            [courseIdValue]
+          );
+          
+          if (courseCheck.rows.length > 0) {
+            resolvedCourseId = courseCheck.rows[0].id;
+          } else {
+            results.failed.push({
+              row: i + 1,
+              data: student,
+              error: `Course with code or name "${courseIdValue}" not found. Please check the course code/name.`
+            });
+            continue;
+          }
+        }
+
         // Check if email already exists
         const existingEmail = await pool.query(
           'SELECT id FROM students WHERE email = $1',
@@ -10964,7 +11156,7 @@ app.post('/api/students/bulk-upload', async (req, res) => {
             student.name,
             registrationNumber,
             student.academicYear || new Date().getFullYear().toString(),
-            student.courseId,
+            resolvedCourseId,
             student.currentSemester || 1,
             student.email,
             student.phone || null,
@@ -11352,7 +11544,7 @@ app.get('/api/progress/student/:student_id', async (req, res) => {
     
     // Get student's assessment submissions for this program
     const submittedAssessmentsResult = await pool.query(`
-      SELECT COUNT(*) as submitted, AVG(COALESCE(score, 0)) as avg_score
+      SELECT COUNT(*) as submitted, AVG(COALESCE(percentage, 0)) as avg_score
       FROM assessment_submissions 
       WHERE student_id = $1 AND student_program = $2
     `, [student_id, program_name]);
@@ -11375,11 +11567,17 @@ app.get('/api/progress/student/:student_id', async (req, res) => {
     const totalAssignmentsResult = await pool.query(assignmentQuery, assignmentParams);
     const totalAssignments = parseInt(totalAssignmentsResult.rows[0].total) || 0;
     
-    // Get student's assignment submissions
+    // Get student's assignment submissions with percentage calculation
     const submittedAssignmentsResult = await pool.query(`
-      SELECT COUNT(*) as submitted, AVG(COALESCE(points_awarded, 0)) as avg_grade
-      FROM assignment_submissions 
-      WHERE student_id = $1 AND student_program = $2
+      SELECT 
+        COUNT(*) as submitted, 
+        AVG(CASE 
+          WHEN a.max_points > 0 THEN (COALESCE(asub.points_awarded, 0)::float / a.max_points * 100)
+          ELSE 0 
+        END) as avg_grade
+      FROM assignment_submissions asub
+      JOIN assignments a ON asub.assignment_id = a.id
+      WHERE asub.student_id = $1 AND asub.student_program = $2
     `, [student_id, program_name]);
     
     const submittedAssignments = parseInt(submittedAssignmentsResult.rows[0].submitted) || 0;
@@ -11400,12 +11598,13 @@ app.get('/api/progress/student/:student_id', async (req, res) => {
     const totalLiveClassesResult = await pool.query(liveClassQuery, liveClassParams);
     const totalLiveClasses = parseInt(totalLiveClassesResult.rows[0].total) || 0;
     
-    // Get student's live class attendance
+    // Get student's live class attendance for this program
     const attendedLiveClassesResult = await pool.query(`
-      SELECT COUNT(DISTINCT class_id) as attended
-      FROM live_class_participants 
-      WHERE student_id = $1
-    `, [student_id]);
+      SELECT COUNT(DISTINCT lcp.class_id) as attended
+      FROM live_class_participants lcp
+      JOIN live_classes lc ON lcp.class_id = lc.id
+      WHERE lcp.student_id = $1 AND lc.program_name = $2
+    `, [student_id, program_name]);
     
     const attendedLiveClasses = parseInt(attendedLiveClassesResult.rows[0].attended) || 0;
     
@@ -11490,7 +11689,11 @@ app.get('/api/progress/students', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Program name is required' });
     }
     
-    // Get all students enrolled in this program
+    // Get all students enrolled in this program - FIXED QUERY
+    let students = [];
+    
+    // Try multiple approaches to find students
+    // 1. Try enrollments table first
     const studentsResult = await pool.query(`
       SELECT DISTINCT s.id, s.name, s.registration_number, s.email
       FROM students s
@@ -11500,9 +11703,9 @@ app.get('/api/progress/students', async (req, res) => {
       ORDER BY s.name
     `, [program_name]);
     
-    let students = studentsResult.rows;
+    students = studentsResult.rows;
     
-    // If no enrollments found, try to get students by program_name directly
+    // 2. If no enrollments found, try to get students by program_name directly
     if (students.length === 0) {
       const directStudentsResult = await pool.query(`
         SELECT DISTINCT s.id, s.name, s.registration_number, s.email
@@ -11511,9 +11714,28 @@ app.get('/api/progress/students', async (req, res) => {
         ORDER BY s.name
       `, [program_name]);
       students = directStudentsResult.rows;
+      console.log(`Found ${students.length} students by program_name field`);
     }
     
-    console.log(`Found ${students.length} students for program: ${program_name}`);
+    // 3. If still no students, try case-insensitive search
+    if (students.length === 0) {
+      const caseInsensitiveResult = await pool.query(`
+        SELECT DISTINCT s.id, s.name, s.registration_number, s.email
+        FROM students s
+        WHERE LOWER(s.program_name) = LOWER($1)
+        ORDER BY s.name
+      `, [program_name]);
+      students = caseInsensitiveResult.rows;
+      console.log(`Found ${students.length} students by case-insensitive search`);
+    }
+    
+    console.log(`✅ Found ${students.length} students for program: ${program_name}`);
+    
+    // If still no students found, return empty array with success
+    if (students.length === 0) {
+      console.log('⚠️ No students found for this program');
+      return res.json({ success: true, data: [] });
+    }
     
     const progressList = [];
     
@@ -11543,7 +11765,7 @@ app.get('/api/progress/students', async (req, res) => {
     for (const student of students) {
       // Get student's assessment submissions
       const submittedAssessmentsResult = await pool.query(`
-        SELECT COUNT(*) as submitted, AVG(COALESCE(score, 0)) as avg_score
+        SELECT COUNT(*) as submitted, AVG(COALESCE(percentage, 0)) as avg_score
         FROM assessment_submissions 
         WHERE student_id = $1 AND student_program = $2
       `, [student.id, program_name]);
@@ -11551,22 +11773,29 @@ app.get('/api/progress/students', async (req, res) => {
       const submittedAssessments = parseInt(submittedAssessmentsResult.rows[0].submitted) || 0;
       const avgAssessmentScore = parseFloat(submittedAssessmentsResult.rows[0].avg_score) || 0;
       
-      // Get student's assignment submissions
+      // Get student's assignment submissions with percentage calculation
       const submittedAssignmentsResult = await pool.query(`
-        SELECT COUNT(*) as submitted, AVG(COALESCE(points_awarded, 0)) as avg_grade
-        FROM assignment_submissions 
-        WHERE student_id = $1 AND student_program = $2
+        SELECT 
+          COUNT(*) as submitted, 
+          AVG(CASE 
+            WHEN a.max_points > 0 THEN (COALESCE(asub.points_awarded, 0)::float / a.max_points * 100)
+            ELSE 0 
+          END) as avg_grade
+        FROM assignment_submissions asub
+        JOIN assignments a ON asub.assignment_id = a.id
+        WHERE asub.student_id = $1 AND asub.student_program = $2
       `, [student.id, program_name]);
       
       const submittedAssignments = parseInt(submittedAssignmentsResult.rows[0].submitted) || 0;
       const avgAssignmentGrade = parseFloat(submittedAssignmentsResult.rows[0].avg_grade) || 0;
       
-      // Get student's live class attendance
+      // Get student's live class attendance for this program
       const attendedLiveClassesResult = await pool.query(`
-        SELECT COUNT(DISTINCT class_id) as attended
-        FROM live_class_participants 
-        WHERE student_id = $1
-      `, [student.id]);
+        SELECT COUNT(DISTINCT lcp.class_id) as attended
+        FROM live_class_participants lcp
+        JOIN live_classes lc ON lcp.class_id = lc.id
+        WHERE lcp.student_id = $1 AND lc.program_name = $2
+      `, [student.id, program_name]);
       
       const attendedLiveClasses = parseInt(attendedLiveClassesResult.rows[0].attended) || 0;
       

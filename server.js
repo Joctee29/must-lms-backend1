@@ -10,6 +10,9 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
+// Trust proxy for express-rate-limit to work correctly behind reverse proxies (like Render)
+app.set('trust proxy', 1);
+
 // JWT Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'must-lms-secret-key-change-in-production-2024';
 const JWT_EXPIRES_IN = '24h';
@@ -572,7 +575,14 @@ app.get('/api/files/:filename', async (req, res) => {
 const poolConfig = process.env.DATABASE_URL 
   ? {
       connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false }
+      ssl: { rejectUnauthorized: false },
+      // Add connection timeout and retry settings
+      connectionTimeoutMillis: 10000, // 10 seconds
+      idleTimeoutMillis: 30000, // 30 seconds
+      max: 20, // Maximum pool size
+      // Keep connections alive
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
     }
   : {
       user: process.env.DB_USER || 'postgres',
@@ -580,16 +590,29 @@ const poolConfig = process.env.DATABASE_URL
       database: process.env.DB_NAME || 'LMS_MUST_DB_ORG',
       password: process.env.DB_PASSWORD || '@Jctnftr01',
       port: process.env.DB_PORT || 5432,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
     };
 
 const pool = new Pool(poolConfig);
 
-// Test database connection
+// Handle pool errors
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});
+
+// Test database connection with better error handling
 pool.connect((err, client, release) => {
   if (err) {
-    console.error('Error connecting to database:', err);
+    console.error('❌ Error connecting to database:', err.message);
+    if (err.code === 'ENOTFOUND') {
+      console.error('⚠️  DNS Error: Database hostname cannot be resolved');
+      console.error('💡 Solution: Check your DATABASE_URL in Render dashboard');
+      console.error('💡 Make sure you are using the EXTERNAL database URL, not internal');
+    }
   } else {
-    console.log('Connected to PostgreSQL database: LMS_MUST_DB_ORG');
+    console.log('✅ Connected to PostgreSQL database: LMS_MUST_DB_ORG');
     release();
   }
 });
@@ -6190,7 +6213,7 @@ const checkScheduledClasses = async () => {
     }
   } catch (error) {
     // Only log non-connection errors to avoid spam
-    if (error.code !== 'ECONNREFUSED') {
+    if (error.code !== 'ECONNREFUSED' && error.code !== 'ENOTFOUND') {
       console.error('❌ Error in automatic scheduler:', error.message);
     }
     // Connection errors are silently ignored as database may not be available yet
