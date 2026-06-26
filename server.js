@@ -576,14 +576,16 @@ const poolConfig = process.env.DATABASE_URL
   ? {
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
-      connectionTimeoutMillis: 10000, 
-      idleTimeoutMillis: 30000, 
-      max: 20,
-      min: 2, 
+      connectionTimeoutMillis: 20000, 
+      idleTimeoutMillis: 60000, 
+      max: 10,
+      min: 0, 
       keepAlive: true,
-      keepAliveInitialDelayMillis: 10000,
+      keepAliveInitialDelayMillis: 30000,
       allowExitOnIdle: false, 
-      maxUses: 7500 
+      maxUses: 5000,
+      statement_timeout: 30000,
+      idle_in_transaction_session_timeout: 60000
     }
   : {
       user: process.env.DB_USER || 'postgres',
@@ -592,10 +594,11 @@ const poolConfig = process.env.DATABASE_URL
       password: process.env.DB_PASSWORD || '@Jctnftr01',
       port: process.env.DB_PORT || 5432,
       keepAlive: true,
-      keepAliveInitialDelayMillis: 10000,
+      keepAliveInitialDelayMillis: 30000,
       allowExitOnIdle: false,
-      maxUses: 7500,
-      min:2
+      maxUses: 5000,
+      max: 10,
+      min:0
     };
 
 const pool = new Pool(poolConfig);
