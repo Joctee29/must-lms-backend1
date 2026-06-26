@@ -666,25 +666,43 @@ app.get('/api/files/:filename', async (req, res) => {
   }
 });
 
-// PostgreSQL connection - Use minimal Render-recommended config
-const poolConfig = process.env.DATABASE_URL 
-  ? {
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
-      connectionTimeoutMillis: 30000,
-      idleTimeoutMillis: 30000,
-      max: 5,
-      allowExitOnIdle: true
-    }
-  : {
-      user: process.env.DB_USER || 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      database: process.env.DB_NAME || 'LMS_MUST_DB_ORG',
-      password: process.env.DB_PASSWORD || '@Jctnftr01',
-      port: process.env.DB_PORT || 5432,
-      max: 5
-    };
+const url = require('url');
 
+// PostgreSQL connection - Use minimal Render-recommended config - parse DATABASE_URL manually (pg-pool doesn't accept connectionString directly
+let poolConfig;
+if (process.env.DATABASE_URL) {
+  const params = url.parse(process.env.DATABASE_URL);
+  const auth = params.auth ? params.auth.split(':') : [];
+  poolConfig = {
+    user: auth[0],
+    password: auth[1],
+    host: params.hostname,
+    port: params.port,
+    database: params.pathname.split('/')[1],
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 30000,
+    idleTimeoutMillis: 30000,
+    max: 5,
+    allowExitOnIdle: true
+  };
+} else {
+  poolConfig = {
+    user: process.env.DB_USER || 'postgres',
+    host: process.env.DB_HOST || 'localhost',
+    database: process.env.DB_NAME || 'LMS_MUST_DB_ORG',
+    password: process.env.DB_PASSWORD || '@Jctnftr01',
+    port: process.env.DB_PORT || 5432,
+    max: 5
+  };
+}
+
+console.log("🟢 DB Config parsed (backend):", {
+  user: poolConfig.user,
+  host: poolConfig.host,
+  database: poolConfig.database,
+  port: poolConfig.port,
+  ssl: !!poolConfig.ssl
+});
 const pool = new Pool(poolConfig);
 
 // Helper function to retry queries on connection errors
