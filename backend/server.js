@@ -58,7 +58,7 @@ const FALLBACK_EMAIL_CONFIG = {
 // Function to get admin email from database
 const getAdminEmail = async () => {
   try {
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT setting_value FROM admin_settings WHERE setting_key = $1',
       ['admin_email']
     );
@@ -293,7 +293,7 @@ app.post('/api/announcements', upload.single('file'), async (req, res) => {
       const uploaderId = created_by_id && created_by_id !== '' ? parseInt(created_by_id, 10) : null;
       
       // Store file in database
-      await pool.query(
+      await queryWithRetry(
         'INSERT INTO file_storage (file_name, original_name, file_data, file_mimetype, file_size, uploaded_by_id, uploaded_by_type) VALUES ($1, $2, $3, $4, $5, $6, $7)',
         [uniqueFilename, req.file.originalname, req.file.buffer, req.file.mimetype, req.file.size, uploaderId, created_by_type || 'admin']
       );
@@ -312,7 +312,7 @@ app.post('/api/announcements', upload.single('file'), async (req, res) => {
     const announcementCreatorId = created_by_id && created_by_id !== '' ? parseInt(created_by_id, 10) : null;
     
     // Insert into database
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'INSERT INTO announcements (title, content, target_type, target_value, created_by, created_by_id, created_by_type, file_url, file_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
       [title, content, target_type || 'all', target_value || null, created_by || 'Admin', announcementCreatorId, created_by_type || 'admin', file_url, file_name]
     );
@@ -358,7 +358,7 @@ app.post('/api/assignment-submissions/upload', upload.single('file'), async (req
     const uniqueFilename = Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(uploadedFile.originalname);
     
     // Store file in database
-    await pool.query(
+    await queryWithRetry(
       'INSERT INTO file_storage (file_name, original_name, file_data, file_mimetype, file_size, uploaded_by_type) VALUES ($1, $2, $3, $4, $5, $6)',
       [uniqueFilename, uploadedFile.originalname, uploadedFile.buffer, uploadedFile.mimetype, uploadedFile.size, 'student']
     );
@@ -409,10 +409,10 @@ app.post('/api/discussion-replies/upload', upload.single('file'), async (req, re
     
     // Ensure discussion_replies table has file columns
     try {
-      await pool.query(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_url VARCHAR(500)`);
-      await pool.query(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_name VARCHAR(255)`);
-      await pool.query(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_type VARCHAR(50)`);
-      await pool.query(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_size INTEGER`);
+      await queryWithRetry(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_url VARCHAR(500)`);
+      await queryWithRetry(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_name VARCHAR(255)`);
+      await queryWithRetry(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_type VARCHAR(50)`);
+      await queryWithRetry(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_size INTEGER`);
     } catch (alterError) {
       console.log('Column check note:', alterError.message);
     }
@@ -440,7 +440,7 @@ app.post('/api/discussion-replies/upload', upload.single('file'), async (req, re
       }
       
       // Store file in database
-      await pool.query(
+      await queryWithRetry(
         'INSERT INTO file_storage (file_name, original_name, file_data, file_mimetype, file_size, uploaded_by_id, uploaded_by_type) VALUES ($1, $2, $3, $4, $5, $6, $7)',
         [uniqueFilename, req.file.originalname, req.file.buffer, req.file.mimetype, req.file.size, author_id || null, author_type || 'student']
       );
@@ -458,13 +458,13 @@ app.post('/api/discussion-replies/upload', upload.single('file'), async (req, re
     }
     
     // Insert reply with file info
-    const replyResult = await pool.query(`
+    const replyResult = await queryWithRetry(`
       INSERT INTO discussion_replies (discussion_id, content, author, author_id, author_type, file_url, file_name, file_type, file_size)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
     `, [discussion_id, content || '', author, author_id, author_type || 'student', file_url, file_name, file_type, file_size]);
     
     // Update discussion reply count
-    await pool.query(`
+    await queryWithRetry(`
       UPDATE discussions 
       SET replies = replies + 1, updated_at = CURRENT_TIMESTAMP 
       WHERE id = $1
@@ -501,7 +501,7 @@ app.post('/api/announcements/json', async (req, res) => {
     const announcementCreatorId = created_by_id && created_by_id !== '' && created_by_id !== null ? parseInt(created_by_id, 10) : null;
     
     // Insert into database
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'INSERT INTO announcements (title, content, target_type, target_value, created_by, created_by_id, created_by_type, file_url, file_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
       [title, content, target_type || 'all', target_value || null, created_by || 'Admin', announcementCreatorId, created_by_type || 'admin', file_url || null, file_name || null]
     );
@@ -583,7 +583,7 @@ app.get('/content/:filename', async (req, res) => {
     console.log('Requested filename:', filename);
     
     // Try to get file from database
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT file_data, file_mimetype, original_name FROM file_storage WHERE file_name = $1',
       [filename]
     );
@@ -616,7 +616,7 @@ app.get('/uploads/:filename', async (req, res) => {
   try {
     const filename = decodeURIComponent(req.params.filename);
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT file_data, file_mimetype, original_name FROM file_storage WHERE file_name = $1',
       [filename]
     );
@@ -643,7 +643,7 @@ app.get('/api/files/:filename', async (req, res) => {
     console.log('=== FILE DOWNLOAD REQUEST FROM DATABASE ===');
     console.log('Requested filename:', filename);
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT file_data, file_mimetype, original_name FROM file_storage WHERE file_name = $1',
       [filename]
     );
@@ -692,7 +692,7 @@ const queryWithRetry = async (text, params, retries = 3) => {
   let attempts = 0;
   while (attempts < retries) {
     try {
-      return await pool.query(text, params);
+      return await queryWithRetry(text, params);
     } catch (err) {
       attempts++;
       console.error(`Query failed (attempt ${attempts}/${retries}):`, err.message);
@@ -726,7 +726,7 @@ const initializeDatabase = async () => {
     console.log('Initializing database tables...');
     
     // Create lecturers table
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS lecturers (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -742,7 +742,7 @@ const initializeDatabase = async () => {
 
     // Add is_active column for lecturers (must self-register to activate)
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE lecturers 
         ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false
       `);
@@ -753,7 +753,7 @@ const initializeDatabase = async () => {
 
     // Fix password field size if it's too small (varchar(10) -> varchar(255))
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE lecturers 
         ALTER COLUMN password TYPE VARCHAR(255)
       `);
@@ -764,7 +764,7 @@ const initializeDatabase = async () => {
 
     // Add is_locked column for account locking
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE lecturers 
         ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false
       `);
@@ -775,7 +775,7 @@ const initializeDatabase = async () => {
 
     // Add locked_at column to track when account was locked
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE lecturers 
         ADD COLUMN IF NOT EXISTS locked_at TIMESTAMP
       `);
@@ -785,7 +785,7 @@ const initializeDatabase = async () => {
     }
 
     // Create colleges table
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS colleges (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -797,7 +797,7 @@ const initializeDatabase = async () => {
     `);
 
     // Create departments table
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS departments (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -809,7 +809,7 @@ const initializeDatabase = async () => {
     `);
 
     // Create courses table
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS courses (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -823,11 +823,11 @@ const initializeDatabase = async () => {
 
     // Update existing courses table if needed
     try {
-      await pool.query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS department_id INTEGER REFERENCES departments(id)`);
-      await pool.query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS credits INTEGER DEFAULT 0`);
-      await pool.query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 4`);
-      await pool.query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS academic_level VARCHAR(20) DEFAULT 'bachelor'`);
-      await pool.query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS year_of_study INTEGER DEFAULT 1`);
+      await queryWithRetry(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS department_id INTEGER REFERENCES departments(id)`);
+      await queryWithRetry(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS credits INTEGER DEFAULT 0`);
+      await queryWithRetry(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 4`);
+      await queryWithRetry(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS academic_level VARCHAR(20) DEFAULT 'bachelor'`);
+      await queryWithRetry(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS year_of_study INTEGER DEFAULT 1`);
       console.log('✅ Courses table updated with duration, academic_level, and year_of_study columns');
     } catch (error) {
       console.log('Table alteration completed or not needed');
@@ -835,7 +835,7 @@ const initializeDatabase = async () => {
 
     // Update existing departments with realistic HOD names
     try {
-      const deptResult = await pool.query('SELECT * FROM departments WHERE head_of_department IS NULL OR head_of_department = \'\'');
+      const deptResult = await queryWithRetry('SELECT * FROM departments WHERE head_of_department IS NULL OR head_of_department = \'\'');
       if (deptResult.rows.length > 0) {
         console.log('✅ Updating departments with realistic HOD names...');
         
@@ -858,7 +858,7 @@ const initializeDatabase = async () => {
           );
           const hodName = departmentNames[deptType] || `Dr. ${dept.name.split(' ')[0]} Head`;
           
-          await pool.query(
+          await queryWithRetry(
             'UPDATE departments SET head_of_department = $1 WHERE id = $2',
             [hodName, dept.id]
           );
@@ -870,7 +870,7 @@ const initializeDatabase = async () => {
     }
 
     // Create programs table
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS programs (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -887,17 +887,17 @@ const initializeDatabase = async () => {
 
     // Update existing programs table if needed
     try {
-      await pool.query(`ALTER TABLE programs ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 1`);
-      await pool.query(`ALTER TABLE programs ADD COLUMN IF NOT EXISTS lecturer_name VARCHAR(255)`);
-      await pool.query(`ALTER TABLE programs ALTER COLUMN credits SET DEFAULT 0`);
-      await pool.query(`ALTER TABLE programs ALTER COLUMN total_semesters SET DEFAULT 1`);
-      await pool.query(`ALTER TABLE programs ADD COLUMN IF NOT EXISTS semester INTEGER`);
+      await queryWithRetry(`ALTER TABLE programs ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 1`);
+      await queryWithRetry(`ALTER TABLE programs ADD COLUMN IF NOT EXISTS lecturer_name VARCHAR(255)`);
+      await queryWithRetry(`ALTER TABLE programs ALTER COLUMN credits SET DEFAULT 0`);
+      await queryWithRetry(`ALTER TABLE programs ALTER COLUMN total_semesters SET DEFAULT 1`);
+      await queryWithRetry(`ALTER TABLE programs ADD COLUMN IF NOT EXISTS semester INTEGER`);
     } catch (error) {
       console.log('Programs table alteration completed or not needed');
     }
 
     // Create students table
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS students (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -915,7 +915,7 @@ const initializeDatabase = async () => {
 
     // Add year_of_study column if it doesn't exist (for data separation by year)
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE students 
         ADD COLUMN IF NOT EXISTS year_of_study INTEGER DEFAULT 1
       `);
@@ -926,7 +926,7 @@ const initializeDatabase = async () => {
 
     // Add academic_level column if it doesn't exist (for level-based filtering)
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE students 
         ADD COLUMN IF NOT EXISTS academic_level VARCHAR(50) DEFAULT 'bachelor'
       `);
@@ -937,7 +937,7 @@ const initializeDatabase = async () => {
 
     // Add is_active column for account activation (students must self-register to activate)
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE students 
         ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false
       `);
@@ -948,7 +948,7 @@ const initializeDatabase = async () => {
 
     // Fix password field size if it's too small (varchar(10) -> varchar(255))
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE students 
         ALTER COLUMN password TYPE VARCHAR(255)
       `);
@@ -959,7 +959,7 @@ const initializeDatabase = async () => {
 
     // Add is_locked column for account locking
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE students 
         ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false
       `);
@@ -970,7 +970,7 @@ const initializeDatabase = async () => {
 
     // Add locked_at column to track when account was locked
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE students 
         ADD COLUMN IF NOT EXISTS locked_at TIMESTAMP
       `);
@@ -981,7 +981,7 @@ const initializeDatabase = async () => {
 
     // Add CR (Class Representative) columns
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE students 
         ADD COLUMN IF NOT EXISTS is_cr BOOLEAN DEFAULT false
       `);
@@ -991,7 +991,7 @@ const initializeDatabase = async () => {
     }
 
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE students 
         ADD COLUMN IF NOT EXISTS cr_activated_at TIMESTAMP
       `);
@@ -1001,7 +1001,7 @@ const initializeDatabase = async () => {
     }
 
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE students 
         ADD COLUMN IF NOT EXISTS cr_activated_by VARCHAR(255)
       `);
@@ -1011,7 +1011,7 @@ const initializeDatabase = async () => {
     }
 
     // Create academic_periods table for global academic year & semester settings
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS academic_periods (
         id SERIAL PRIMARY KEY,
         academic_year VARCHAR(20) NOT NULL,
@@ -1025,7 +1025,7 @@ const initializeDatabase = async () => {
     // Ensure only one active period logically enforced by updates (no unique constraint errors on old data)
 
     // Create passwords table for password management
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS password_records (
         id SERIAL PRIMARY KEY,
         user_type VARCHAR(20) NOT NULL,
@@ -1040,7 +1040,7 @@ const initializeDatabase = async () => {
     
     // Add UNIQUE constraint if it doesn't exist (for existing databases)
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE password_records 
         ADD CONSTRAINT password_records_user_type_user_id_key 
         UNIQUE (user_type, user_id)
@@ -1052,7 +1052,7 @@ const initializeDatabase = async () => {
     }
 
     // Create content table for file uploads (with file_data for database storage)
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS content (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -1073,15 +1073,15 @@ const initializeDatabase = async () => {
 
     // Add file_data column if it doesn't exist (for existing databases)
     try {
-      await pool.query(`ALTER TABLE content ADD COLUMN IF NOT EXISTS file_data BYTEA`);
-      await pool.query(`ALTER TABLE content ADD COLUMN IF NOT EXISTS file_mimetype VARCHAR(100)`);
+      await queryWithRetry(`ALTER TABLE content ADD COLUMN IF NOT EXISTS file_data BYTEA`);
+      await queryWithRetry(`ALTER TABLE content ADD COLUMN IF NOT EXISTS file_mimetype VARCHAR(100)`);
       console.log('✅ file_data and file_mimetype columns added/verified in content table');
     } catch (error) {
       console.log('file_data column may already exist:', error.message);
     }
 
     // Create file_storage table for all uploaded files (centralized storage)
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS file_storage (
         id SERIAL PRIMARY KEY,
         file_name VARCHAR(255) NOT NULL,
@@ -1097,11 +1097,11 @@ const initializeDatabase = async () => {
     console.log('✅ file_storage table created/verified for persistent file storage');
 
     // Drop and recreate discussions table to ensure correct structure
-    await pool.query(`DROP TABLE IF EXISTS discussions CASCADE`);
-    await pool.query(`DROP TABLE IF EXISTS discussion_replies CASCADE`);
+    await queryWithRetry(`DROP TABLE IF EXISTS discussions CASCADE`);
+    await queryWithRetry(`DROP TABLE IF EXISTS discussion_replies CASCADE`);
     
     // Create discussions table
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE discussions (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -1126,7 +1126,7 @@ const initializeDatabase = async () => {
     `);
 
     // Create discussion_replies table with file support
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE discussion_replies (
         id SERIAL PRIMARY KEY,
         discussion_id INTEGER NOT NULL,
@@ -1145,11 +1145,11 @@ const initializeDatabase = async () => {
 
     // Add file columns to existing discussion_replies table
     try {
-      await pool.query(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_url VARCHAR(500)`);
-      await pool.query(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_name VARCHAR(255)`);
-      await pool.query(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_type VARCHAR(50)`);
-      await pool.query(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_size INTEGER`);
-      await pool.query(`ALTER TABLE discussion_replies ALTER COLUMN content DROP NOT NULL`);
+      await queryWithRetry(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_url VARCHAR(500)`);
+      await queryWithRetry(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_name VARCHAR(255)`);
+      await queryWithRetry(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_type VARCHAR(50)`);
+      await queryWithRetry(`ALTER TABLE discussion_replies ADD COLUMN IF NOT EXISTS file_size INTEGER`);
+      await queryWithRetry(`ALTER TABLE discussion_replies ALTER COLUMN content DROP NOT NULL`);
       console.log('✅ File columns added to discussion_replies table');
     } catch (error) {
       console.log('Discussion replies file columns may already exist:', error.message);
@@ -1157,7 +1157,7 @@ const initializeDatabase = async () => {
 
 
     // Create study_group_notifications table
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS study_group_notifications (
         id SERIAL PRIMARY KEY,
         discussion_id INTEGER NOT NULL REFERENCES discussions(id) ON DELETE CASCADE,
@@ -1173,7 +1173,7 @@ const initializeDatabase = async () => {
     `);
 
     // Create assignments table
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS assignments (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -1192,14 +1192,14 @@ const initializeDatabase = async () => {
 
     // Add program_id column to existing assignments table if it doesn't exist
     try {
-      await pool.query(`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS program_id INTEGER`);
+      await queryWithRetry(`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS program_id INTEGER`);
       console.log('✅ Ensured program_id column exists in assignments table');
     } catch (error) {
       console.log('Assignment table migration completed or not needed');
     }
 
     // Create assignment_submissions table
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS assignment_submissions (
         id SERIAL PRIMARY KEY,
         assignment_id INTEGER REFERENCES assignments(id) ON DELETE CASCADE,
@@ -1258,7 +1258,7 @@ app.post('/api/auth/login', async (req, res) => {
       `;
       params = [username];
       
-      const result = await pool.query(query, params);
+      const result = await queryWithRetry(query, params);
       
       if (result.rows.length > 0) {
         const student = result.rows[0];
@@ -1313,7 +1313,7 @@ app.post('/api/auth/login', async (req, res) => {
       `;
       params = [username];
       
-      const result = await pool.query(query, params);
+      const result = await queryWithRetry(query, params);
       
       if (result.rows.length > 0) {
         const lecturer = result.rows[0];
@@ -1416,7 +1416,7 @@ app.post('/api/auth/student-register', async (req, res) => {
     }
 
     // Check if registration number exists in database (pre-registered by admin)
-    const existingStudent = await pool.query(
+    const existingStudent = await queryWithRetry(
       'SELECT * FROM students WHERE registration_number = $1',
       [registrationNumber]
     );
@@ -1439,7 +1439,7 @@ app.post('/api/auth/student-register', async (req, res) => {
     }
 
     // Update student record with new information and activate account
-    const updateResult = await pool.query(
+    const updateResult = await queryWithRetry(
       `UPDATE students 
        SET email = $1, 
            password = $2, 
@@ -1452,7 +1452,7 @@ app.post('/api/auth/student-register', async (req, res) => {
 
     // Try to update password records (non-critical - don't fail if it errors)
     try {
-      await pool.query(
+      await queryWithRetry(
         `INSERT INTO password_records (user_type, user_id, username, password_hash) 
          VALUES ('student', $1, $2, $3)
          ON CONFLICT (user_type, user_id) 
@@ -1523,7 +1523,7 @@ app.post('/api/auth/lecturer-register', async (req, res) => {
     }
 
     // Check if employee ID exists in database (pre-registered by admin)
-    const existingLecturer = await pool.query(
+    const existingLecturer = await queryWithRetry(
       'SELECT * FROM lecturers WHERE employee_id = $1',
       [employeeId]
     );
@@ -1546,7 +1546,7 @@ app.post('/api/auth/lecturer-register', async (req, res) => {
     }
 
     // Update lecturer record with new password and activate account
-    const updateResult = await pool.query(
+    const updateResult = await queryWithRetry(
       `UPDATE lecturers 
        SET password = $1, 
            is_active = true, 
@@ -1558,7 +1558,7 @@ app.post('/api/auth/lecturer-register', async (req, res) => {
 
     // Try to update password records (non-critical - don't fail if it errors)
     try {
-      await pool.query(
+      await queryWithRetry(
         `INSERT INTO password_records (user_type, user_id, username, password_hash) 
          VALUES ('lecturer', $1, $2, $3)
          ON CONFLICT (user_type, user_id) 
@@ -1597,7 +1597,7 @@ app.post('/api/lecturers', async (req, res) => {
     const { name, employeeId, specialization, email, phone, password } = req.body;
     
     // Check if email already exists
-    const existingEmail = await pool.query(
+    const existingEmail = await queryWithRetry(
       'SELECT id FROM lecturers WHERE email = $1',
       [email]
     );
@@ -1610,7 +1610,7 @@ app.post('/api/lecturers', async (req, res) => {
     }
     
     // Check if employee ID already exists
-    const existingEmployeeId = await pool.query(
+    const existingEmployeeId = await queryWithRetry(
       'SELECT id FROM lecturers WHERE employee_id = $1',
       [employeeId]
     );
@@ -1622,14 +1622,14 @@ app.post('/api/lecturers', async (req, res) => {
       });
     }
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `INSERT INTO lecturers (name, employee_id, specialization, email, phone, password) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [name, employeeId, specialization, email, phone, password]
     );
 
     // Also save to password records
-    await pool.query(
+    await queryWithRetry(
       `INSERT INTO password_records (user_type, user_id, username, password_hash) 
        VALUES ('lecturer', $1, $2, $3)`,
       [result.rows[0].id, employeeId, password]
@@ -1678,7 +1678,7 @@ app.get('/api/lecturers', optionalAuth, async (req, res) => {
       console.log('Username/Employee ID:', username);
       
       // First try direct field match
-      let result = await pool.query(
+      let result = await queryWithRetry(
         'SELECT id, name, employee_id, specialization, email, phone, created_at FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
         [username]
       );
@@ -1687,14 +1687,14 @@ app.get('/api/lecturers', optionalAuth, async (req, res) => {
       // If not found, try password_records lookup
       if (result.rows.length === 0) {
         console.log('Lecturer not found by direct match, checking password_records...');
-        const passwordResult = await pool.query(
+        const passwordResult = await queryWithRetry(
           'SELECT user_id FROM password_records WHERE username = $1 AND user_type = $2',
           [username, 'lecturer']
         );
         
         if (passwordResult.rows.length > 0) {
           console.log('Found lecturer via password_records, user_id:', passwordResult.rows[0].user_id);
-          result = await pool.query(
+          result = await queryWithRetry(
             'SELECT id, name, employee_id, specialization, email, phone, created_at FROM lecturers WHERE id = $1',
             [passwordResult.rows[0].user_id]
           );
@@ -1708,11 +1708,11 @@ app.get('/api/lecturers', optionalAuth, async (req, res) => {
         console.log('=== LECTURER NOT FOUND - DEBUGGING ===');
         
         // Check total lecturers in database
-        const totalLecturers = await pool.query('SELECT COUNT(*) FROM lecturers');
+        const totalLecturers = await queryWithRetry('SELECT COUNT(*) FROM lecturers');
         console.log('Total lecturers in database:', totalLecturers.rows[0].count);
         
         // Show sample lecturer employee_ids
-        const sampleLecturers = await pool.query('SELECT employee_id, name FROM lecturers LIMIT 5');
+        const sampleLecturers = await queryWithRetry('SELECT employee_id, name FROM lecturers LIMIT 5');
         console.log('Sample lecturer employee_ids:', sampleLecturers.rows);
       }
       
@@ -1721,7 +1721,7 @@ app.get('/api/lecturers', optionalAuth, async (req, res) => {
     
     // For specific lecturer - only their info
     if (effectiveUserType === 'lecturer' && effectiveUserId) {
-      const result = await pool.query(
+      const result = await queryWithRetry(
         'SELECT id, name, employee_id, specialization, email, phone, created_at FROM lecturers WHERE id = $1',
         [effectiveUserId]
       );
@@ -1731,7 +1731,7 @@ app.get('/api/lecturers', optionalAuth, async (req, res) => {
     
     // For admin - all lecturers
     if (effectiveUserType === 'admin') {
-      const result = await pool.query(
+      const result = await queryWithRetry(
         'SELECT id, name, employee_id, specialization, email, phone, created_at, updated_at FROM lecturers ORDER BY created_at DESC'
       );
       console.log(`Found ${result.rows.length} lecturers (admin view)`);
@@ -1740,7 +1740,7 @@ app.get('/api/lecturers', optionalAuth, async (req, res) => {
     
     // For students or unauthenticated - can see basic lecturer info (names only for program display)
     // This is safe as it only exposes public information needed for course catalogs
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT id, name, employee_id, specialization FROM lecturers ORDER BY name ASC'
     );
     console.log(`Found ${result.rows.length} lecturers (public view - basic info only)`);
@@ -1764,7 +1764,7 @@ app.get('/api/lecturers/me', async (req, res) => {
     }
     
     // SECURITY: Exclude password from response
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT id, name, employee_id, specialization, email, phone, created_at, updated_at FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
       [username]
     );
@@ -1836,7 +1836,7 @@ app.put('/api/lecturers/:id', async (req, res) => {
     console.log('Update Query:', query);
     console.log('Update Values:', values);
     
-    const result = await pool.query(query, values);
+    const result = await queryWithRetry(query, values);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Lecturer not found' });
@@ -1845,7 +1845,7 @@ app.put('/api/lecturers/:id', async (req, res) => {
     // Update password records if password was changed
     if (password) {
       try {
-        await pool.query(
+        await queryWithRetry(
           `INSERT INTO password_records (user_type, user_id, username, password_hash) 
            VALUES ('lecturer', $1, $2, $3)
            ON CONFLICT (user_type, user_id) 
@@ -1874,13 +1874,13 @@ app.delete('/api/lecturers/:id', async (req, res) => {
     activeSessions.delete(parseInt(id));
     
     // First delete from password_records
-    await pool.query('DELETE FROM password_records WHERE user_type = $1 AND user_id = $2', ['lecturer', id]);
+    await queryWithRetry('DELETE FROM password_records WHERE user_type = $1 AND user_id = $2', ['lecturer', id]);
     
     // Update programs to remove lecturer assignment
-    await pool.query('UPDATE programs SET lecturer_id = NULL, lecturer_name = NULL WHERE lecturer_id = $1', [id]);
+    await queryWithRetry('UPDATE programs SET lecturer_id = NULL, lecturer_name = NULL WHERE lecturer_id = $1', [id]);
     
     // Then delete the lecturer
-    const result = await pool.query('DELETE FROM lecturers WHERE id = $1 RETURNING *', [id]);
+    const result = await queryWithRetry('DELETE FROM lecturers WHERE id = $1 RETURNING *', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Lecturer not found' });
@@ -1900,7 +1900,7 @@ app.post('/api/students', async (req, res) => {
     
     // If semester not provided, get from active academic period
     if (!currentSemester || currentSemester === null || currentSemester === undefined) {
-      const activePeriodResult = await pool.query(
+      const activePeriodResult = await queryWithRetry(
         `SELECT semester FROM academic_periods WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
       );
       
@@ -1919,7 +1919,7 @@ app.post('/api/students', async (req, res) => {
     
     // If academic year not provided, get from active academic period
     if (!academicYear) {
-      const activePeriodResult = await pool.query(
+      const activePeriodResult = await queryWithRetry(
         `SELECT academic_year FROM academic_periods WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
       );
       
@@ -1932,14 +1932,14 @@ app.post('/api/students', async (req, res) => {
       }
     }
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `INSERT INTO students (name, registration_number, academic_year, course_id, current_semester, email, phone, password, year_of_study, academic_level) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [name, registrationNumber, academicYear, courseId, currentSemester, email, phone, password, yearOfStudy || 1, academicLevel || 'bachelor']
     );
 
     // Also save to password records
-    await pool.query(
+    await queryWithRetry(
       `INSERT INTO password_records (user_type, user_id, username, password_hash) 
        VALUES ('student', $1, $2, $3)`,
       [result.rows[0].id, registrationNumber, password]
@@ -1973,7 +1973,7 @@ app.post('/api/students', async (req, res) => {
 // Get active academic period (for global year/semester settings)
 app.get('/api/academic-periods/active', async (req, res) => {
   try {
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `SELECT * FROM academic_periods WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
     );
 
@@ -2002,10 +2002,10 @@ app.post('/api/academic-periods/active', async (req, res) => {
   }
 
   try {
-    await pool.query('BEGIN');
+    await queryWithRetry('BEGIN');
     
     // Check if academic period already exists
-    const existingResult = await pool.query(
+    const existingResult = await queryWithRetry(
       `SELECT * FROM academic_periods WHERE academic_year = $1 AND semester = $2`,
       [year, sem]
     );
@@ -2017,7 +2017,7 @@ app.post('/api/academic-periods/active', async (req, res) => {
       periodRecord = existingResult.rows[0];
     } else {
       // Period doesn't exist, create it
-      const insertResult = await pool.query(
+      const insertResult = await queryWithRetry(
         `INSERT INTO academic_periods (academic_year, semester, is_active) VALUES ($1, $2, false) RETURNING *`,
         [year, sem]
       );
@@ -2025,20 +2025,20 @@ app.post('/api/academic-periods/active', async (req, res) => {
     }
     
     // Deactivate any existing active period
-    await pool.query(`UPDATE academic_periods SET is_active = false WHERE is_active = true`);
+    await queryWithRetry(`UPDATE academic_periods SET is_active = false WHERE is_active = true`);
     
     // Activate the selected period
-    const updateResult = await pool.query(
+    const updateResult = await queryWithRetry(
       `UPDATE academic_periods SET is_active = true WHERE academic_year = $1 AND semester = $2 RETURNING *`,
       [year, sem]
     );
 
-    await pool.query('COMMIT');
+    await queryWithRetry('COMMIT');
     
     console.log(`✅ Academic period activated: ${year} - Semester ${sem}`);
     return res.json({ success: true, data: updateResult.rows[0] });
   } catch (error) {
-    await pool.query('ROLLBACK');
+    await queryWithRetry('ROLLBACK');
     console.error('Error setting active academic period:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -2076,7 +2076,7 @@ app.get('/api/students', optionalAuth, async (req, res) => {
     // For lecturers - only their students (students in their programs)
     if (effectiveUserType === 'lecturer' && effectiveUserId) {
       // First get lecturer info to match by both ID and name/employee_id
-      const lecturerResult = await pool.query(
+      const lecturerResult = await queryWithRetry(
         'SELECT id, employee_id, name FROM lecturers WHERE id = $1',
         [effectiveUserId]
       );
@@ -2093,7 +2093,7 @@ app.get('/api/students', optionalAuth, async (req, res) => {
       const baseParams = [lecturer.id, lecturer.employee_id, lecturer.name, `%${lecturer.employee_id}%`, `%${lecturer.name}%`];
       const allParams = [...baseParams, ...filterParams];
       
-      const result = await pool.query(`
+      const result = await queryWithRetry(`
         SELECT DISTINCT s.id, s.name, s.registration_number, s.academic_year, 
                s.course_id, s.current_semester, s.email, s.phone, s.created_at,
                s.year_of_study, s.academic_level,
@@ -2125,7 +2125,7 @@ app.get('/api/students', optionalAuth, async (req, res) => {
     
     // For admin - all students with optional filtering
     if (effectiveUserType === 'admin') {
-      const result = await pool.query(`
+      const result = await queryWithRetry(`
         SELECT s.id, s.name, s.registration_number, s.academic_year, s.course_id, 
                s.current_semester, s.email, s.phone, s.created_at, s.updated_at,
                s.year_of_study, s.academic_level,
@@ -2161,7 +2161,7 @@ app.post('/api/students/by-registration', async (req, res) => {
     }
     
     const placeholders = registrationNumbers.map((_, index) => `$${index + 1}`).join(',');
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT s.*, c.name as course_name 
       FROM students s 
       LEFT JOIN courses c ON s.course_id = c.id 
@@ -2190,7 +2190,7 @@ app.get('/api/students/me', async (req, res) => {
     // SECURITY: Exclude password from response
     // FIXED: Include year_of_study for short-term program targeting
     // FIXED: Include is_cr, cr_activated_at, cr_activated_by for CR status display
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT s.id, s.name, s.registration_number, s.academic_year, s.course_id, 
              s.current_semester, s.email, s.phone, s.created_at, s.updated_at,
              s.year_of_study, s.is_cr, s.cr_activated_at, s.cr_activated_by,
@@ -2223,7 +2223,7 @@ app.get('/api/students/:id/programs', async (req, res) => {
     console.log('Student ID:', id);
     
     // First get student info with college, department, course details
-    const studentResult = await pool.query(`
+    const studentResult = await queryWithRetry(`
       SELECT s.*, 
              c.name as course_name,
              d.name as department_name,
@@ -2242,7 +2242,7 @@ app.get('/api/students/:id/programs', async (req, res) => {
     const student = studentResult.rows[0];
     
     // Get regular programs for student's course
-    const programsResult = await pool.query(`
+    const programsResult = await queryWithRetry(`
       SELECT p.*, c.name as course_name, 'regular' as program_type
       FROM programs p 
       LEFT JOIN courses c ON p.course_id = c.id 
@@ -2255,7 +2255,7 @@ app.get('/api/students/:id/programs', async (req, res) => {
     console.log('Regular programs found:', regularPrograms.length);
     
     // Get short-term programs based on targeting
-    const shortTermResult = await pool.query(
+    const shortTermResult = await queryWithRetry(
       'SELECT * FROM short_term_programs WHERE end_date > NOW() ORDER BY created_at DESC'
     );
     
@@ -2377,7 +2377,7 @@ app.put('/api/students/:id', async (req, res) => {
     console.log('Update Query:', query);
     console.log('Update Values:', values);
     
-    const result = await pool.query(query, values);
+    const result = await queryWithRetry(query, values);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Student not found' });
@@ -2386,7 +2386,7 @@ app.put('/api/students/:id', async (req, res) => {
     // Update password records if password was changed
     if (password) {
       try {
-        await pool.query(
+        await queryWithRetry(
           `INSERT INTO password_records (user_type, user_id, username, password_hash) 
            VALUES ('student', $1, $2, $3)
            ON CONFLICT (user_type, user_id) 
@@ -2415,10 +2415,10 @@ app.delete('/api/students/:id', async (req, res) => {
     activeSessions.delete(parseInt(id));
     
     // First delete from password_records
-    await pool.query('DELETE FROM password_records WHERE user_type = $1 AND user_id = $2', ['student', id]);
+    await queryWithRetry('DELETE FROM password_records WHERE user_type = $1 AND user_id = $2', ['student', id]);
     
     // Then delete the student
-    const result = await pool.query('DELETE FROM students WHERE id = $1 RETURNING *', [id]);
+    const result = await queryWithRetry('DELETE FROM students WHERE id = $1 RETURNING *', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Student not found' });
@@ -2439,7 +2439,7 @@ app.get('/api/class-representatives', async (req, res) => {
     console.log('=== FETCHING ALL CLASS REPRESENTATIVES ===');
     
     // First ensure students table exists
-    const tableCheck = await pool.query(`
+    const tableCheck = await queryWithRetry(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_name = 'students'
@@ -2449,7 +2449,7 @@ app.get('/api/class-representatives', async (req, res) => {
     if (!tableCheck.rows[0].exists) {
       console.log('⚠️ Students table does not exist, creating...');
       // Create students table if it doesn't exist
-      await pool.query(`
+      await queryWithRetry(`
         CREATE TABLE IF NOT EXISTS students (
           id SERIAL PRIMARY KEY,
           name VARCHAR(255) NOT NULL,
@@ -2475,17 +2475,17 @@ app.get('/api/class-representatives', async (req, res) => {
     
     // Ensure required CR columns exist
     try {
-      await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS is_cr BOOLEAN DEFAULT false`);
-      await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS cr_activated_at TIMESTAMP`);
-      await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS cr_activated_by VARCHAR(255)`);
-      await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS year_of_study INTEGER DEFAULT 1`);
-      await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS academic_level VARCHAR(50) DEFAULT 'bachelor'`);
+      await queryWithRetry(`ALTER TABLE students ADD COLUMN IF NOT EXISTS is_cr BOOLEAN DEFAULT false`);
+      await queryWithRetry(`ALTER TABLE students ADD COLUMN IF NOT EXISTS cr_activated_at TIMESTAMP`);
+      await queryWithRetry(`ALTER TABLE students ADD COLUMN IF NOT EXISTS cr_activated_by VARCHAR(255)`);
+      await queryWithRetry(`ALTER TABLE students ADD COLUMN IF NOT EXISTS year_of_study INTEGER DEFAULT 1`);
+      await queryWithRetry(`ALTER TABLE students ADD COLUMN IF NOT EXISTS academic_level VARCHAR(50) DEFAULT 'bachelor'`);
       console.log('✅ CR columns verified/created');
     } catch (alterError) {
       console.log('Column check note:', alterError.message);
     }
     
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT 
         s.id,
         s.name,
@@ -2527,7 +2527,7 @@ app.get('/api/class-representatives/by-course/:courseId', async (req, res) => {
   try {
     const { courseId } = req.params;
     
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT 
         s.id,
         s.name,
@@ -2563,7 +2563,7 @@ app.get('/api/class-representatives/by-program/:programId', async (req, res) => 
     console.log('Program ID:', programId);
     
     // Get program's course_id
-    const programResult = await pool.query('SELECT course_id FROM programs WHERE id = $1', [programId]);
+    const programResult = await queryWithRetry('SELECT course_id FROM programs WHERE id = $1', [programId]);
     
     if (programResult.rows.length === 0) {
       console.log('Program not found');
@@ -2574,7 +2574,7 @@ app.get('/api/class-representatives/by-program/:programId', async (req, res) => 
     console.log('Course ID:', courseId);
     
     // Find CR for this course (simplified query without year_of_study subquery)
-    const crResult = await pool.query(`
+    const crResult = await queryWithRetry(`
       SELECT 
         s.id,
         s.name,
@@ -2617,7 +2617,7 @@ app.get('/api/students/search-for-cr', async (req, res) => {
     
     const searchTerm = `%${search.trim()}%`;
     
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT 
         s.id,
         s.name,
@@ -2663,7 +2663,7 @@ app.post('/api/class-representatives/activate', async (req, res) => {
     }
     
     // Check if student exists
-    const studentCheck = await pool.query(
+    const studentCheck = await queryWithRetry(
       'SELECT * FROM students WHERE id = $1',
       [studentId]
     );
@@ -2686,7 +2686,7 @@ app.post('/api/class-representatives/activate', async (req, res) => {
     }
     
     // Activate as CR
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       UPDATE students 
       SET 
         is_cr = true,
@@ -2723,7 +2723,7 @@ app.post('/api/class-representatives/deactivate', async (req, res) => {
     }
     
     // Check if student exists and is a CR
-    const studentCheck = await pool.query(
+    const studentCheck = await queryWithRetry(
       'SELECT * FROM students WHERE id = $1',
       [studentId]
     );
@@ -2745,7 +2745,7 @@ app.post('/api/class-representatives/deactivate', async (req, res) => {
     }
     
     // Deactivate CR
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       UPDATE students 
       SET 
         is_cr = false,
@@ -2774,7 +2774,7 @@ app.get('/api/students/:id/is-cr', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT is_cr FROM students WHERE id = $1',
       [id]
     );
@@ -2809,7 +2809,7 @@ app.get('/api/students/check-cr-by-username', async (req, res) => {
     }
     
     // Search by registration_number OR name OR email to handle all login scenarios
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT id, is_cr, name, registration_number, course_id FROM students WHERE registration_number = $1 OR name = $1 OR email = $1',
       [username]
     );
@@ -2840,7 +2840,7 @@ app.get('/api/students/check-cr-by-username', async (req, res) => {
 app.post('/api/colleges', async (req, res) => {
   try {
     const { name, shortName, description, established } = req.body;
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `INSERT INTO colleges (name, short_name, description, established) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [name, shortName, description, established]
@@ -2854,7 +2854,7 @@ app.post('/api/colleges', async (req, res) => {
 
 app.get('/api/colleges', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM colleges ORDER BY created_at DESC');
+    const result = await queryWithRetry('SELECT * FROM colleges ORDER BY created_at DESC');
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching colleges:', error);
@@ -2890,7 +2890,7 @@ app.post('/api/departments', async (req, res) => {
       hodName = departmentNames[deptType] || `Dr. ${name.split(' ')[0]} Head`;
     }
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `INSERT INTO departments (name, college_id, description, head_of_department) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [name, collegeId, description, hodName]
@@ -2904,7 +2904,7 @@ app.post('/api/departments', async (req, res) => {
 
 app.get('/api/departments', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM departments ORDER BY created_at DESC');
+    const result = await queryWithRetry('SELECT * FROM departments ORDER BY created_at DESC');
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching departments:', error);
@@ -2918,7 +2918,7 @@ app.post('/api/courses', async (req, res) => {
     console.log('=== BACKEND COURSE CREATION ===');
     console.log('Received data:', req.body);
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `INSERT INTO courses (name, code, department_id, duration, academic_level, year_of_study, description) 
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [name, code, departmentId, duration || 4, academicLevel || 'bachelor', yearOfStudy || 1, description]
@@ -2935,7 +2935,7 @@ app.post('/api/courses', async (req, res) => {
 // Get all courses list (for bulk upload reference)
 app.get('/api/courses/list', async (req, res) => {
   try {
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT id, code, name, academic_level FROM courses ORDER BY code ASC'
     );
     res.json({ success: true, courses: result.rows });
@@ -2971,7 +2971,7 @@ app.get('/api/courses', async (req, res) => {
     
     query += ' ORDER BY created_at DESC';
     
-    const result = await pool.query(query, params);
+    const result = await queryWithRetry(query, params);
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching courses:', error);
@@ -2986,7 +2986,7 @@ app.post('/api/programs', async (req, res) => {
     // Find lecturer by name or employee_id
     let lecturerId = null;
     if (lecturerName) {
-      const lecturerResult = await pool.query(
+      const lecturerResult = await queryWithRetry(
         'SELECT id FROM lecturers WHERE name = $1 OR employee_id = $1',
         [lecturerName]
       );
@@ -2995,7 +2995,7 @@ app.post('/api/programs', async (req, res) => {
       }
     }
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `INSERT INTO programs (name, course_id, lecturer_id, credits, total_semesters, duration, lecturer_name, description, semester) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [name, courseId, lecturerId, credits || 0, totalSemesters || 1, duration || 1, lecturerName, description, semester || null]
@@ -3023,7 +3023,7 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
     
     // For students - only their course programs (regular + short-term)
     if (effectiveUserType === 'student' && effectiveUserId) {
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, 
                c.name as course_name,
                d.name as department_name,
@@ -3043,7 +3043,7 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       const student = studentResult.rows[0];
       
       // Get regular programs for student's course
-      const regularProgramsResult = await pool.query(
+      const regularProgramsResult = await queryWithRetry(
         'SELECT *, \'regular\' as program_type FROM programs WHERE course_id = $1 ORDER BY created_at DESC',
         [student.course_id]
       );
@@ -3055,7 +3055,7 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       
       // CRITICAL: Add short-term programs that student is eligible for
       try {
-        const shortTermResult = await pool.query(
+        const shortTermResult = await queryWithRetry(
           'SELECT * FROM short_term_programs WHERE end_date > NOW() ORDER BY created_at DESC'
         );
         
@@ -3101,7 +3101,7 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       let activeSemester = null;
       
       if (!skipSemesterFilter) {
-        const activePeriodResult = await pool.query(
+        const activePeriodResult = await queryWithRetry(
           `SELECT * FROM academic_periods WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
         );
         
@@ -3112,7 +3112,7 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       }
       
       // First, try to find lecturer by direct field matches
-      let lecturerResult = await pool.query(
+      let lecturerResult = await queryWithRetry(
         'SELECT id, employee_id, name FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
         [lecturer_username]
       );
@@ -3120,14 +3120,14 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       // If not found, try to find via password_records table using username
       if (lecturerResult.rows.length === 0) {
         console.log('Lecturer not found by direct match, checking password_records...');
-        const passwordResult = await pool.query(
+        const passwordResult = await queryWithRetry(
           'SELECT user_id FROM password_records WHERE username = $1 AND user_type = $2',
           [lecturer_username, 'lecturer']
         );
         
         if (passwordResult.rows.length > 0) {
           console.log('Found lecturer via password_records, user_id:', passwordResult.rows[0].user_id);
-          lecturerResult = await pool.query(
+          lecturerResult = await queryWithRetry(
             'SELECT id, employee_id, name FROM lecturers WHERE id = $1',
             [passwordResult.rows[0].user_id]
           );
@@ -3151,7 +3151,7 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       let result;
       if (skipSemesterFilter || activeSemester === null) {
         // No semester filtering - return all programs for this lecturer
-        result = await pool.query(
+        result = await queryWithRetry(
           `SELECT * FROM programs 
            WHERE (lecturer_id = $1 
               OR lecturer_name = $2 
@@ -3164,7 +3164,7 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
         console.log(`Found ${result.rows.length} programs for lecturer username: ${lecturer_username} (no semester filter)`);
       } else {
         // Filter by active semester
-        result = await pool.query(
+        result = await queryWithRetry(
           `SELECT * FROM programs 
            WHERE (lecturer_id = $1 
               OR lecturer_name = $2 
@@ -3183,7 +3183,7 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
     
     // For lecturers - only their programs
     if (effectiveUserType === 'lecturer' && effectiveUserId) {
-      const lecturerResult = await pool.query(
+      const lecturerResult = await queryWithRetry(
         'SELECT employee_id, name FROM lecturers WHERE id = $1',
         [effectiveUserId]
       );
@@ -3195,7 +3195,7 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
       
       const lecturer = lecturerResult.rows[0];
       // More flexible query using ILIKE for partial matching
-      const result = await pool.query(
+      const result = await queryWithRetry(
         `SELECT * FROM programs 
          WHERE lecturer_id = $1 
             OR lecturer_name = $2 
@@ -3211,14 +3211,14 @@ app.get('/api/programs', optionalAuth, async (req, res) => {
     
     // For admin - all programs
     if (effectiveUserType === 'admin') {
-      const result = await pool.query('SELECT * FROM programs ORDER BY created_at DESC');
+      const result = await queryWithRetry('SELECT * FROM programs ORDER BY created_at DESC');
       console.log(`Found ${result.rows.length} programs (admin view)`);
       return res.json({ success: true, data: result.rows });
     }
     
     // No user type specified but user_type=admin in query - return all programs
     if (user_type === 'admin') {
-      const result = await pool.query('SELECT * FROM programs ORDER BY created_at DESC');
+      const result = await queryWithRetry('SELECT * FROM programs ORDER BY created_at DESC');
       console.log(`Found ${result.rows.length} programs (admin query param)`);
       return res.json({ success: true, data: result.rows });
     }
@@ -3241,7 +3241,7 @@ app.post('/api/auth', loginLimiter, async (req, res) => {
     console.log('Username:', username);
     console.log('User Type:', userType);
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT * FROM password_records WHERE username = $1 AND password_hash = $2 AND user_type = $3',
       [username, password, userType]
     );
@@ -3253,12 +3253,12 @@ app.post('/api/auth', loginLimiter, async (req, res) => {
       let userIsLocked = false;
       
       if (userType === 'student') {
-        const studentResult = await pool.query('SELECT is_locked FROM students WHERE id = $1', [passwordRecord.user_id]);
+        const studentResult = await queryWithRetry('SELECT is_locked FROM students WHERE id = $1', [passwordRecord.user_id]);
         if (studentResult.rows.length > 0 && studentResult.rows[0].is_locked === true) {
           userIsLocked = true;
         }
       } else if (userType === 'lecturer') {
-        const lecturerResult = await pool.query('SELECT is_locked FROM lecturers WHERE id = $1', [passwordRecord.user_id]);
+        const lecturerResult = await queryWithRetry('SELECT is_locked FROM lecturers WHERE id = $1', [passwordRecord.user_id]);
         if (lecturerResult.rows.length > 0 && lecturerResult.rows[0].is_locked === true) {
           userIsLocked = true;
         }
@@ -3412,7 +3412,7 @@ app.post('/api/logout', async (req, res) => {
 app.get('/api/colleges/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('SELECT * FROM colleges WHERE id = $1', [id]);
+    const result = await queryWithRetry('SELECT * FROM colleges WHERE id = $1', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'College not found' });
@@ -3431,11 +3431,11 @@ app.delete('/api/colleges/:id', async (req, res) => {
     const { id } = req.params;
     
     // Delete in correct order to avoid foreign key constraints
-    await pool.query('DELETE FROM students WHERE course_id IN (SELECT id FROM courses WHERE department_id IN (SELECT id FROM departments WHERE college_id = $1))', [id]);
-    await pool.query('DELETE FROM programs WHERE course_id IN (SELECT id FROM courses WHERE department_id IN (SELECT id FROM departments WHERE college_id = $1))', [id]);
-    await pool.query('DELETE FROM courses WHERE department_id IN (SELECT id FROM departments WHERE college_id = $1)', [id]);
-    await pool.query('DELETE FROM departments WHERE college_id = $1', [id]);
-    const result = await pool.query('DELETE FROM colleges WHERE id = $1 RETURNING *', [id]);
+    await queryWithRetry('DELETE FROM students WHERE course_id IN (SELECT id FROM courses WHERE department_id IN (SELECT id FROM departments WHERE college_id = $1))', [id]);
+    await queryWithRetry('DELETE FROM programs WHERE course_id IN (SELECT id FROM courses WHERE department_id IN (SELECT id FROM departments WHERE college_id = $1))', [id]);
+    await queryWithRetry('DELETE FROM courses WHERE department_id IN (SELECT id FROM departments WHERE college_id = $1)', [id]);
+    await queryWithRetry('DELETE FROM departments WHERE college_id = $1', [id]);
+    const result = await queryWithRetry('DELETE FROM colleges WHERE id = $1 RETURNING *', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'College not found' });
@@ -3451,7 +3451,7 @@ app.delete('/api/colleges/:id', async (req, res) => {
 app.get('/api/departments/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('SELECT * FROM departments WHERE id = $1', [id]);
+    const result = await queryWithRetry('SELECT * FROM departments WHERE id = $1', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Department not found' });
@@ -3469,10 +3469,10 @@ app.delete('/api/departments/:id', async (req, res) => {
     const { id } = req.params;
     
     // Delete in correct order to avoid foreign key constraints
-    await pool.query('DELETE FROM students WHERE course_id IN (SELECT id FROM courses WHERE department_id = $1)', [id]);
-    await pool.query('DELETE FROM programs WHERE course_id IN (SELECT id FROM courses WHERE department_id = $1)', [id]);
-    await pool.query('DELETE FROM courses WHERE department_id = $1', [id]);
-    const result = await pool.query('DELETE FROM departments WHERE id = $1 RETURNING *', [id]);
+    await queryWithRetry('DELETE FROM students WHERE course_id IN (SELECT id FROM courses WHERE department_id = $1)', [id]);
+    await queryWithRetry('DELETE FROM programs WHERE course_id IN (SELECT id FROM courses WHERE department_id = $1)', [id]);
+    await queryWithRetry('DELETE FROM courses WHERE department_id = $1', [id]);
+    const result = await queryWithRetry('DELETE FROM departments WHERE id = $1 RETURNING *', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Department not found' });
@@ -3488,7 +3488,7 @@ app.delete('/api/departments/:id', async (req, res) => {
 app.get('/api/courses/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('SELECT * FROM courses WHERE id = $1', [id]);
+    const result = await queryWithRetry('SELECT * FROM courses WHERE id = $1', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Course not found' });
@@ -3506,9 +3506,9 @@ app.delete('/api/courses/:id', async (req, res) => {
     const { id } = req.params;
     
     // Delete in correct order to avoid foreign key constraints
-    await pool.query('DELETE FROM students WHERE course_id = $1', [id]);
-    await pool.query('DELETE FROM programs WHERE course_id = $1', [id]);
-    const result = await pool.query('DELETE FROM courses WHERE id = $1 RETURNING *', [id]);
+    await queryWithRetry('DELETE FROM students WHERE course_id = $1', [id]);
+    await queryWithRetry('DELETE FROM programs WHERE course_id = $1', [id]);
+    const result = await queryWithRetry('DELETE FROM courses WHERE id = $1 RETURNING *', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Course not found' });
@@ -3523,7 +3523,7 @@ app.delete('/api/courses/:id', async (req, res) => {
 app.delete('/api/programs/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('DELETE FROM programs WHERE id = $1 RETURNING *', [id]);
+    const result = await queryWithRetry('DELETE FROM programs WHERE id = $1 RETURNING *', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Program not found' });
     }
@@ -3539,7 +3539,7 @@ app.put('/api/colleges/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { name, shortName, established, description } = req.body;
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'UPDATE colleges SET name = $1, short_name = $2, established = $3, description = $4 WHERE id = $5 RETURNING *',
       [name, shortName, established, description, id]
     );
@@ -3557,7 +3557,7 @@ app.put('/api/departments/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { name, collegeId, headOfDepartment, description } = req.body;
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'UPDATE departments SET name = $1, college_id = $2, head_of_department = $3, description = $4 WHERE id = $5 RETURNING *',
       [name, collegeId, headOfDepartment, description, id]
     );
@@ -3579,7 +3579,7 @@ app.put('/api/courses/:id', async (req, res) => {
     console.log('Updating course ID:', id);
     console.log('Update data:', req.body);
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'UPDATE courses SET name = $1, code = $2, department_id = $3, duration = $4, academic_level = $5, year_of_study = $6, description = $7 WHERE id = $8 RETURNING *',
       [name, code, departmentId, duration, academicLevel, yearOfStudy || 1, description, id]
     );
@@ -3601,7 +3601,7 @@ app.put('/api/programs/:id', async (req, res) => {
     // Find lecturer by name or employee_id
     let lecturerId = null;
     if (lecturerName) {
-      const lecturerResult = await pool.query(
+      const lecturerResult = await queryWithRetry(
         'SELECT id FROM lecturers WHERE name = $1 OR employee_id = $1',
         [lecturerName]
       );
@@ -3610,7 +3610,7 @@ app.put('/api/programs/:id', async (req, res) => {
       }
     }
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'UPDATE programs SET name = $1, course_id = $2, lecturer_id = $3, credits = $4, total_semesters = $5, duration = $6, lecturer_name = $7, description = $8, semester = $9 WHERE id = $10 RETURNING *',
       [name, courseId, lecturerId, credits, totalSemesters, duration, lecturerName, description, semester || null, id]
     );
@@ -3629,7 +3629,7 @@ app.put('/api/programs/:id', async (req, res) => {
 // Create content table if not exists
 app.post('/api/content/init', async (req, res) => {
   try {
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS content (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -3657,7 +3657,7 @@ app.post('/api/content/init', async (req, res) => {
 app.get('/api/content/test', async (req, res) => {
   try {
     // Check if table exists
-    const tableExists = await pool.query(`
+    const tableExists = await queryWithRetry(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_name = 'content'
@@ -3665,7 +3665,7 @@ app.get('/api/content/test', async (req, res) => {
     `);
     
     // Get table structure
-    const tableStructure = await pool.query(`
+    const tableStructure = await queryWithRetry(`
       SELECT column_name, data_type, is_nullable, column_default
       FROM information_schema.columns
       WHERE table_name = 'content'
@@ -3673,7 +3673,7 @@ app.get('/api/content/test', async (req, res) => {
     `);
     
     // Get content count
-    const contentCount = await pool.query('SELECT COUNT(*) FROM content');
+    const contentCount = await queryWithRetry('SELECT COUNT(*) FROM content');
     
     res.json({ 
       success: true, 
@@ -3709,7 +3709,7 @@ app.post('/api/content/upload', upload.single('file'), async (req, res) => {
     const uniqueFilename = Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(uploadedFile.originalname);
     
     // Store file in database
-    const fileResult = await pool.query(
+    const fileResult = await queryWithRetry(
       'INSERT INTO file_storage (file_name, original_name, file_data, file_mimetype, file_size, uploaded_by_id, uploaded_by_type) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, file_name',
       [uniqueFilename, uploadedFile.originalname, uploadedFile.buffer, uploadedFile.mimetype, uploadedFile.size, lecturer_id, 'lecturer']
     );
@@ -3718,7 +3718,7 @@ app.post('/api/content/upload', upload.single('file'), async (req, res) => {
     const fileUrl = `/content/${uniqueFilename}`;
     
     // Store content metadata
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'INSERT INTO content (title, description, program_name, content_type, file_name, file_size, file_url, file_mimetype, lecturer_id, lecturer_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
       [title, description, program, type, uniqueFilename, file_size || uploadedFile.size, fileUrl, uploadedFile.mimetype, lecturer_id, lecturer_name]
     );
@@ -3743,7 +3743,7 @@ app.get('/api/content', async (req, res) => {
     
     // If no student info provided, return all content (for admin/lecturer view)
     if (!student_id && !student_username) {
-      const result = await pool.query('SELECT * FROM content ORDER BY upload_date DESC');
+      const result = await queryWithRetry('SELECT * FROM content ORDER BY upload_date DESC');
       console.log('Content found (no filter):', result.rows.length);
       return res.json({ success: true, data: result.rows });
     }
@@ -3751,7 +3751,7 @@ app.get('/api/content', async (req, res) => {
     // Get student information
     let studentInfo = null;
     if (student_id) {
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, c.name as course_name
         FROM students s
         LEFT JOIN courses c ON s.course_id = c.id
@@ -3762,7 +3762,7 @@ app.get('/api/content', async (req, res) => {
         studentInfo = studentResult.rows[0];
       }
     } else if (student_username) {
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, c.name as course_name
         FROM students s
         LEFT JOIN courses c ON s.course_id = c.id
@@ -3782,7 +3782,7 @@ app.get('/api/content', async (req, res) => {
     console.log('Student Info:', studentInfo);
     
     // Get student's regular programs
-    const programsResult = await pool.query(
+    const programsResult = await queryWithRetry(
       'SELECT name FROM programs WHERE course_id = $1',
       [studentInfo.course_id]
     );
@@ -3793,7 +3793,7 @@ app.get('/api/content', async (req, res) => {
     // CRITICAL: Add short-term programs that student is eligible for
     try {
       // FIXED: Remove end_date filter to match live-classes endpoint behavior
-      const shortTermResult = await pool.query(
+      const shortTermResult = await queryWithRetry(
         'SELECT * FROM short_term_programs ORDER BY created_at DESC'
       );
       
@@ -3824,7 +3824,7 @@ app.get('/api/content', async (req, res) => {
     console.log('Student All Programs for Content:', studentPrograms);
     
     // Fetch all content
-    const contentResult = await pool.query('SELECT * FROM content ORDER BY upload_date DESC');
+    const contentResult = await queryWithRetry('SELECT * FROM content ORDER BY upload_date DESC');
     
     // Filter content based on student's programs
     const filteredContent = contentResult.rows.filter(content => {
@@ -3881,7 +3881,7 @@ app.get('/api/content', async (req, res) => {
 app.get('/api/content/lecturer/:lecturerId', async (req, res) => {
   try {
     const { lecturerId } = req.params;
-    const result = await pool.query('SELECT * FROM content WHERE lecturer_id = $1 ORDER BY upload_date DESC', [lecturerId]);
+    const result = await queryWithRetry('SELECT * FROM content WHERE lecturer_id = $1 ORDER BY upload_date DESC', [lecturerId]);
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching lecturer content:', error);
@@ -3896,7 +3896,7 @@ app.get('/api/content/student/:studentId', async (req, res) => {
     console.log(`=== FETCHING CONTENT FOR STUDENT ${studentId} ===`);
     
     // First get student's program information
-    const studentResult = await pool.query('SELECT * FROM students WHERE id = $1', [studentId]);
+    const studentResult = await queryWithRetry('SELECT * FROM students WHERE id = $1', [studentId]);
     if (studentResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Student not found' });
     }
@@ -3905,7 +3905,7 @@ app.get('/api/content/student/:studentId', async (req, res) => {
     console.log('Student info:', student);
     
     // Get programs for this student's course
-    const programsResult = await pool.query('SELECT * FROM programs WHERE course_id = $1', [student.course_id]);
+    const programsResult = await queryWithRetry('SELECT * FROM programs WHERE course_id = $1', [student.course_id]);
     console.log('Student programs:', programsResult.rows);
     
     if (programsResult.rows.length === 0) {
@@ -3916,7 +3916,7 @@ app.get('/api/content/student/:studentId', async (req, res) => {
     const programNames = programsResult.rows.map(p => p.name);
     const placeholders = programNames.map((_, index) => `$${index + 1}`).join(',');
     
-    const contentResult = await pool.query(
+    const contentResult = await queryWithRetry(
       `SELECT c.* FROM content c 
        LEFT JOIN student_content_deletions scd ON c.id = scd.content_id AND scd.student_id = $${programNames.length + 1}
        WHERE c.program_name IN (${placeholders}) AND scd.id IS NULL 
@@ -3935,7 +3935,7 @@ app.get('/api/content/student/:studentId', async (req, res) => {
 // Create student_content_deletions table for tracking individual deletions
 app.post('/api/content/init-deletions', async (req, res) => {
   try {
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS student_content_deletions (
         id SERIAL PRIMARY KEY,
         student_id INTEGER NOT NULL,
@@ -3959,7 +3959,7 @@ app.delete('/api/content/:contentId/student/:studentId', async (req, res) => {
     console.log(`=== STUDENT ${studentId} DELETING CONTENT ${contentId} ===`);
     
     // Add to deletions table (content remains for other students)
-    await pool.query(
+    await queryWithRetry(
       'INSERT INTO student_content_deletions (student_id, content_id) VALUES ($1, $2) ON CONFLICT (student_id, content_id) DO NOTHING',
       [studentId, contentId]
     );
@@ -3976,7 +3976,7 @@ app.delete('/api/content/:contentId/student/:studentId', async (req, res) => {
 app.delete('/api/content/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('DELETE FROM content WHERE id = $1 RETURNING *', [id]);
+    const result = await queryWithRetry('DELETE FROM content WHERE id = $1 RETURNING *', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Content not found' });
     }
@@ -3991,7 +3991,7 @@ app.delete('/api/content/:id', async (req, res) => {
 // Create assignments table if not exists
 app.post('/api/assignments/init', async (req, res) => {
   try {
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS assignments (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -4022,7 +4022,7 @@ app.get('/api/assignments', async (req, res) => {
     
     // If no student info provided, return all assignments (for admin/lecturer view)
     if (!student_id && !student_username) {
-      const result = await pool.query('SELECT * FROM assignments ORDER BY created_at DESC');
+      const result = await queryWithRetry('SELECT * FROM assignments ORDER BY created_at DESC');
       console.log('Assignments found (no filter):', result.rows.length);
       return res.json({ success: true, data: result.rows });
     }
@@ -4030,7 +4030,7 @@ app.get('/api/assignments', async (req, res) => {
     // Get student information with college and department
     let studentInfo = null;
     if (student_id) {
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, 
                c.name as course_name,
                d.name as department_name,
@@ -4046,7 +4046,7 @@ app.get('/api/assignments', async (req, res) => {
         studentInfo = studentResult.rows[0];
       }
     } else if (student_username) {
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, 
                c.name as course_name,
                d.name as department_name,
@@ -4081,7 +4081,7 @@ app.get('/api/assignments', async (req, res) => {
     if (studentInfo.course_id && (!studentInfo.department_name || !studentInfo.college_name)) {
       console.log('⚠️ Student missing department/college info, attempting direct lookup...');
       try {
-        const courseInfoResult = await pool.query(`
+        const courseInfoResult = await queryWithRetry(`
           SELECT c.name as course_name, 
                  d.name as department_name,
                  col.name as college_name
@@ -4104,7 +4104,7 @@ app.get('/api/assignments', async (req, res) => {
     }
     
     // Get student's REGULAR programs ONLY (not short-term)
-    const programsResult = await pool.query(
+    const programsResult = await queryWithRetry(
       'SELECT id, name FROM programs WHERE course_id = $1',
       [studentInfo.course_id]
     );
@@ -4120,12 +4120,12 @@ app.get('/api/assignments', async (req, res) => {
     let enrolledShortTermPrograms = [];
     
     try {
-      shortTermResult = await pool.query('SELECT * FROM short_term_programs ORDER BY created_at DESC');
+      shortTermResult = await queryWithRetry('SELECT * FROM short_term_programs ORDER BY created_at DESC');
       console.log('Total Short-Term Programs in DB:', shortTermResult.rows.length);
       
       // Check if student is enrolled in any short-term programs
       try {
-        const enrollmentResult = await pool.query(
+        const enrollmentResult = await queryWithRetry(
           `SELECT stp.title FROM short_term_enrollments ste
            JOIN short_term_programs stp ON ste.program_id = stp.id
            WHERE ste.student_id = $1`,
@@ -4241,7 +4241,7 @@ app.get('/api/assignments', async (req, res) => {
     console.log('All Student Programs (Names):', allStudentProgramNames);
     
     // Fetch ALL assignments
-    const allAssignmentsResult = await pool.query('SELECT * FROM assignments ORDER BY created_at DESC');
+    const allAssignmentsResult = await queryWithRetry('SELECT * FROM assignments ORDER BY created_at DESC');
     console.log('Total Assignments in DB:', allAssignmentsResult.rows.length);
     
     // Filter assignments using NAME-BASED matching (like live-classes endpoint)
@@ -4407,22 +4407,22 @@ app.delete('/api/clear-all-data', async (req, res) => {
     console.log('Clearing all data from database...');
     
     // Delete all data from all tables - correct order to avoid foreign key constraints
-    await pool.query('DELETE FROM assignments');
-    await pool.query('DELETE FROM content');
-    await pool.query('DELETE FROM students');
-    await pool.query('DELETE FROM programs');
-    await pool.query('DELETE FROM courses');
-    await pool.query('DELETE FROM departments');
-    await pool.query('DELETE FROM colleges');
-    await pool.query('DELETE FROM lecturers');
+    await queryWithRetry('DELETE FROM assignments');
+    await queryWithRetry('DELETE FROM content');
+    await queryWithRetry('DELETE FROM students');
+    await queryWithRetry('DELETE FROM programs');
+    await queryWithRetry('DELETE FROM courses');
+    await queryWithRetry('DELETE FROM departments');
+    await queryWithRetry('DELETE FROM colleges');
+    await queryWithRetry('DELETE FROM lecturers');
     
     // Reset sequences
-    await pool.query('ALTER SEQUENCE students_id_seq RESTART WITH 1');
-    await pool.query('ALTER SEQUENCE lecturers_id_seq RESTART WITH 1');
-    await pool.query('ALTER SEQUENCE programs_id_seq RESTART WITH 1');
-    await pool.query('ALTER SEQUENCE courses_id_seq RESTART WITH 1');
-    await pool.query('ALTER SEQUENCE departments_id_seq RESTART WITH 1');
-    await pool.query('ALTER SEQUENCE colleges_id_seq RESTART WITH 1');
+    await queryWithRetry('ALTER SEQUENCE students_id_seq RESTART WITH 1');
+    await queryWithRetry('ALTER SEQUENCE lecturers_id_seq RESTART WITH 1');
+    await queryWithRetry('ALTER SEQUENCE programs_id_seq RESTART WITH 1');
+    await queryWithRetry('ALTER SEQUENCE courses_id_seq RESTART WITH 1');
+    await queryWithRetry('ALTER SEQUENCE departments_id_seq RESTART WITH 1');
+    await queryWithRetry('ALTER SEQUENCE colleges_id_seq RESTART WITH 1');
     
     console.log('All data cleared successfully');
     res.json({ success: true, message: 'All data cleared successfully' });
@@ -4437,7 +4437,7 @@ app.delete('/api/clear-all-data', async (req, res) => {
 // Initialize assessments table
 app.post('/api/assessments/init', async (req, res) => {
   try {
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS assessments (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -4463,7 +4463,7 @@ app.post('/api/assessments/init', async (req, res) => {
       )
     `);
 
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS assessment_submissions (
         id SERIAL PRIMARY KEY,
         assessment_id INTEGER REFERENCES assessments(id) ON DELETE CASCADE,
@@ -4488,39 +4488,39 @@ app.post('/api/assessments/init', async (req, res) => {
 
     // Add missing columns if they don't exist
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE assessment_submissions 
         ADD COLUMN IF NOT EXISTS published_to_students BOOLEAN DEFAULT false
       `);
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE assessment_submissions 
         ADD COLUMN IF NOT EXISTS published_at TIMESTAMP
       `);
       
       // Add missing column to assessments table
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE assessments 
         ADD COLUMN IF NOT EXISTS results_published_to_students BOOLEAN DEFAULT false
       `);
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE assessments 
         ADD COLUMN IF NOT EXISTS results_published_at TIMESTAMP
       `);
       
       // Add missing columns to assessment_submissions table for manual grading
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE assessment_submissions 
         ADD COLUMN IF NOT EXISTS manual_scores JSONB DEFAULT '{}'
       `);
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE assessment_submissions 
         ADD COLUMN IF NOT EXISTS feedback JSONB DEFAULT '{}'
       `);
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE assessment_submissions 
         ADD COLUMN IF NOT EXISTS manual_feedback JSONB DEFAULT '{}'
       `);
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE assessment_submissions 
         ADD COLUMN IF NOT EXISTS graded_at TIMESTAMP
       `);
@@ -4551,7 +4551,7 @@ app.post('/api/assessments', async (req, res) => {
     const total_questions = questions ? questions.length : 0;
     const total_points = questions ? questions.reduce((sum, q) => sum + (q.points || 0), 0) : 0;
 
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `INSERT INTO assessments (
         title, description, program_name, lecturer_id, lecturer_name,
         duration, start_date, end_date, scheduled_date, scheduled_time,
@@ -4616,7 +4616,7 @@ app.get('/api/assessments', async (req, res) => {
 
     query += ' ORDER BY created_at DESC';
 
-    const result = await pool.query(query, params);
+    const result = await queryWithRetry(query, params);
     
     console.log('Query:', query);
     console.log('Params:', params);
@@ -4629,7 +4629,7 @@ app.get('/api/assessments', async (req, res) => {
       // Get student information with college and department
       let studentInfo = null;
       if (student_id) {
-        const studentResult = await pool.query(`
+        const studentResult = await queryWithRetry(`
           SELECT s.*, 
                  c.name as course_name,
                  d.name as department_name,
@@ -4645,7 +4645,7 @@ app.get('/api/assessments', async (req, res) => {
           studentInfo = studentResult.rows[0];
         }
       } else if (student_username) {
-        const studentResult = await pool.query(`
+        const studentResult = await queryWithRetry(`
           SELECT s.*, 
                  c.name as course_name,
                  d.name as department_name,
@@ -4675,7 +4675,7 @@ app.get('/api/assessments', async (req, res) => {
         if (studentInfo.course_id && (!studentInfo.department_name || !studentInfo.college_name)) {
           console.log('⚠️ Student missing department/college info, attempting direct lookup...');
           try {
-            const courseInfoResult = await pool.query(`
+            const courseInfoResult = await queryWithRetry(`
               SELECT c.name as course_name, 
                      d.name as department_name,
                      col.name as college_name
@@ -4698,7 +4698,7 @@ app.get('/api/assessments', async (req, res) => {
         }
         
         // Get student's REGULAR programs ONLY
-        const programsResult = await pool.query(
+        const programsResult = await queryWithRetry(
           'SELECT name FROM programs WHERE course_id = $1',
           [studentInfo.course_id]
         );
@@ -4712,12 +4712,12 @@ app.get('/api/assessments', async (req, res) => {
         let enrolledShortTermPrograms = [];
         
         try {
-          shortTermResult = await pool.query('SELECT * FROM short_term_programs ORDER BY created_at DESC');
+          shortTermResult = await queryWithRetry('SELECT * FROM short_term_programs ORDER BY created_at DESC');
           console.log('Total Short-Term Programs in DB:', shortTermResult.rows.length);
           
           // Check if student is enrolled in any short-term programs
           try {
-            const enrollmentResult = await pool.query(
+            const enrollmentResult = await queryWithRetry(
               `SELECT stp.title FROM short_term_enrollments ste
                JOIN short_term_programs stp ON ste.program_id = stp.id
                WHERE ste.student_id = $1`,
@@ -4949,7 +4949,7 @@ app.get('/api/assessments', async (req, res) => {
           console.log(`AUTO-EXPIRING: ${assessment.title}`);
           
           // Update status to expired in database
-          await pool.query(
+          await queryWithRetry(
             'UPDATE assessments SET status = $1 WHERE id = $2',
             ['expired', assessment.id]
           );
@@ -4961,7 +4961,7 @@ app.get('/api/assessments', async (req, res) => {
           console.log(`AUTO-ACTIVATING: ${assessment.title}`);
           
           // Update status to active in database
-          await pool.query(
+          await queryWithRetry(
             'UPDATE assessments SET status = $1 WHERE id = $2',
             ['active', assessment.id]
           );
@@ -4985,14 +4985,14 @@ app.get('/api/assessments/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await pool.query('SELECT * FROM assessments WHERE id = $1', [id]);
+    const result = await queryWithRetry('SELECT * FROM assessments WHERE id = $1', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Assessment not found' });
     }
 
     // Get submissions for this assessment
-    const submissionsResult = await pool.query(
+    const submissionsResult = await queryWithRetry(
       'SELECT * FROM assessment_submissions WHERE assessment_id = $1 ORDER BY submitted_at DESC',
       [id]
     );
@@ -5020,7 +5020,7 @@ app.put('/api/assessments/:id', async (req, res) => {
     const total_questions = questions ? questions.length : 0;
     const total_points = questions ? questions.reduce((sum, q) => sum + (q.points || 0), 0) : 0;
 
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `UPDATE assessments SET 
         title = $1, description = $2, program_name = $3, duration = $4,
         start_date = $5, end_date = $6, scheduled_date = $7, scheduled_time = $8,
@@ -5051,7 +5051,7 @@ app.delete('/api/assessments/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await pool.query('DELETE FROM assessments WHERE id = $1 RETURNING *', [id]);
+    const result = await queryWithRetry('DELETE FROM assessments WHERE id = $1 RETURNING *', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Assessment not found' });
@@ -5083,7 +5083,7 @@ app.post('/api/assessments/:id/submit', async (req, res) => {
     console.log('Auto submitted:', auto_submitted, 'Reason:', reason);
 
     // Get assessment details
-    const assessmentResult = await pool.query('SELECT * FROM assessments WHERE id = $1', [id]);
+    const assessmentResult = await queryWithRetry('SELECT * FROM assessments WHERE id = $1', [id]);
     
     if (assessmentResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Assessment not found' });
@@ -5117,7 +5117,7 @@ app.post('/api/assessments/:id/submit', async (req, res) => {
     }
 
     // Insert submission
-    const submissionResult = await pool.query(
+    const submissionResult = await queryWithRetry(
       `INSERT INTO assessment_submissions (
         assessment_id, student_id, student_name, student_registration, student_program,
         answers, score, percentage, auto_graded_score, status, submitted_at
@@ -5161,7 +5161,7 @@ app.get('/api/student-assessments', async (req, res) => {
     }
 
     // Get student's programs first to filter assessments
-    const studentResult = await pool.query(
+    const studentResult = await queryWithRetry(
       'SELECT course_id FROM students WHERE id = $1',
       [student_id]
     );
@@ -5174,7 +5174,7 @@ app.get('/api/student-assessments', async (req, res) => {
     const studentInfo = studentResult.rows[0];
     
     // Get all regular programs for student's course
-    const programsResult = await pool.query(
+    const programsResult = await queryWithRetry(
       'SELECT name FROM programs WHERE course_id = $1',
       [studentInfo.course_id]
     );
@@ -5185,7 +5185,7 @@ app.get('/api/student-assessments', async (req, res) => {
     // CRITICAL: Add short-term programs that student is eligible for
     try {
       // Get full student info for targeting - INCLUDING college and department
-      const fullStudentResult = await pool.query(`
+      const fullStudentResult = await queryWithRetry(`
         SELECT s.*, 
                c.name as course_name,
                d.name as department_name,
@@ -5208,7 +5208,7 @@ app.get('/api/student-assessments', async (req, res) => {
         console.log('College Name:', fullStudentInfo.college_name);
         console.log('Year of Study:', fullStudentInfo.year_of_study);
         
-        const shortTermResult = await pool.query(
+        const shortTermResult = await queryWithRetry(
           'SELECT * FROM short_term_programs WHERE end_date > NOW()'
         );
         
@@ -5357,7 +5357,7 @@ app.get('/api/student-assessments', async (req, res) => {
     console.log('Query:', query);
     console.log('Params:', params);
 
-    const result = await pool.query(query, params);
+    const result = await queryWithRetry(query, params);
     
     console.log('Found available assessments for student:', result.rows.length);
     console.log('Assessments:', result.rows);
@@ -5385,7 +5385,7 @@ app.get('/api/student-submitted-assessments', async (req, res) => {
       ORDER BY s.submitted_at DESC
     `;
     
-    const result = await pool.query(query, [student_id]);
+    const result = await queryWithRetry(query, [student_id]);
     
     console.log('Found submitted assessments:', result.rows.length);
     res.json({ success: true, data: result.rows });
@@ -5404,7 +5404,7 @@ app.post('/api/submit-results-to-students/:assessmentId', async (req, res) => {
     console.log('Assessment ID:', assessmentId);
 
     // Update assessment status to completed and mark results as published
-    const assessmentUpdate = await pool.query(
+    const assessmentUpdate = await queryWithRetry(
       'UPDATE assessments SET status = $1, results_published_to_students = $2, results_published_at = $3 WHERE id = $4 RETURNING *',
       ['completed', true, new Date(), assessmentId]
     );
@@ -5414,7 +5414,7 @@ app.post('/api/submit-results-to-students/:assessmentId', async (req, res) => {
     }
 
     // Update all submissions to mark as published to students
-    const submissionsUpdate = await pool.query(
+    const submissionsUpdate = await queryWithRetry(
       'UPDATE assessment_submissions SET published_to_students = $1, published_at = $2 WHERE assessment_id = $3 RETURNING *',
       [true, new Date(), assessmentId]
     );
@@ -5425,7 +5425,7 @@ app.post('/api/submit-results-to-students/:assessmentId', async (req, res) => {
     // Create assignment entries for students (results in Assignment section)
     for (const submission of submissionsUpdate.rows) {
       try {
-        await pool.query(`
+        await queryWithRetry(`
           INSERT INTO assignments (
             title, 
             description, 
@@ -5484,7 +5484,7 @@ app.post('/api/manual-grade-submission', async (req, res) => {
     console.log('Status:', status);
 
     // Update submission with manual grades
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `UPDATE assessment_submissions 
        SET score = $1, percentage = $2, status = $3, manual_scores = $4, feedback = $5, manual_feedback = $6, graded_at = NOW()
        WHERE id = $7 
@@ -5513,7 +5513,7 @@ app.post('/api/auto-grade-all/:assessment_id', async (req, res) => {
     console.log('Assessment ID:', assessment_id);
 
     // Get assessment details
-    const assessmentResult = await pool.query('SELECT * FROM assessments WHERE id = $1', [assessment_id]);
+    const assessmentResult = await queryWithRetry('SELECT * FROM assessments WHERE id = $1', [assessment_id]);
     if (assessmentResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Assessment not found' });
     }
@@ -5522,7 +5522,7 @@ app.post('/api/auto-grade-all/:assessment_id', async (req, res) => {
     const questions = assessment.questions || [];
 
     // Get all ungraded submissions for this assessment
-    const submissionsResult = await pool.query(
+    const submissionsResult = await queryWithRetry(
       'SELECT * FROM assessment_submissions WHERE assessment_id = $1 AND status = $2',
       [assessment_id, 'submitted']
     );
@@ -5554,7 +5554,7 @@ app.post('/api/auto-grade-all/:assessment_id', async (req, res) => {
       const percentage = totalPoints > 0 ? Math.round((autoGradedScore / totalPoints) * 100) : 0;
 
       // Update submission with auto-graded score
-      const updateResult = await pool.query(
+      const updateResult = await queryWithRetry(
         `UPDATE assessment_submissions 
          SET score = $1, percentage = $2, status = $3, auto_graded_score = $4, graded_at = NOW()
          WHERE id = $5 
@@ -5603,7 +5603,7 @@ app.get('/api/student-graded-assessments', async (req, res) => {
       ORDER BY s.graded_at DESC
     `;
     
-    const result = await pool.query(query, [student_id]);
+    const result = await queryWithRetry(query, [student_id]);
     
     console.log('Found graded assessments:', result.rows.length);
     res.json({ success: true, data: result.rows });
@@ -5622,7 +5622,7 @@ app.post('/api/submit-results-to-students', async (req, res) => {
     console.log('Assessment ID:', assessment_id);
 
     // Get all graded submissions for this assessment
-    const submissionsResult = await pool.query(
+    const submissionsResult = await queryWithRetry(
       'SELECT * FROM assessment_submissions WHERE assessment_id = $1 AND status IN ($2, $3)',
       [assessment_id, 'auto-graded', 'manually-graded']
     );
@@ -5634,13 +5634,13 @@ app.post('/api/submit-results-to-students', async (req, res) => {
     console.log('Found graded submissions:', submissionsResult.rows.length);
 
     // Update assessment to mark results as published
-    const assessmentUpdate = await pool.query(
+    const assessmentUpdate = await queryWithRetry(
       'UPDATE assessments SET results_published_to_students = true, results_published_at = NOW() WHERE id = $1 RETURNING *',
       [assessment_id]
     );
 
     // Update all graded submissions to indicate they've been published to students
-    const submissionsUpdate = await pool.query(
+    const submissionsUpdate = await queryWithRetry(
       'UPDATE assessment_submissions SET published_to_students = true, published_at = NOW() WHERE assessment_id = $1 AND status IN ($2, $3) RETURNING *',
       [assessment_id, 'auto-graded', 'manually-graded']
     );
@@ -5681,7 +5681,7 @@ app.get('/api/assessment-submissions', async (req, res) => {
         params = [assessment_id, student_id];
       }
       
-      const result = await pool.query(query, params);
+      const result = await queryWithRetry(query, params);
       console.log('Found submissions for student:', result.rows.length);
       return res.json({ success: true, data: result.rows });
     }
@@ -5693,7 +5693,7 @@ app.get('/api/assessment-submissions', async (req, res) => {
     }
     
     const query = 'SELECT * FROM assessment_submissions WHERE assessment_id = $1 ORDER BY submitted_at DESC';
-    const result = await pool.query(query, [assessment_id]);
+    const result = await queryWithRetry(query, [assessment_id]);
     
     console.log('Found submissions:', result.rows.length);
     res.json({ success: true, data: result.rows });
@@ -5712,7 +5712,7 @@ app.post('/api/assessment-submissions/:id/auto-grade', async (req, res) => {
     console.log('Submission ID:', submissionId);
     
     // Get submission details
-    const submissionResult = await pool.query(
+    const submissionResult = await queryWithRetry(
       'SELECT * FROM assessment_submissions WHERE id = $1',
       [submissionId]
     );
@@ -5724,7 +5724,7 @@ app.post('/api/assessment-submissions/:id/auto-grade', async (req, res) => {
     const submission = submissionResult.rows[0];
     
     // Get assessment details
-    const assessmentResult = await pool.query(
+    const assessmentResult = await queryWithRetry(
       'SELECT * FROM assessments WHERE id = $1',
       [submission.assessment_id]
     );
@@ -5772,7 +5772,7 @@ app.post('/api/assessment-submissions/:id/auto-grade', async (req, res) => {
     let submissionStatus = manualQuestions > 0 ? 'partially-graded' : 'auto-graded';
     
     // Update submission in database
-    const updateResult = await pool.query(
+    const updateResult = await queryWithRetry(
       `UPDATE assessment_submissions 
        SET score = $1, percentage = $2, status = $3, auto_graded_score = $4, graded_at = CURRENT_TIMESTAMP
        WHERE id = $5 RETURNING *`,
@@ -5811,7 +5811,7 @@ app.get('/api/student-progress/:studentId', async (req, res) => {
     console.log('Student ID:', studentId);
     
     // Get student basic info
-    const studentResult = await pool.query(
+    const studentResult = await queryWithRetry(
       'SELECT * FROM students WHERE id = $1',
       [studentId]
     );
@@ -5823,7 +5823,7 @@ app.get('/api/student-progress/:studentId', async (req, res) => {
     const student = studentResult.rows[0];
     
     // Get student's program/course info
-    const programResult = await pool.query(
+    const programResult = await queryWithRetry(
       'SELECT * FROM programs WHERE course_id = $1',
       [student.course_id]
     );
@@ -5848,7 +5848,7 @@ app.get('/api/student-progress/:studentId', async (req, res) => {
       ORDER BY s.submitted_at DESC
     `;
     
-    const assessmentsResult = await pool.query(assessmentsQuery, [studentId]);
+    const assessmentsResult = await queryWithRetry(assessmentsQuery, [studentId]);
     
     // Get assignment submissions (if any)
     const assignmentsQuery = `
@@ -5874,7 +5874,7 @@ app.get('/api/student-progress/:studentId', async (req, res) => {
       ORDER BY a.created_at DESC
     `;
     
-    const assignmentsResult = await pool.query(
+    const assignmentsResult = await queryWithRetry(
       assignmentsQuery, 
       [studentId, student.program_name || '', student.course_id]
     );
@@ -5896,7 +5896,7 @@ app.get('/api/student-progress/:studentId', async (req, res) => {
       WHERE program_name = $1
     `;
     
-    const contentResult = await pool.query(contentQuery, [student.program_name || '']);
+    const contentResult = await queryWithRetry(contentQuery, [student.program_name || '']);
     
     const progressData = {
       student: {
@@ -5947,7 +5947,7 @@ app.post('/api/submit-results-to-students/:assessmentId', async (req, res) => {
     console.log('Assessment ID:', assessmentId);
     
     // Update all submissions to published_to_students = true
-    const updateResult = await pool.query(
+    const updateResult = await queryWithRetry(
       `UPDATE assessment_submissions 
        SET published_to_students = true, published_at = CURRENT_TIMESTAMP
        WHERE assessment_id = $1 
@@ -5956,7 +5956,7 @@ app.post('/api/submit-results-to-students/:assessmentId', async (req, res) => {
     );
     
     // Update assessment status to completed
-    const assessmentUpdate = await pool.query(
+    const assessmentUpdate = await queryWithRetry(
       `UPDATE assessments 
        SET status = 'completed', results_published_at = CURRENT_TIMESTAMP
        WHERE id = $1 
@@ -6000,7 +6000,7 @@ app.post('/api/assessment-submissions', async (req, res) => {
     console.log('Student Answers:', answers);
 
     // Check if student already submitted
-    const existingSubmission = await pool.query(
+    const existingSubmission = await queryWithRetry(
       'SELECT id FROM assessment_submissions WHERE assessment_id = $1 AND student_id = $2',
       [assessment_id, student_id]
     );
@@ -6013,7 +6013,7 @@ app.post('/api/assessment-submissions', async (req, res) => {
     }
 
     // Get assessment details to check auto_grade setting
-    const assessmentResult = await pool.query('SELECT * FROM assessments WHERE id = $1', [assessment_id]);
+    const assessmentResult = await queryWithRetry('SELECT * FROM assessments WHERE id = $1', [assessment_id]);
     if (assessmentResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Assessment not found' });
     }
@@ -6103,7 +6103,7 @@ app.post('/api/assessment-submissions', async (req, res) => {
     console.log('Final Percentage:', finalPercentage);
     console.log('Status:', submissionStatus);
     // Insert submission with calculated scores
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `INSERT INTO assessment_submissions 
        (assessment_id, student_id, student_name, student_registration, student_program, 
         answers, score, percentage, status, auto_graded_score, submitted_at) 
@@ -6129,7 +6129,7 @@ app.post('/api/assignments/add-program-id', async (req, res) => {
     console.log('Adding program_id column to assignments table...');
     
     // Add program_id column if it doesn't exist
-    await pool.query(`
+    await queryWithRetry(`
       ALTER TABLE assignments 
       ADD COLUMN IF NOT EXISTS program_id INTEGER
     `);
@@ -6146,10 +6146,10 @@ app.post('/api/assignments/add-program-id', async (req, res) => {
 app.post('/api/assignments/fix', async (req, res) => {
   try {
     // Drop and recreate assignments table with correct schema
-    await pool.query('DROP TABLE IF EXISTS assignment_submissions CASCADE');
-    await pool.query('DROP TABLE IF EXISTS assignments CASCADE');
+    await queryWithRetry('DROP TABLE IF EXISTS assignment_submissions CASCADE');
+    await queryWithRetry('DROP TABLE IF EXISTS assignments CASCADE');
     
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE assignments (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -6166,7 +6166,7 @@ app.post('/api/assignments/fix', async (req, res) => {
       )
     `);
 
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE assignment_submissions (
         id SERIAL PRIMARY KEY,
         assignment_id INTEGER REFERENCES assignments(id) ON DELETE CASCADE,
@@ -6196,7 +6196,7 @@ app.post('/api/assignments/fix', async (req, res) => {
 // Initialize assignment tables
 app.post('/api/assignments/init', async (req, res) => {
   try {
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS assignments (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -6213,7 +6213,7 @@ app.post('/api/assignments/init', async (req, res) => {
       )
     `);
 
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS assignment_submissions (
         id SERIAL PRIMARY KEY,
         assignment_id INTEGER REFERENCES assignments(id) ON DELETE CASCADE,
@@ -6296,7 +6296,7 @@ app.post('/api/assignments', async (req, res) => {
     let isShortTermProgram = false;
     try {
       // First, try to find program by exact name match in regular programs
-      const programResult = await pool.query(
+      const programResult = await queryWithRetry(
         'SELECT id, name, lecturer_id FROM programs WHERE name = $1 LIMIT 1',
         [program_name]
       );
@@ -6313,7 +6313,7 @@ app.post('/api/assignments', async (req, res) => {
         }
       } else {
         // If no exact match in regular programs, try case-insensitive search
-        const programResultCaseInsensitive = await pool.query(
+        const programResultCaseInsensitive = await queryWithRetry(
           'SELECT id, name FROM programs WHERE LOWER(name) = LOWER($1) LIMIT 1',
           [program_name]
         );
@@ -6326,7 +6326,7 @@ app.post('/api/assignments', async (req, res) => {
           console.log('🔍 Program not found in regular programs, checking short-term programs...');
           
           // Try exact match in short-term programs (match by title)
-          const shortTermResult = await pool.query(
+          const shortTermResult = await queryWithRetry(
             'SELECT id, title FROM short_term_programs WHERE title = $1 LIMIT 1',
             [program_name]
           );
@@ -6337,7 +6337,7 @@ app.post('/api/assignments', async (req, res) => {
             console.log('✅ Found short-term program_id:', programId, 'for program:', program_name);
           } else {
             // Try case-insensitive match in short-term programs
-            const shortTermResultCaseInsensitive = await pool.query(
+            const shortTermResultCaseInsensitive = await queryWithRetry(
               'SELECT id, title FROM short_term_programs WHERE LOWER(title) = LOWER($1) LIMIT 1',
               [program_name]
             );
@@ -6378,7 +6378,7 @@ app.post('/api/assignments', async (req, res) => {
       });
     }
 
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       INSERT INTO assignments (
         title, description, program_id, program_name, deadline, submission_type, 
         max_points, lecturer_id, lecturer_name, status
@@ -6415,7 +6415,7 @@ app.get('/api/lecturer-programs', async (req, res) => {
     console.log('Lecturer ID requested:', lecturer_id);
     
     // First get lecturer info
-    const lecturerResult = await pool.query('SELECT * FROM lecturers WHERE id = $1', [lecturer_id]);
+    const lecturerResult = await queryWithRetry('SELECT * FROM lecturers WHERE id = $1', [lecturer_id]);
     console.log('Lecturer found:', lecturerResult.rows[0]);
     
     if (lecturerResult.rows.length === 0) {
@@ -6426,7 +6426,7 @@ app.get('/api/lecturer-programs', async (req, res) => {
     const lecturer = lecturerResult.rows[0];
     
     // Get programs assigned to this lecturer
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT p.*, c.name as course_name, d.name as department_name, col.name as college_name
       FROM programs p
       LEFT JOIN courses c ON p.course_id = c.id
@@ -6490,7 +6490,7 @@ app.get('/api/student-assignments', async (req, res) => {
     console.log('Student username:', student_username);
     
     // First, auto-delete expired assignments
-    await pool.query(`
+    await queryWithRetry(`
       UPDATE assignments 
       SET status = 'expired' 
       WHERE deadline <= NOW() AND status = 'active'
@@ -6516,13 +6516,13 @@ app.get('/api/student-assignments', async (req, res) => {
           studentParams = [student_username];
         }
         
-        const studentResult = await pool.query(studentQuery, studentParams);
+        const studentResult = await queryWithRetry(studentQuery, studentParams);
         
         if (studentResult.rows.length > 0) {
           const studentInfo = studentResult.rows[0];
           
           // Get student's regular programs
-          const programsResult = await pool.query(
+          const programsResult = await queryWithRetry(
             'SELECT id, name FROM programs WHERE course_id = $1',
             [studentInfo.course_id]
           );
@@ -6534,7 +6534,7 @@ app.get('/api/student-assignments', async (req, res) => {
           
           // Add short-term programs that student is eligible for
           try {
-            const shortTermResult = await pool.query(
+            const shortTermResult = await queryWithRetry(
               'SELECT * FROM short_term_programs WHERE end_date > NOW()'
             );
             
@@ -6567,7 +6567,7 @@ app.get('/api/student-assignments', async (req, res) => {
     let result;
     
     if (studentProgramIds.length > 0) {
-      result = await pool.query(`
+      result = await queryWithRetry(`
         SELECT a.* FROM assignments a
         WHERE a.program_id = ANY($1)
         AND a.status = 'active' 
@@ -6578,7 +6578,7 @@ app.get('/api/student-assignments', async (req, res) => {
       console.log(`Found ${result.rows.length} assignments via program_id matching`);
     } else if (student_program) {
       // Fallback to exact name matching only (no fuzzy matching to prevent cross-program leakage)
-      result = await pool.query(`
+      result = await queryWithRetry(`
         SELECT a.* FROM assignments a
         WHERE LOWER(a.program_name) = LOWER($1)
         AND a.status = 'active' 
@@ -6606,7 +6606,7 @@ app.post('/api/assignments/cleanup', async (req, res) => {
     console.log('=== AUTO CLEANUP EXPIRED ASSIGNMENTS ===');
     
     // Update expired assignments
-    const expiredResult = await pool.query(`
+    const expiredResult = await queryWithRetry(`
       UPDATE assignments 
       SET status = 'expired' 
       WHERE deadline <= NOW() AND status = 'active'
@@ -6682,7 +6682,7 @@ app.post('/api/assignment-submissions', async (req, res) => {
     }
     
     // Check if assignment exists
-    const assignmentCheck = await pool.query(
+    const assignmentCheck = await queryWithRetry(
       'SELECT id FROM assignments WHERE id = $1',
       [assignmentIdInt]
     );
@@ -6697,7 +6697,7 @@ app.post('/api/assignment-submissions', async (req, res) => {
     
     console.log('✅ Assignment exists, proceeding with submission...');
 
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       INSERT INTO assignment_submissions (
         assignment_id, student_id, student_name, student_registration,
         student_program, submission_type, text_content, file_path, file_name
@@ -6761,20 +6761,20 @@ app.get('/api/assignment-submissions', async (req, res) => {
         params = [student_name];
       }
       
-      result = await pool.query(query, params);
+      result = await queryWithRetry(query, params);
       console.log('Found submissions for student:', result.rows.length);
       return res.json({ success: true, data: result.rows });
     }
     
     if (assignment_id) {
       // Get submissions for specific assignment (lecturer view)
-      result = await pool.query(`
+      result = await queryWithRetry(`
         SELECT * FROM assignment_submissions 
         WHERE assignment_id = $1 ORDER BY submitted_at DESC
       `, [assignment_id]);
     } else if (lecturer_id) {
       // Get all submissions for lecturer's assignments
-      result = await pool.query(`
+      result = await queryWithRetry(`
         SELECT s.*, a.title as assignment_title, a.program_name
         FROM assignment_submissions s
         JOIN assignments a ON s.assignment_id = a.id
@@ -6804,7 +6804,7 @@ app.delete('/api/assignment-submissions/:id', async (req, res) => {
     console.log('Submission ID to delete:', id);
     
     // Delete the submission
-    const result = await pool.query('DELETE FROM assignment_submissions WHERE id = $1 RETURNING *', [id]);
+    const result = await queryWithRetry('DELETE FROM assignment_submissions WHERE id = $1 RETURNING *', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Submission not found' });
@@ -6827,10 +6827,10 @@ app.delete('/api/assignments/:id', async (req, res) => {
     console.log('Assignment ID to delete:', id);
     
     // First delete all submissions for this assignment
-    await pool.query('DELETE FROM assignment_submissions WHERE assignment_id = $1', [id]);
+    await queryWithRetry('DELETE FROM assignment_submissions WHERE assignment_id = $1', [id]);
     
     // Then delete the assignment
-    const result = await pool.query('DELETE FROM assignments WHERE id = $1 RETURNING *', [id]);
+    const result = await queryWithRetry('DELETE FROM assignments WHERE id = $1 RETURNING *', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Assignment not found' });
@@ -6854,7 +6854,7 @@ app.put('/api/assignments/:id', async (req, res) => {
     console.log('Assignment ID to update:', id);
     console.log('Update data:', req.body);
     
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       UPDATE assignments 
       SET title = $1, description = $2, program_name = $3, deadline = $4, 
           submission_type = $5, max_points = $6
@@ -6879,7 +6879,7 @@ app.put('/api/assignments/:id', async (req, res) => {
 // Create live classes table
 const initializeLiveClassesTable = async () => {
   try {
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS live_classes (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -6898,7 +6898,7 @@ const initializeLiveClassesTable = async () => {
       )
     `);
     
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS live_class_participants (
         id SERIAL PRIMARY KEY,
         class_id INTEGER REFERENCES live_classes(id) ON DELETE CASCADE,
@@ -6926,7 +6926,7 @@ app.post('/api/live-classes', async (req, res) => {
     
     // Add meeting_url column if it doesn't exist
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE live_classes ADD COLUMN IF NOT EXISTS meeting_url TEXT
       `);
     } catch (alterError) {
@@ -6936,7 +6936,7 @@ app.post('/api/live-classes', async (req, res) => {
     // Generate room_id if not provided
     const finalRoomId = room_id || `room_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       INSERT INTO live_classes (title, description, program_name, date, time, duration, lecturer_id, lecturer_name, room_id, status, meeting_url)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
@@ -6963,7 +6963,7 @@ app.get('/api/live-classes', async (req, res) => {
     
     // If lecturer_name provided, return only that lecturer's classes (for lecturer view)
     if (lecturer_name && !student_id && !student_username) {
-      const result = await pool.query(
+      const result = await queryWithRetry(
         'SELECT * FROM live_classes WHERE lecturer_name = $1 ORDER BY date ASC, time ASC',
         [lecturer_name]
       );
@@ -6973,7 +6973,7 @@ app.get('/api/live-classes', async (req, res) => {
     
     // If no student info provided, return all classes (for admin view)
     if (!student_id && !student_username) {
-      const result = await pool.query('SELECT * FROM live_classes ORDER BY date ASC, time ASC');
+      const result = await queryWithRetry('SELECT * FROM live_classes ORDER BY date ASC, time ASC');
       console.log('Live classes found (no filter):', result.rows.length);
       return res.json({ success: true, data: result.rows });
     }
@@ -6981,7 +6981,7 @@ app.get('/api/live-classes', async (req, res) => {
     // Get student information - INCLUDING college and department for short-term targeting
     let studentInfo = null;
     if (student_id) {
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, 
                c.name as course_name,
                d.name as department_name,
@@ -6998,7 +6998,7 @@ app.get('/api/live-classes', async (req, res) => {
       }
     } else if (student_username) {
       console.log('Looking up student by username for live classes:', student_username);
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, 
                c.name as course_name,
                d.name as department_name,
@@ -7022,7 +7022,7 @@ app.get('/api/live-classes', async (req, res) => {
     let studentShortTermEnrollments = [];
     if (studentInfo) {
       try {
-        const enrollmentCheck = await pool.query(`
+        const enrollmentCheck = await queryWithRetry(`
           SELECT stp.id, stp.title, stp.target_type, stp.target_value
           FROM short_term_enrollments ste
           JOIN short_term_programs stp ON ste.program_id = stp.id
@@ -7054,7 +7054,7 @@ app.get('/api/live-classes', async (req, res) => {
       // First, get course info
       if (!studentInfo.course_name) {
         try {
-          const courseResult = await pool.query('SELECT name FROM courses WHERE id = $1', [studentInfo.course_id]);
+          const courseResult = await queryWithRetry('SELECT name FROM courses WHERE id = $1', [studentInfo.course_id]);
           if (courseResult.rows.length > 0) {
             studentInfo.course_name = courseResult.rows[0].name;
             console.log('   ✅ Found course_name via direct lookup:', studentInfo.course_name);
@@ -7065,7 +7065,7 @@ app.get('/api/live-classes', async (req, res) => {
       // Then, get department info via course
       if (!studentInfo.department_name) {
         try {
-          const deptResult = await pool.query(`
+          const deptResult = await queryWithRetry(`
             SELECT d.name as department_name, d.college_id
             FROM courses c
             JOIN departments d ON c.department_id = d.id
@@ -7084,7 +7084,7 @@ app.get('/api/live-classes', async (req, res) => {
         try {
           // Try via stored college_id first
           if (studentInfo._college_id) {
-            const collegeResult = await pool.query('SELECT name FROM colleges WHERE id = $1', [studentInfo._college_id]);
+            const collegeResult = await queryWithRetry('SELECT name FROM colleges WHERE id = $1', [studentInfo._college_id]);
             if (collegeResult.rows.length > 0) {
               studentInfo.college_name = collegeResult.rows[0].name;
               console.log('   ✅ Found college_name via stored college_id:', studentInfo.college_name);
@@ -7093,7 +7093,7 @@ app.get('/api/live-classes', async (req, res) => {
           
           // If still no college, try full chain lookup
           if (!studentInfo.college_name) {
-            const collegeResult = await pool.query(`
+            const collegeResult = await queryWithRetry(`
               SELECT col.name as college_name
               FROM courses c
               JOIN departments d ON c.department_id = d.id
@@ -7115,7 +7115,7 @@ app.get('/api/live-classes', async (req, res) => {
     }
     
     // Get student's regular programs
-    const programsResult = await pool.query(
+    const programsResult = await queryWithRetry(
       'SELECT name FROM programs WHERE course_id = $1',
       [studentInfo.course_id]
     );
@@ -7126,7 +7126,7 @@ app.get('/api/live-classes', async (req, res) => {
     // Get student's short-term programs (based on targeting)
     // FIXED: Include ALL short-term programs - filtering will happen later based on targeting
     // This ensures we don't miss any short-term programs due to naming mismatches
-    const shortTermResult = await pool.query(
+    const shortTermResult = await queryWithRetry(
       `SELECT * FROM short_term_programs 
        ORDER BY created_at DESC`
     );
@@ -7137,7 +7137,7 @@ app.get('/api/live-classes', async (req, res) => {
     // Also check if student is enrolled in any short-term programs via short_term_enrollments table
     let enrolledShortTermPrograms = [];
     try {
-      const enrollmentResult = await pool.query(
+      const enrollmentResult = await queryWithRetry(
         `SELECT stp.title FROM short_term_enrollments ste
          JOIN short_term_programs stp ON ste.program_id = stp.id
          WHERE ste.student_id = $1 AND stp.end_date > NOW()`,
@@ -7305,7 +7305,7 @@ app.get('/api/live-classes', async (req, res) => {
     console.log('All Student Programs (Regular + Short-Term):', allStudentPrograms);
     
     // Fetch all live classes
-    const liveClassesResult = await pool.query('SELECT * FROM live_classes ORDER BY date ASC, time ASC');
+    const liveClassesResult = await queryWithRetry('SELECT * FROM live_classes ORDER BY date ASC, time ASC');
     
     console.log('=== ALL LIVE CLASSES IN DATABASE ===');
     console.log('Total Live Classes:', liveClassesResult.rows.length);
@@ -7687,7 +7687,7 @@ app.delete('/api/live-classes/:id', async (req, res) => {
     console.log('=== DELETE LIVE CLASS DEBUG ===');
     console.log('Deleting class ID:', id);
     
-    const result = await pool.query('DELETE FROM live_classes WHERE id = $1 RETURNING *', [id]);
+    const result = await queryWithRetry('DELETE FROM live_classes WHERE id = $1 RETURNING *', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Live class not found' });
@@ -7710,7 +7710,7 @@ app.post('/api/live-classes/join', async (req, res) => {
     console.log('Join data:', req.body);
     
     // Check if student already joined
-    const existingParticipant = await pool.query(
+    const existingParticipant = await queryWithRetry(
       'SELECT * FROM live_class_participants WHERE class_id = $1 AND student_id = $2',
       [class_id, student_id]
     );
@@ -7720,7 +7720,7 @@ app.post('/api/live-classes/join', async (req, res) => {
     }
     
     // Add student to participants
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'INSERT INTO live_class_participants (class_id, student_id, student_name, join_time, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [class_id, student_id, student_name, join_time, 'active']
     );
@@ -7741,7 +7741,7 @@ app.get('/api/live-classes/:id/participants', async (req, res) => {
     console.log('=== GETTING LIVE CLASS PARTICIPANTS ===');
     console.log('Class ID:', id);
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT * FROM live_class_participants WHERE class_id = $1 ORDER BY join_time ASC',
       [id]
     );
@@ -7759,7 +7759,7 @@ app.post('/api/live-classes/end-all', async (req, res) => {
   try {
     console.log('=== ENDING ALL LIVE CLASSES ===');
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       "UPDATE live_classes SET status = 'ended' WHERE status = 'live' RETURNING *"
     );
     
@@ -7777,7 +7777,7 @@ app.post('/api/live-classes/cleanup', async (req, res) => {
     console.log('=== CLEANING UP FAKE CLASSES ===');
     
     // Delete classes with fake program names
-    const result = await pool.query(
+    const result = await queryWithRetry(
       "DELETE FROM live_classes WHERE program_name IN ('ELECTRONICS', 'TEST', 'DEMO') OR title LIKE '%test%' OR title LIKE '%demo%' RETURNING *"
     );
     
@@ -7797,7 +7797,7 @@ app.post('/api/live-classes/:id/auto-start', async (req, res) => {
     console.log('=== AUTO-STARTING SCHEDULED CLASS ===');
     console.log('Class ID:', id);
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       "UPDATE live_classes SET status = 'live' WHERE id = $1 AND status = 'scheduled' RETURNING *",
       [id]
     );
@@ -7837,7 +7837,7 @@ const checkScheduledClasses = async () => {
     console.log(`Scheduler running at: ${new Date().toLocaleString()}`);
     
     // Get ALL live classes first for debugging
-    const allClassesResult = await pool.query("SELECT * FROM live_classes ORDER BY created_at DESC");
+    const allClassesResult = await queryWithRetry("SELECT * FROM live_classes ORDER BY created_at DESC");
     console.log(`Total live classes in database: ${allClassesResult.rows.length}`);
     
     if (allClassesResult.rows.length > 0) {
@@ -7848,7 +7848,7 @@ const checkScheduledClasses = async () => {
     }
     
     // Get scheduled classes specifically
-    const result = await pool.query(
+    const result = await queryWithRetry(
       "SELECT * FROM live_classes WHERE status = 'scheduled' ORDER BY date, time"
     );
     
@@ -7941,7 +7941,7 @@ const checkScheduledClasses = async () => {
           console.log(`Starting now at: ${now.toLocaleString()}`);
           
           // Update status to 'live' with started_at timestamp
-          const updateResult = await pool.query(
+          const updateResult = await queryWithRetry(
             "UPDATE live_classes SET status = 'live', started_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *",
             [classItem.id]
           );
@@ -7952,7 +7952,7 @@ const checkScheduledClasses = async () => {
             console.log(`Class ID ${classItem.id} status changed from 'scheduled' to 'live'`);
             
             // Verify the update worked
-            const verifyResult = await pool.query(
+            const verifyResult = await queryWithRetry(
               "SELECT * FROM live_classes WHERE id = $1",
               [classItem.id]
             );
@@ -7968,7 +7968,7 @@ const checkScheduledClasses = async () => {
             
             // Try alternative update
             try {
-              const altUpdateResult = await pool.query(
+              const altUpdateResult = await queryWithRetry(
                 "UPDATE live_classes SET status = $1 WHERE id = $2 RETURNING *",
                 ['live', classItem.id]
               );
@@ -8018,9 +8018,9 @@ app.get('/api/live-classes/debug', async (req, res) => {
   try {
     console.log('=== DEBUG: ALL LIVE CLASSES ===');
     
-    const allClasses = await pool.query("SELECT * FROM live_classes ORDER BY created_at DESC");
-    const scheduledClasses = await pool.query("SELECT * FROM live_classes WHERE status = 'scheduled' ORDER BY date, time");
-    const liveClasses = await pool.query("SELECT * FROM live_classes WHERE status = 'live' ORDER BY created_at DESC");
+    const allClasses = await queryWithRetry("SELECT * FROM live_classes ORDER BY created_at DESC");
+    const scheduledClasses = await queryWithRetry("SELECT * FROM live_classes WHERE status = 'scheduled' ORDER BY date, time");
+    const liveClasses = await queryWithRetry("SELECT * FROM live_classes WHERE status = 'live' ORDER BY created_at DESC");
     
     const debugInfo = {
       total_classes: allClasses.rows.length,
@@ -8048,7 +8048,7 @@ app.post('/api/live-classes/:id/force-start', async (req, res) => {
     console.log(`=== FORCE STARTING CLASS ID: ${id} ===`);
     
     // Get class details first
-    const classResult = await pool.query("SELECT * FROM live_classes WHERE id = $1", [id]);
+    const classResult = await queryWithRetry("SELECT * FROM live_classes WHERE id = $1", [id]);
     
     if (classResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Class not found' });
@@ -8059,7 +8059,7 @@ app.post('/api/live-classes/:id/force-start', async (req, res) => {
     console.log(`Current status: ${classItem.status}`);
     
     // Force update to live
-    const updateResult = await pool.query(
+    const updateResult = await queryWithRetry(
       "UPDATE live_classes SET status = 'live', started_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *",
       [id]
     );
@@ -8093,7 +8093,7 @@ app.post('/api/live-classes/test-scheduler', async (req, res) => {
           console.log('=== TESTING SCHEDULED CLASSES ===');
           console.log(`Simulated time: ${new Date(simulateTime).toLocaleString()}`);
           
-          const result = await pool.query("SELECT * FROM live_classes WHERE status = 'scheduled' ORDER BY date, time");
+          const result = await queryWithRetry("SELECT * FROM live_classes WHERE status = 'scheduled' ORDER BY date, time");
           const scheduledClasses = result.rows;
           console.log(`Found ${scheduledClasses.length} scheduled classes for testing`);
           
@@ -8111,7 +8111,7 @@ app.post('/api/live-classes/test-scheduler', async (req, res) => {
             if (timeDiff <= 60) {
               console.log(`🚀 TEST: Would start class ${classItem.title}`);
               
-              const updateResult = await pool.query(
+              const updateResult = await queryWithRetry(
                 "UPDATE live_classes SET status = 'live', started_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *",
                 [classItem.id]
               );
@@ -8160,14 +8160,14 @@ app.get('/api/discussions', async (req, res) => {
       let lecturerPrograms = [];
       
       // Get regular programs
-      const regularProgramsResult = await pool.query(`
+      const regularProgramsResult = await queryWithRetry(`
         SELECT name FROM programs 
         WHERE lecturer_id = $1 OR lecturer_name = $2
       `, [lecturer_id || null, lecturer_username || '']);
       lecturerPrograms = regularProgramsResult.rows.map(p => p.name);
       
       // Get short-term programs
-      const shortTermResult = await pool.query(`
+      const shortTermResult = await queryWithRetry(`
         SELECT title FROM short_term_programs 
         WHERE lecturer_id = $1 OR lecturer_name = $2
       `, [lecturer_id || null, lecturer_username || '']);
@@ -8177,7 +8177,7 @@ app.get('/api/discussions', async (req, res) => {
       console.log('Lecturer Programs:', lecturerPrograms);
       
       // Get all discussions
-      const allDiscussionsResult = await pool.query(`
+      const allDiscussionsResult = await queryWithRetry(`
         SELECT d.*, 
                (SELECT COUNT(*) FROM discussion_replies WHERE discussion_id = d.id) as reply_count
         FROM discussions d 
@@ -8235,7 +8235,7 @@ app.get('/api/discussions', async (req, res) => {
     
     // If no student or lecturer info provided, return all discussions (for admin view)
     if (!student_id && !student_username) {
-      const result = await pool.query(`
+      const result = await queryWithRetry(`
         SELECT d.*, 
                (SELECT COUNT(*) FROM discussion_replies WHERE discussion_id = d.id) as reply_count
         FROM discussions d 
@@ -8248,7 +8248,7 @@ app.get('/api/discussions', async (req, res) => {
     // Get student information
     let studentInfo = null;
     if (student_id) {
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, c.name as course_name
         FROM students s
         LEFT JOIN courses c ON s.course_id = c.id
@@ -8259,7 +8259,7 @@ app.get('/api/discussions', async (req, res) => {
         studentInfo = studentResult.rows[0];
       }
     } else if (student_username) {
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, c.name as course_name
         FROM students s
         LEFT JOIN courses c ON s.course_id = c.id
@@ -8281,7 +8281,7 @@ app.get('/api/discussions', async (req, res) => {
     // Get student's full info including college and department for short-term program targeting
     let studentFullInfo = studentInfo;
     if (!studentInfo.college_name || !studentInfo.department_name) {
-      const fullInfoResult = await pool.query(`
+      const fullInfoResult = await queryWithRetry(`
         SELECT s.*, 
                c.name as course_name,
                d.name as department_name,
@@ -8299,7 +8299,7 @@ app.get('/api/discussions', async (req, res) => {
     }
     
     // Get student's regular programs
-    const programsResult = await pool.query(
+    const programsResult = await queryWithRetry(
       'SELECT name FROM programs WHERE course_id = $1',
       [studentInfo.course_id]
     );
@@ -8310,7 +8310,7 @@ app.get('/api/discussions', async (req, res) => {
     // CRITICAL: Add short-term programs that student is eligible for
     try {
       // FIXED: Remove end_date filter to match live-classes endpoint behavior
-      const shortTermResult = await pool.query(
+      const shortTermResult = await queryWithRetry(
         'SELECT * FROM short_term_programs ORDER BY created_at DESC'
       );
       
@@ -8381,7 +8381,7 @@ app.get('/api/discussions', async (req, res) => {
     console.log('Student All Programs:', studentPrograms);
     
     // Fetch all discussions
-    const discussionsResult = await pool.query(`
+    const discussionsResult = await queryWithRetry(`
       SELECT d.*, 
              (SELECT COUNT(*) FROM discussion_replies WHERE discussion_id = d.id) as reply_count
       FROM discussions d 
@@ -8470,7 +8470,7 @@ app.post('/api/discussions', async (req, res) => {
       }
       
       // Check if user is a CR
-      const crCheck = await pool.query(
+      const crCheck = await queryWithRetry(
         'SELECT is_cr, name FROM students WHERE id = $1',
         [author_id]
       );
@@ -8486,7 +8486,7 @@ app.post('/api/discussions', async (req, res) => {
       console.log(`✅ CR ${crCheck.rows[0].name} creating general discussion`);
     }
     
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       INSERT INTO discussions (
         title, content, category, program, author, author_id,
         group_name, group_leader, group_members, priority, status
@@ -8513,14 +8513,14 @@ app.get('/api/discussions/:id', async (req, res) => {
     console.log('=== FETCHING DISCUSSION BY ID ===');
     console.log('Discussion ID:', id);
     
-    const discussionResult = await pool.query('SELECT * FROM discussions WHERE id = $1', [id]);
+    const discussionResult = await queryWithRetry('SELECT * FROM discussions WHERE id = $1', [id]);
     
     if (discussionResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Discussion not found' });
     }
     
     // Get replies for this discussion
-    const repliesResult = await pool.query(`
+    const repliesResult = await queryWithRetry(`
       SELECT * FROM discussion_replies 
       WHERE discussion_id = $1 
       ORDER BY created_at ASC
@@ -8548,13 +8548,13 @@ app.post('/api/discussion-replies', async (req, res) => {
     console.log('Reply data:', req.body);
     
     // Insert reply with optional file info
-    const replyResult = await pool.query(`
+    const replyResult = await queryWithRetry(`
       INSERT INTO discussion_replies (discussion_id, content, author, author_id, author_type, file_url, file_name, file_type, file_size)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
     `, [discussion_id, content || '', author, author_id, author_type || 'student', file_url || null, file_name || null, file_type || null, file_size || null]);
     
     // Update discussion reply count
-    await pool.query(`
+    await queryWithRetry(`
       UPDATE discussions 
       SET replies = replies + 1, updated_at = CURRENT_TIMESTAMP 
       WHERE id = $1
@@ -8604,7 +8604,7 @@ app.put('/api/discussions/:id', async (req, res) => {
     updateQuery += ` WHERE id = $${paramCount} RETURNING *`;
     updateValues.push(id);
     
-    const result = await pool.query(updateQuery, updateValues);
+    const result = await queryWithRetry(updateQuery, updateValues);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Discussion not found' });
@@ -8627,10 +8627,10 @@ app.delete('/api/discussions/:id', async (req, res) => {
     console.log('Discussion ID:', id);
     
     // Delete replies first (CASCADE should handle this, but being explicit)
-    await pool.query('DELETE FROM discussion_replies WHERE discussion_id = $1', [id]);
+    await queryWithRetry('DELETE FROM discussion_replies WHERE discussion_id = $1', [id]);
     
     // Delete discussion
-    const result = await pool.query('DELETE FROM discussions WHERE id = $1 RETURNING *', [id]);
+    const result = await queryWithRetry('DELETE FROM discussions WHERE id = $1 RETURNING *', [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Discussion not found' });
@@ -8666,7 +8666,7 @@ app.post('/api/study-group-notifications', async (req, res) => {
         group_leader, program, notification_type
       } = notification;
       
-      const result = await pool.query(`
+      const result = await queryWithRetry(`
         INSERT INTO study_group_notifications (
           discussion_id, student_reg_no, student_name, group_name,
           group_leader, program, notification_type, status
@@ -8696,7 +8696,7 @@ app.get('/api/study-group-notifications/:regNo', async (req, res) => {
     console.log('=== FETCHING STUDY GROUP NOTIFICATIONS ===');
     console.log('Student Reg No:', regNo);
     
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT sgn.*, d.title as discussion_title, d.content as discussion_content
       FROM study_group_notifications sgn
       LEFT JOIN discussions d ON sgn.discussion_id = d.id
@@ -8721,7 +8721,7 @@ app.put('/api/study-group-notifications/:id', async (req, res) => {
     console.log('=== UPDATING NOTIFICATION STATUS ===');
     console.log('Notification ID:', id, 'Status:', status);
     
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       UPDATE study_group_notifications 
       SET status = $1 
       WHERE id = $2 
@@ -8743,7 +8743,7 @@ app.put('/api/study-group-notifications/:id', async (req, res) => {
 app.get('/api/discussions/:id/replies', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT * FROM discussion_replies WHERE discussion_id = $1 ORDER BY created_at ASC',
       [id]
     );
@@ -8759,13 +8759,13 @@ app.post('/api/discussion-replies', async (req, res) => {
   try {
     const { discussion_id, content, author, author_id, author_type, file_url, file_name, file_type, file_size } = req.body;
     
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       INSERT INTO discussion_replies (discussion_id, content, author, author_id, author_type, file_url, file_name, file_type, file_size)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
     `, [discussion_id, content || '', author, author_id, author_type || 'student', file_url || null, file_name || null, file_type || null, file_size || null]);
     
     // Update discussion reply count
-    await pool.query(
+    await queryWithRetry(
       'UPDATE discussions SET replies = replies + 1 WHERE id = $1',
       [discussion_id]
     );
@@ -8782,7 +8782,7 @@ app.post('/api/discussions/:id/like', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'UPDATE discussions SET likes = likes + 1 WHERE id = $1 RETURNING *',
       [id]
     );
@@ -8806,7 +8806,7 @@ app.delete('/api/discussions/:id', async (req, res) => {
     console.log('User Type:', user_type);
     
     // First, get the discussion to check permissions
-    const discussionResult = await pool.query(
+    const discussionResult = await queryWithRetry(
       'SELECT * FROM discussions WHERE id = $1',
       [id]
     );
@@ -8823,7 +8823,7 @@ app.delete('/api/discussions/:id', async (req, res) => {
     
     if (user_type === 'lecturer') {
       // Lecturer can delete discussions in their programs
-      const programResult = await pool.query(
+      const programResult = await queryWithRetry(
         'SELECT * FROM programs WHERE name = $1 AND (lecturer_id = $2 OR lecturer_name = $3)',
         [discussion.program, user_id, req.body.username]
       );
@@ -8843,7 +8843,7 @@ app.delete('/api/discussions/:id', async (req, res) => {
     }
     
     // Delete the discussion (CASCADE will automatically delete replies)
-    const deleteResult = await pool.query(
+    const deleteResult = await queryWithRetry(
       'DELETE FROM discussions WHERE id = $1 RETURNING *',
       [id]
     );
@@ -8875,7 +8875,7 @@ app.delete('/api/discussion-replies/:id', async (req, res) => {
     console.log('Delete Type:', delete_type);
     
     // Get the reply to check permissions
-    const replyResult = await pool.query(
+    const replyResult = await queryWithRetry(
       'SELECT * FROM discussion_replies WHERE id = $1',
       [id]
     );
@@ -8899,13 +8899,13 @@ app.delete('/api/discussion-replies/:id', async (req, res) => {
     
     if (delete_type === 'all') {
       // Delete for everyone - permanently remove from database
-      const deleteResult = await pool.query(
+      const deleteResult = await queryWithRetry(
         'DELETE FROM discussion_replies WHERE id = $1 RETURNING *',
         [id]
       );
       
       // Update discussion reply count
-      await pool.query(
+      await queryWithRetry(
         'UPDATE discussions SET replies = GREATEST(0, replies - 1) WHERE id = $1',
         [reply.discussion_id]
       );
@@ -8920,13 +8920,13 @@ app.delete('/api/discussion-replies/:id', async (req, res) => {
     } else {
       // Delete for me only - mark as hidden for this user
       // For now, we'll just delete it (can be enhanced later with a hidden_for field)
-      const deleteResult = await pool.query(
+      const deleteResult = await queryWithRetry(
         'DELETE FROM discussion_replies WHERE id = $1 RETURNING *',
         [id]
       );
       
       // Update discussion reply count
-      await pool.query(
+      await queryWithRetry(
         'UPDATE discussions SET replies = GREATEST(0, replies - 1) WHERE id = $1',
         [reply.discussion_id]
       );
@@ -8952,7 +8952,7 @@ const initializeAnnouncementsTable = async () => {
     console.log('Initializing announcements table...');
     
     // Drop and recreate announcements table
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS announcements (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -8977,7 +8977,7 @@ const initializeAnnouncementsTable = async () => {
 // Initialize short-term programs table
 const initializeShortTermProgramsTable = async () => {
   try {
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS short_term_programs (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -9013,7 +9013,7 @@ app.get('/api/announcements', async (req, res) => {
     
     // If no student info provided, return all announcements (for admin/lecturer view)
     if (!student_id && !student_username) {
-      const result = await pool.query(
+      const result = await queryWithRetry(
         'SELECT * FROM announcements ORDER BY created_at DESC'
       );
       return res.json({ success: true, data: result.rows });
@@ -9022,7 +9022,7 @@ app.get('/api/announcements', async (req, res) => {
     // Get student information with college, department, and course details
     let studentInfo = null;
     if (student_id) {
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, 
                c.name as course_name,
                d.name as department_name,
@@ -9038,7 +9038,7 @@ app.get('/api/announcements', async (req, res) => {
         studentInfo = studentResult.rows[0];
       }
     } else if (student_username) {
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, 
                c.name as course_name,
                d.name as department_name,
@@ -9063,7 +9063,7 @@ app.get('/api/announcements', async (req, res) => {
     console.log('Student Info:', studentInfo);
     
     // Get student's programs (regular + short-term)
-    const programsResult = await pool.query(
+    const programsResult = await queryWithRetry(
       'SELECT name FROM programs WHERE course_id = $1',
       [studentInfo.course_id]
     );
@@ -9071,7 +9071,7 @@ app.get('/api/announcements', async (req, res) => {
     
     // Add short-term programs that student is eligible for
     try {
-      const shortTermResult = await pool.query(
+      const shortTermResult = await queryWithRetry(
         'SELECT * FROM short_term_programs WHERE end_date > NOW()'
       );
       
@@ -9099,7 +9099,7 @@ app.get('/api/announcements', async (req, res) => {
     console.log('Student Programs (Regular + Short-Term):', studentPrograms);
     
     // Fetch all announcements
-    const announcementsResult = await pool.query(
+    const announcementsResult = await queryWithRetry(
       'SELECT * FROM announcements ORDER BY created_at DESC'
     );
     
@@ -9211,7 +9211,7 @@ app.delete('/api/announcements/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'DELETE FROM announcements WHERE id = $1 RETURNING *',
       [id]
     );
@@ -9240,7 +9240,7 @@ app.get('/api/short-term-programs', async (req, res) => {
       console.log('Lecturer Username:', lecturer_username);
       
       // Find lecturer first - try direct field matches
-      let lecturerResult = await pool.query(
+      let lecturerResult = await queryWithRetry(
         'SELECT id, employee_id, name FROM lecturers WHERE employee_id = $1 OR email = $1 OR name = $1',
         [lecturer_username]
       );
@@ -9248,14 +9248,14 @@ app.get('/api/short-term-programs', async (req, res) => {
       // If not found, try to find via password_records table using username
       if (lecturerResult.rows.length === 0) {
         console.log('Lecturer not found by direct match, checking password_records...');
-        const passwordResult = await pool.query(
+        const passwordResult = await queryWithRetry(
           'SELECT user_id FROM password_records WHERE username = $1 AND user_type = $2',
           [lecturer_username, 'lecturer']
         );
         
         if (passwordResult.rows.length > 0) {
           console.log('Found lecturer via password_records, user_id:', passwordResult.rows[0].user_id);
-          lecturerResult = await pool.query(
+          lecturerResult = await queryWithRetry(
             'SELECT id, employee_id, name FROM lecturers WHERE id = $1',
             [passwordResult.rows[0].user_id]
           );
@@ -9265,7 +9265,7 @@ app.get('/api/short-term-programs', async (req, res) => {
       // If still not found, try case-insensitive search
       if (lecturerResult.rows.length === 0) {
         console.log('Trying case-insensitive search...');
-        lecturerResult = await pool.query(
+        lecturerResult = await queryWithRetry(
           'SELECT id, employee_id, name FROM lecturers WHERE LOWER(employee_id) = LOWER($1) OR LOWER(email) = LOWER($1) OR LOWER(name) = LOWER($1)',
           [lecturer_username]
         );
@@ -9284,7 +9284,7 @@ app.get('/api/short-term-programs', async (req, res) => {
       
       // More flexible query using ILIKE for partial matching
       // FIXED: Also match by username (employee_id) in lecturer_name field
-      const result = await pool.query(
+      const result = await queryWithRetry(
         `SELECT * FROM short_term_programs 
          WHERE lecturer_id = $1 
             OR lecturer_name = $2 
@@ -9304,11 +9304,11 @@ app.get('/api/short-term-programs', async (req, res) => {
         console.log('=== NO SHORT-TERM PROGRAMS FOUND - DEBUGGING ===');
         
         // Check total short-term programs in database
-        const totalShortTermPrograms = await pool.query('SELECT COUNT(*) FROM short_term_programs');
+        const totalShortTermPrograms = await queryWithRetry('SELECT COUNT(*) FROM short_term_programs');
         console.log('Total short-term programs in database:', totalShortTermPrograms.rows[0].count);
         
         // Check short-term programs with lecturer assignments
-        const shortTermWithLecturer = await pool.query(`
+        const shortTermWithLecturer = await queryWithRetry(`
           SELECT id, title, lecturer_id, lecturer_name 
           FROM short_term_programs 
           WHERE lecturer_id IS NOT NULL OR lecturer_name IS NOT NULL 
@@ -9321,7 +9321,7 @@ app.get('/api/short-term-programs', async (req, res) => {
     }
     
     // Otherwise return all programs (admin view)
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT * FROM short_term_programs ORDER BY created_at DESC'
     );
     
@@ -9341,7 +9341,7 @@ app.get('/api/short-term-programs/lecturer/:lecturer_id', async (req, res) => {
     console.log('Lecturer ID:', lecturer_id);
     
     // Get lecturer info for flexible matching
-    const lecturerResult = await pool.query(
+    const lecturerResult = await queryWithRetry(
       'SELECT employee_id, name FROM lecturers WHERE id = $1',
       [lecturer_id]
     );
@@ -9354,7 +9354,7 @@ app.get('/api/short-term-programs/lecturer/:lecturer_id', async (req, res) => {
     const lecturer = lecturerResult.rows[0];
     
     // Get programs assigned to this lecturer with flexible matching
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `SELECT * FROM short_term_programs 
        WHERE lecturer_id = $1 
           OR lecturer_name = $2 
@@ -9392,7 +9392,7 @@ app.get('/api/short-term-programs/student', async (req, res) => {
     // Get student information with college, department, and course details
     let studentInfo = null;
     if (student_id) {
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, 
                c.name as course_name,
                d.name as department_name,
@@ -9408,7 +9408,7 @@ app.get('/api/short-term-programs/student', async (req, res) => {
         studentInfo = studentResult.rows[0];
       }
     } else if (student_username) {
-      const studentResult = await pool.query(`
+      const studentResult = await queryWithRetry(`
         SELECT s.*, 
                c.name as course_name,
                d.name as department_name,
@@ -9433,7 +9433,7 @@ app.get('/api/short-term-programs/student', async (req, res) => {
     console.log('Student Info:', studentInfo);
     
     // Get student's programs
-    const programsResult = await pool.query(
+    const programsResult = await queryWithRetry(
       'SELECT name FROM programs WHERE course_id = $1',
       [studentInfo.course_id]
     );
@@ -9442,7 +9442,7 @@ app.get('/api/short-term-programs/student', async (req, res) => {
     console.log('Student Programs:', studentPrograms);
     
     // Get all active short-term programs
-    const shortTermResult = await pool.query(
+    const shortTermResult = await queryWithRetry(
       'SELECT * FROM short_term_programs WHERE end_date > NOW() ORDER BY created_at DESC'
     );
     
@@ -9588,7 +9588,7 @@ app.post('/api/short-term-programs', async (req, res) => {
     console.log('=== CREATING SHORT-TERM PROGRAM ===');
     console.log('Program Data:', req.body);
 
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `INSERT INTO short_term_programs 
        (title, description, duration_value, duration_unit, start_date, end_date, 
         target_type, target_value, lecturer_id, lecturer_name, created_by, created_by_id) 
@@ -9611,7 +9611,7 @@ app.delete('/api/short-term-programs/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'DELETE FROM short_term_programs WHERE id = $1 RETURNING *',
       [id]
     );
@@ -9633,7 +9633,7 @@ app.patch('/api/short-term-programs/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'UPDATE short_term_programs SET status = $1 WHERE id = $2 RETURNING *',
       [status, id]
     );
@@ -9669,7 +9669,7 @@ app.get('/api/students/by-lecturer', async (req, res) => {
     }
     
     // Get students enrolled in lecturer's programs
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT DISTINCT s.id, s.name, s.registration_number, s.academic_year, 
              s.course_id, s.current_semester, s.email, s.phone, s.created_at,
              c.name as course_name, d.name as department_name, col.name as college_name
@@ -9710,7 +9710,7 @@ app.get('/api/assignments/lecturer', async (req, res) => {
     }
     
     // Get assignments created by this lecturer
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT a.*, p.name as program_name
       FROM assignments a
       LEFT JOIN programs p ON a.program_id = p.id
@@ -9745,7 +9745,7 @@ app.get('/api/assignments/student', async (req, res) => {
     // Get student information
     let studentInfo = null;
     if (student_id) {
-      const studentResult = await pool.query(
+      const studentResult = await queryWithRetry(
         'SELECT * FROM students WHERE id = $1',
         [student_id]
       );
@@ -9753,7 +9753,7 @@ app.get('/api/assignments/student', async (req, res) => {
         studentInfo = studentResult.rows[0];
       }
     } else if (student_username) {
-      const studentResult = await pool.query(
+      const studentResult = await queryWithRetry(
         'SELECT * FROM students WHERE registration_number = $1 OR email = $1',
         [student_username]
       );
@@ -9770,7 +9770,7 @@ app.get('/api/assignments/student', async (req, res) => {
     console.log('Student Info:', studentInfo);
     
     // Get student's programs
-    const programsResult = await pool.query(
+    const programsResult = await queryWithRetry(
       'SELECT id FROM programs WHERE course_id = $1',
       [studentInfo.course_id]
     );
@@ -9782,7 +9782,7 @@ app.get('/api/assignments/student', async (req, res) => {
     }
     
     // Get assignments for student's programs
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT a.*, p.name as program_name
       FROM assignments a
       LEFT JOIN programs p ON a.program_id = p.id
@@ -9814,7 +9814,7 @@ app.get('/api/announcements/lecturer', async (req, res) => {
     }
     
     // Get announcements created by this lecturer
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT * FROM announcements 
       WHERE created_by = $1 AND created_by_type = 'lecturer'
       ORDER BY created_at DESC
@@ -9847,7 +9847,7 @@ app.get('/api/live-classes/student', async (req, res) => {
     // Get student information
     let studentInfo = null;
     if (student_id) {
-      const studentResult = await pool.query(
+      const studentResult = await queryWithRetry(
         'SELECT * FROM students WHERE id = $1',
         [student_id]
       );
@@ -9855,7 +9855,7 @@ app.get('/api/live-classes/student', async (req, res) => {
         studentInfo = studentResult.rows[0];
       }
     } else if (student_username) {
-      const studentResult = await pool.query(
+      const studentResult = await queryWithRetry(
         'SELECT * FROM students WHERE registration_number = $1 OR email = $1',
         [student_username]
       );
@@ -9870,7 +9870,7 @@ app.get('/api/live-classes/student', async (req, res) => {
     }
     
     // Get student's programs
-    const programsResult = await pool.query(
+    const programsResult = await queryWithRetry(
       'SELECT name FROM programs WHERE course_id = $1',
       [studentInfo.course_id]
     );
@@ -9882,7 +9882,7 @@ app.get('/api/live-classes/student', async (req, res) => {
     }
     
     // Get live classes for student's programs
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT * FROM live_classes 
       WHERE program_name = ANY($1)
       ORDER BY scheduled_time DESC
@@ -9903,7 +9903,7 @@ app.get('/api/live-classes/student', async (req, res) => {
 // Initialize timetable table
 const initializeTimetableTable = async () => {
   try {
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS timetable (
         id SERIAL PRIMARY KEY,
         day VARCHAR(20) NOT NULL,
@@ -9930,7 +9930,7 @@ const initializeTimetableTable = async () => {
 // Initialize venues table
 const initializeVenuesTable = async () => {
   try {
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS venues (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -9954,7 +9954,7 @@ const initializeVenuesTable = async () => {
 app.get('/api/timetable', async (req, res) => {
   try {
     console.log('=== TIMETABLE GET ALL DEBUG ===');
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT * FROM timetable 
       ORDER BY 
         CASE day 
@@ -10014,7 +10014,7 @@ app.post('/api/timetable', async (req, res) => {
     }
 
     // Check for time conflicts
-    const conflictCheck = await pool.query(`
+    const conflictCheck = await queryWithRetry(`
       SELECT * FROM timetable 
       WHERE day = $1 
       AND venue = $2 
@@ -10034,7 +10034,7 @@ app.post('/api/timetable', async (req, res) => {
     }
 
     // Insert new timetable entry
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       INSERT INTO timetable (
         day, time_start, time_end, program_name, lecturer_name, venue,
         course_name, department_name, college_name, semester, academic_year
@@ -10076,7 +10076,7 @@ app.put('/api/timetable/:id', async (req, res) => {
     console.log('Update data:', req.body);
 
     // Check for time conflicts (excluding current entry)
-    const conflictCheck = await pool.query(`
+    const conflictCheck = await queryWithRetry(`
       SELECT * FROM timetable 
       WHERE day = $1 
       AND venue = $2 
@@ -10096,7 +10096,7 @@ app.put('/api/timetable/:id', async (req, res) => {
       });
     }
 
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       UPDATE timetable SET 
         day = $1, time_start = $2, time_end = $3, program_name = $4, 
         lecturer_name = $5, venue = $6, course_name = $7, 
@@ -10129,7 +10129,7 @@ app.delete('/api/timetable/:id', async (req, res) => {
     console.log('=== TIMETABLE DELETE DEBUG ===');
     console.log('Deleting entry ID:', id);
 
-    const result = await pool.query('DELETE FROM timetable WHERE id = $1 RETURNING *', [id]);
+    const result = await queryWithRetry('DELETE FROM timetable WHERE id = $1 RETURNING *', [id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Timetable entry not found' });
@@ -10151,7 +10151,7 @@ app.get('/api/timetable/lecturer/:lecturerName', async (req, res) => {
     console.log('=== LECTURER TIMETABLE DEBUG ===');
     console.log('Fetching timetable for lecturer:', lecturerName);
 
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT * FROM timetable 
       WHERE lecturer_name = $1 
       ORDER BY 
@@ -10183,7 +10183,7 @@ app.get('/api/timetable/program/:programName', async (req, res) => {
     console.log('=== PROGRAM TIMETABLE DEBUG ===');
     console.log('Fetching timetable for program:', programName);
 
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT * FROM timetable 
       WHERE program_name = $1 
       ORDER BY 
@@ -10210,10 +10210,10 @@ app.get('/api/timetable/program/:programName', async (req, res) => {
 // Get timetable statistics
 app.get('/api/timetable/stats', async (req, res) => {
   try {
-    const totalEntries = await pool.query('SELECT COUNT(*) FROM timetable');
-    const activeLecturers = await pool.query('SELECT COUNT(DISTINCT lecturer_name) FROM timetable');
-    const programsScheduled = await pool.query('SELECT COUNT(DISTINCT program_name) FROM timetable');
-    const venuesUsed = await pool.query('SELECT COUNT(DISTINCT venue) FROM timetable');
+    const totalEntries = await queryWithRetry('SELECT COUNT(*) FROM timetable');
+    const activeLecturers = await queryWithRetry('SELECT COUNT(DISTINCT lecturer_name) FROM timetable');
+    const programsScheduled = await queryWithRetry('SELECT COUNT(DISTINCT program_name) FROM timetable');
+    const venuesUsed = await queryWithRetry('SELECT COUNT(DISTINCT venue) FROM timetable');
 
     const stats = {
       totalSchedules: parseInt(totalEntries.rows[0].count),
@@ -10237,7 +10237,7 @@ app.get('/api/timetable/stats', async (req, res) => {
 // Get all venues
 app.get('/api/venues', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM venues ORDER BY name');
+    const result = await queryWithRetry('SELECT * FROM venues ORDER BY name');
     console.log('=== VENUES API DEBUG ===');
     console.log('Total venues:', result.rows.length);
     console.log('Venues:', result.rows);
@@ -10273,7 +10273,7 @@ app.post('/api/venues', async (req, res) => {
     }
 
     // Check for duplicate venue names
-    const duplicateCheck = await pool.query(
+    const duplicateCheck = await queryWithRetry(
       'SELECT * FROM venues WHERE name = $1 OR short_name = $2',
       [name, short_name]
     );
@@ -10286,7 +10286,7 @@ app.post('/api/venues', async (req, res) => {
     }
 
     // Insert new venue
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       INSERT INTO venues (name, short_name, capacity, type, building, floor, description) 
       VALUES ($1, $2, $3, $4, $5, $6, $7) 
       RETURNING *
@@ -10318,7 +10318,7 @@ app.put('/api/venues/:id', async (req, res) => {
     console.log('Updating venue ID:', id);
     console.log('Update data:', req.body);
 
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       UPDATE venues SET 
         name = $1, short_name = $2, capacity = $3, type = $4, 
         building = $5, floor = $6, description = $7, updated_at = CURRENT_TIMESTAMP
@@ -10347,7 +10347,7 @@ app.delete('/api/venues/:id', async (req, res) => {
     console.log('Deleting venue ID:', id);
 
     // Check if venue is being used in timetable
-    const usageCheck = await pool.query('SELECT COUNT(*) as count FROM timetable WHERE venue = (SELECT name FROM venues WHERE id = $1)', [id]);
+    const usageCheck = await queryWithRetry('SELECT COUNT(*) as count FROM timetable WHERE venue = (SELECT name FROM venues WHERE id = $1)', [id]);
     
     if (parseInt(usageCheck.rows[0].count) > 0) {
       return res.status(400).json({
@@ -10356,7 +10356,7 @@ app.delete('/api/venues/:id', async (req, res) => {
       });
     }
 
-    const result = await pool.query('DELETE FROM venues WHERE id = $1 RETURNING *', [id]);
+    const result = await queryWithRetry('DELETE FROM venues WHERE id = $1 RETURNING *', [id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Venue not found' });
@@ -10376,7 +10376,7 @@ app.delete('/api/venues/:id', async (req, res) => {
 const createPasswordResetTable = async () => {
   try {
     // Create password_reset_logs table
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS password_reset_logs (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL,
@@ -10393,7 +10393,7 @@ const createPasswordResetTable = async () => {
 
     // Make sure reset_code column can hold longer markers (e.g. 'MANUAL_RESET')
     try {
-      await pool.query(`
+      await queryWithRetry(`
         ALTER TABLE password_reset_logs
         ALTER COLUMN reset_code TYPE VARCHAR(255)
       `);
@@ -10403,7 +10403,7 @@ const createPasswordResetTable = async () => {
     }
 
     // Create admin_settings table for admin email
-    await pool.query(`
+    await queryWithRetry(`
       CREATE TABLE IF NOT EXISTS admin_settings (
         id SERIAL PRIMARY KEY,
         setting_key VARCHAR(100) UNIQUE NOT NULL,
@@ -10413,7 +10413,7 @@ const createPasswordResetTable = async () => {
     `);
 
     // Insert default admin email if not exists
-    await pool.query(`
+    await queryWithRetry(`
       INSERT INTO admin_settings (setting_key, setting_value) 
       VALUES ('admin_email', 'uj23hiueddhpna2y@ethereal.email')
       ON CONFLICT (setting_key) DO NOTHING
@@ -10445,7 +10445,7 @@ app.post('/api/password-reset/manual', async (req, res) => {
     let userEmail = '';
     
     if (userType === 'student') {
-      updateResult = await pool.query(
+      updateResult = await queryWithRetry(
         'UPDATE students SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING name, email',
         [newPassword, userId]
       );
@@ -10454,7 +10454,7 @@ app.post('/api/password-reset/manual', async (req, res) => {
         userEmail = updateResult.rows[0].email;
       }
     } else if (userType === 'lecturer') {
-      updateResult = await pool.query(
+      updateResult = await queryWithRetry(
         'UPDATE lecturers SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING name, email',
         [newPassword, userId]
       );
@@ -10469,13 +10469,13 @@ app.post('/api/password-reset/manual', async (req, res) => {
     }
     
     // Update password_records table
-    await pool.query(
+    await queryWithRetry(
       'UPDATE password_records SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE user_type = $2 AND user_id = $3',
       [newPassword, userType, userId]
     );
     
     // Log the manual reset
-    await pool.query(
+    await queryWithRetry(
       `INSERT INTO password_reset_logs (user_id, user_name, email, user_type, reset_code, expires_at, used, used_at) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [userId, userName, adminEmail, userType, 'MANUAL_RESET', new Date(Date.now() + 24*60*60*1000), true, new Date()]
@@ -10514,12 +10514,12 @@ app.post('/api/password-reset/verify-email', async (req, res) => {
     let user = null;
     
     if (userType === 'student') {
-      const result = await pool.query('SELECT id, name, email FROM students WHERE email = $1', [email]);
+      const result = await queryWithRetry('SELECT id, name, email FROM students WHERE email = $1', [email]);
       if (result.rows.length > 0) {
         user = result.rows[0];
       }
     } else if (userType === 'lecturer') {
-      const result = await pool.query('SELECT id, name, email FROM lecturers WHERE email = $1', [email]);
+      const result = await queryWithRetry('SELECT id, name, email FROM lecturers WHERE email = $1', [email]);
       if (result.rows.length > 0) {
         user = result.rows[0];
       }
@@ -10568,14 +10568,14 @@ app.post('/api/password-reset/send-code', async (req, res) => {
     let userName = '';
     
     if (userType === 'student') {
-      const result = await pool.query('SELECT id, name, email FROM students WHERE email = $1', [email]);
+      const result = await queryWithRetry('SELECT id, name, email FROM students WHERE email = $1', [email]);
       if (result.rows.length > 0) {
         user = result.rows[0];
         userId = user.id;
         userName = user.name;
       }
     } else if (userType === 'lecturer') {
-      const result = await pool.query('SELECT id, name, email FROM lecturers WHERE email = $1', [email]);
+      const result = await queryWithRetry('SELECT id, name, email FROM lecturers WHERE email = $1', [email]);
       if (result.rows.length > 0) {
         user = result.rows[0];
         userId = user.id;
@@ -10595,7 +10595,7 @@ app.post('/api/password-reset/send-code', async (req, res) => {
     const expiresAt = new Date(Date.now() + 15*60*1000); // 15 minutes expiry
     
     // Save reset code to database
-    await pool.query(
+    await queryWithRetry(
       `INSERT INTO password_reset_logs (user_id, user_name, email, user_type, reset_code, expires_at) 
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [userId, userName, email, userType, resetCode, expiresAt]
@@ -10646,7 +10646,7 @@ app.post('/api/password-reset/verify-and-reset', async (req, res) => {
     console.log('User Type:', userType);
     
     // Find valid reset code
-    const codeResult = await pool.query(
+    const codeResult = await queryWithRetry(
       `SELECT * FROM password_reset_logs 
        WHERE email = $1 AND reset_code = $2 AND user_type = $3 AND used = FALSE AND expires_at > CURRENT_TIMESTAMP
        ORDER BY created_at DESC LIMIT 1`,
@@ -10665,12 +10665,12 @@ app.post('/api/password-reset/verify-and-reset', async (req, res) => {
     // Update password in respective table
     let updateResult;
     if (userType === 'student') {
-      updateResult = await pool.query(
+      updateResult = await queryWithRetry(
         'UPDATE students SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING name, email',
         [newPassword, resetLog.user_id]
       );
     } else if (userType === 'lecturer') {
-      updateResult = await pool.query(
+      updateResult = await queryWithRetry(
         'UPDATE lecturers SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING name, email',
         [newPassword, resetLog.user_id]
       );
@@ -10681,13 +10681,13 @@ app.post('/api/password-reset/verify-and-reset', async (req, res) => {
     }
     
     // Update password_records table
-    await pool.query(
+    await queryWithRetry(
       'UPDATE password_records SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE user_type = $2 AND user_id = $3',
       [newPassword, userType, resetLog.user_id]
     );
     
     // Mark reset code as used
-    await pool.query(
+    await queryWithRetry(
       'UPDATE password_reset_logs SET used = TRUE, used_at = CURRENT_TIMESTAMP WHERE id = $1',
       [resetLog.id]
     );
@@ -10751,7 +10751,7 @@ app.post('/api/password-reset/verify-and-reset', async (req, res) => {
 // Get password reset logs endpoint
 app.get('/api/password-reset-logs', async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await queryWithRetry(`
       SELECT * FROM password_reset_logs 
       ORDER BY created_at DESC 
       LIMIT 50
@@ -10781,12 +10781,12 @@ app.post('/api/user/lock', async (req, res) => {
     let updateResult;
     
     if (userType === 'student') {
-      updateResult = await pool.query(
+      updateResult = await queryWithRetry(
         'UPDATE students SET is_locked = TRUE, locked_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING name, email, is_locked',
         [userId]
       );
     } else if (userType === 'lecturer') {
-      updateResult = await pool.query(
+      updateResult = await queryWithRetry(
         'UPDATE lecturers SET is_locked = TRUE, locked_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING name, email, is_locked',
         [userId]
       );
@@ -10831,12 +10831,12 @@ app.post('/api/user/unlock', async (req, res) => {
     let updateResult;
     
     if (userType === 'student') {
-      updateResult = await pool.query(
+      updateResult = await queryWithRetry(
         'UPDATE students SET is_locked = FALSE, locked_at = NULL WHERE id = $1 RETURNING name, email, is_locked',
         [userId]
       );
     } else if (userType === 'lecturer') {
-      updateResult = await pool.query(
+      updateResult = await queryWithRetry(
         'UPDATE lecturers SET is_locked = FALSE, locked_at = NULL WHERE id = $1 RETURNING name, email, is_locked',
         [userId]
       );
@@ -10900,7 +10900,7 @@ app.post('/api/admin/configure-email', async (req, res) => {
 // Get admin email
 app.get('/api/admin/email', async (req, res) => {
   try {
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT setting_value FROM admin_settings WHERE setting_key = $1',
       ['admin_email']
     );
@@ -10935,7 +10935,7 @@ app.post('/api/admin/email', async (req, res) => {
     }
     
     // Update admin email in database
-    await pool.query(`
+    await queryWithRetry(`
       INSERT INTO admin_settings (setting_key, setting_value, updated_at) 
       VALUES ('admin_email', $1, CURRENT_TIMESTAMP)
       ON CONFLICT (setting_key) 
@@ -10981,7 +10981,7 @@ app.post('/api/change-password', async (req, res) => {
     
     // Get user from database
     const userQuery = `SELECT * FROM ${table} WHERE ${idField} = $1`;
-    const userResult = await pool.query(userQuery, [username]);
+    const userResult = await queryWithRetry(userQuery, [username]);
     
     if (userResult.rows.length === 0) {
       console.log('User not found in database');
@@ -11010,7 +11010,7 @@ app.post('/api/change-password', async (req, res) => {
     
     // Update password
     const updateQuery = `UPDATE ${table} SET password = $1 WHERE ${idField} = $2 RETURNING *`;
-    const updateResult = await pool.query(updateQuery, [newPassword, username]);
+    const updateResult = await queryWithRetry(updateQuery, [newPassword, username]);
     
     if (updateResult.rows.length === 0) {
       console.log('Failed to update password');
@@ -11024,7 +11024,7 @@ app.post('/api/change-password', async (req, res) => {
     
     // Also update in password_records table if it exists
     try {
-      await pool.query(`
+      await queryWithRetry(`
         UPDATE password_records 
         SET password = $1, updated_at = CURRENT_TIMESTAMP 
         WHERE user_type = $2 AND (user_id = $3 OR username = $4)
@@ -11094,7 +11094,7 @@ app.post('/api/students/bulk-upload', async (req, res) => {
         // Check if it's a numeric ID
         if (!isNaN(courseIdValue) && Number.isInteger(Number(courseIdValue))) {
           // It's a numeric ID, verify it exists
-          const courseCheck = await pool.query(
+          const courseCheck = await queryWithRetry(
             'SELECT id FROM courses WHERE id = $1',
             [parseInt(courseIdValue)]
           );
@@ -11111,7 +11111,7 @@ app.post('/api/students/bulk-upload', async (req, res) => {
           }
         } else {
           // It's a string - try to find by code first, then by name
-          const courseCheck = await pool.query(
+          const courseCheck = await queryWithRetry(
             'SELECT id FROM courses WHERE code = $1 OR name = $1',
             [courseIdValue]
           );
@@ -11129,7 +11129,7 @@ app.post('/api/students/bulk-upload', async (req, res) => {
         }
 
         // Check if email already exists
-        const existingEmail = await pool.query(
+        const existingEmail = await queryWithRetry(
           'SELECT id FROM students WHERE email = $1',
           [student.email]
         );
@@ -11145,7 +11145,7 @@ app.post('/api/students/bulk-upload', async (req, res) => {
 
         // Check if registration number already exists (if provided)
         if (student.registrationNumber) {
-          const existingRegNumber = await pool.query(
+          const existingRegNumber = await queryWithRetry(
             'SELECT id FROM students WHERE registration_number = $1',
             [student.registrationNumber]
           );
@@ -11164,7 +11164,7 @@ app.post('/api/students/bulk-upload', async (req, res) => {
         // Generate registration number if not provided
         const registrationNumber = student.registrationNumber || `MUST/${new Date().getFullYear()}/${String(Date.now()).slice(-6)}`;
         
-        const result = await pool.query(
+        const result = await queryWithRetry(
           `INSERT INTO students (name, registration_number, academic_year, course_id, current_semester, email, phone, password, year_of_study, academic_level) 
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
           [
@@ -11182,7 +11182,7 @@ app.post('/api/students/bulk-upload', async (req, res) => {
         );
 
         // Save to password records
-        await pool.query(
+        await queryWithRetry(
           `INSERT INTO password_records (user_type, user_id, username, password_hash) 
            VALUES ('student', $1, $2, $3)`,
           [result.rows[0].id, registrationNumber, student.password || 'student123']
@@ -11248,7 +11248,7 @@ app.post('/api/course-management/bulk-upload', async (req, res) => {
 
         // 1. College
         if (record.collegeName) {
-          const collegeResult = await pool.query(
+          const collegeResult = await queryWithRetry(
             'SELECT id FROM colleges WHERE name = $1',
             [record.collegeName]
           );
@@ -11256,7 +11256,7 @@ app.post('/api/course-management/bulk-upload', async (req, res) => {
           if (collegeResult.rows.length > 0) {
             collegeId = collegeResult.rows[0].id;
           } else {
-            const newCollege = await pool.query(
+            const newCollege = await queryWithRetry(
               `INSERT INTO colleges (name, short_name, description, established)
                VALUES ($1, $2, $3, $4) RETURNING id`,
               [
@@ -11272,7 +11272,7 @@ app.post('/api/course-management/bulk-upload', async (req, res) => {
 
         // 2. Department
         if (record.departmentName) {
-          const departmentResult = await pool.query(
+          const departmentResult = await queryWithRetry(
             'SELECT id FROM departments WHERE name = $1',
             [record.departmentName]
           );
@@ -11280,7 +11280,7 @@ app.post('/api/course-management/bulk-upload', async (req, res) => {
           if (departmentResult.rows.length > 0) {
             departmentId = departmentResult.rows[0].id;
           } else {
-            const newDepartment = await pool.query(
+            const newDepartment = await queryWithRetry(
               `INSERT INTO departments (name, college_id, description, head_of_department)
                VALUES ($1, $2, $3, $4) RETURNING id`,
               [
@@ -11299,7 +11299,7 @@ app.post('/api/course-management/bulk-upload', async (req, res) => {
           let courseResult = null;
 
           if (record.courseCode) {
-            courseResult = await pool.query(
+            courseResult = await queryWithRetry(
               'SELECT id FROM courses WHERE code = $1',
               [record.courseCode]
             );
@@ -11307,7 +11307,7 @@ app.post('/api/course-management/bulk-upload', async (req, res) => {
 
           if (!courseResult || courseResult.rows.length === 0) {
             if (record.courseName) {
-              const fallbackCourseResult = await pool.query(
+              const fallbackCourseResult = await queryWithRetry(
                 'SELECT id FROM courses WHERE name = $1',
                 [record.courseName]
               );
@@ -11321,7 +11321,7 @@ app.post('/api/course-management/bulk-upload', async (req, res) => {
           if (courseResult && courseResult.rows.length > 0) {
             courseId = courseResult.rows[0].id;
           } else {
-            const newCourse = await pool.query(
+            const newCourse = await queryWithRetry(
               `INSERT INTO courses (name, code, department_id, duration, academic_level, year_of_study, description)
                VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
               [
@@ -11343,7 +11343,7 @@ app.post('/api/course-management/bulk-upload', async (req, res) => {
           // Try to find lecturer by name or employee_id
           let lecturerId = null;
           if (record.programLecturerName) {
-            const lecturerResult = await pool.query(
+            const lecturerResult = await queryWithRetry(
               'SELECT id FROM lecturers WHERE name = $1 OR employee_id = $1',
               [record.programLecturerName]
             );
@@ -11352,7 +11352,7 @@ app.post('/api/course-management/bulk-upload', async (req, res) => {
             }
           }
 
-          const programResult = await pool.query(
+          const programResult = await queryWithRetry(
             `INSERT INTO programs (name, course_id, lecturer_id, credits, total_semesters, duration, lecturer_name, description)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
             [
@@ -11436,7 +11436,7 @@ app.post('/api/lecturers/bulk-upload', async (req, res) => {
         }
 
         // Check if email already exists
-        const existingEmail = await pool.query(
+        const existingEmail = await queryWithRetry(
           'SELECT id FROM lecturers WHERE email = $1',
           [lecturer.email]
         );
@@ -11451,7 +11451,7 @@ app.post('/api/lecturers/bulk-upload', async (req, res) => {
         }
 
         // Check if employee ID already exists
-        const existingEmployeeId = await pool.query(
+        const existingEmployeeId = await queryWithRetry(
           'SELECT id FROM lecturers WHERE employee_id = $1',
           [lecturer.employeeId]
         );
@@ -11466,7 +11466,7 @@ app.post('/api/lecturers/bulk-upload', async (req, res) => {
         }
 
         // Insert lecturer
-        const result = await pool.query(
+        const result = await queryWithRetry(
           `INSERT INTO lecturers (name, employee_id, specialization, email, phone, password) 
            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
           [
@@ -11480,7 +11480,7 @@ app.post('/api/lecturers/bulk-upload', async (req, res) => {
         );
 
         // Save to password records
-        await pool.query(
+        await queryWithRetry(
           `INSERT INTO password_records (user_type, user_id, username, password_hash) 
            VALUES ('lecturer', $1, $2, $3)`,
           [result.rows[0].id, lecturer.employeeId, lecturer.password || 'lecturer123']
@@ -11531,7 +11531,7 @@ app.get('/api/progress/student/:student_id', async (req, res) => {
     console.log('Lecturer ID:', lecturer_id);
     
     // Get student info
-    const studentResult = await pool.query(
+    const studentResult = await queryWithRetry(
       'SELECT * FROM students WHERE id = $1',
       [student_id]
     );
@@ -11554,11 +11554,11 @@ app.get('/api/progress/student/:student_id', async (req, res) => {
       assessmentParams.push(lecturer_id);
     }
     
-    const totalAssessmentsResult = await pool.query(assessmentQuery, assessmentParams);
+    const totalAssessmentsResult = await queryWithRetry(assessmentQuery, assessmentParams);
     const totalAssessments = parseInt(totalAssessmentsResult.rows[0].total) || 0;
     
     // Get student's assessment submissions for this program
-    const submittedAssessmentsResult = await pool.query(`
+    const submittedAssessmentsResult = await queryWithRetry(`
       SELECT COUNT(*) as submitted, AVG(COALESCE(percentage, 0)) as avg_score
       FROM assessment_submissions 
       WHERE student_id = $1 AND student_program = $2
@@ -11579,11 +11579,11 @@ app.get('/api/progress/student/:student_id', async (req, res) => {
       assignmentParams.push(lecturer_id);
     }
     
-    const totalAssignmentsResult = await pool.query(assignmentQuery, assignmentParams);
+    const totalAssignmentsResult = await queryWithRetry(assignmentQuery, assignmentParams);
     const totalAssignments = parseInt(totalAssignmentsResult.rows[0].total) || 0;
     
     // Get student's assignment submissions with percentage calculation
-    const submittedAssignmentsResult = await pool.query(`
+    const submittedAssignmentsResult = await queryWithRetry(`
       SELECT 
         COUNT(*) as submitted, 
         AVG(CASE 
@@ -11610,11 +11610,11 @@ app.get('/api/progress/student/:student_id', async (req, res) => {
       liveClassParams.push(lecturer_id);
     }
     
-    const totalLiveClassesResult = await pool.query(liveClassQuery, liveClassParams);
+    const totalLiveClassesResult = await queryWithRetry(liveClassQuery, liveClassParams);
     const totalLiveClasses = parseInt(totalLiveClassesResult.rows[0].total) || 0;
     
     // Get student's live class attendance for this program
-    const attendedLiveClassesResult = await pool.query(`
+    const attendedLiveClassesResult = await queryWithRetry(`
       SELECT COUNT(DISTINCT lcp.class_id) as attended
       FROM live_class_participants lcp
       JOIN live_classes lc ON lcp.class_id = lc.id
@@ -11709,7 +11709,7 @@ app.get('/api/progress/students', async (req, res) => {
     
     // Try multiple approaches to find students
     // 1. Try enrollments table first
-    const studentsResult = await pool.query(`
+    const studentsResult = await queryWithRetry(`
       SELECT DISTINCT s.id, s.name, s.registration_number, s.email
       FROM students s
       JOIN enrollments e ON s.id = e.student_id
@@ -11722,7 +11722,7 @@ app.get('/api/progress/students', async (req, res) => {
     
     // 2. If no enrollments found, try to get students by program_name directly
     if (students.length === 0) {
-      const directStudentsResult = await pool.query(`
+      const directStudentsResult = await queryWithRetry(`
         SELECT DISTINCT s.id, s.name, s.registration_number, s.email
         FROM students s
         WHERE s.program_name = $1
@@ -11734,7 +11734,7 @@ app.get('/api/progress/students', async (req, res) => {
     
     // 3. If still no students, try case-insensitive search
     if (students.length === 0) {
-      const caseInsensitiveResult = await pool.query(`
+      const caseInsensitiveResult = await queryWithRetry(`
         SELECT DISTINCT s.id, s.name, s.registration_number, s.email
         FROM students s
         WHERE LOWER(s.program_name) = LOWER($1)
@@ -11768,9 +11768,9 @@ app.get('/api/progress/students', async (req, res) => {
       queryParams.push(lecturer_id);
     }
     
-    const totalAssessmentsResult = await pool.query(assessmentQuery, queryParams);
-    const totalAssignmentsResult = await pool.query(assignmentQuery, queryParams);
-    const totalLiveClassesResult = await pool.query(liveClassQuery, queryParams);
+    const totalAssessmentsResult = await queryWithRetry(assessmentQuery, queryParams);
+    const totalAssignmentsResult = await queryWithRetry(assignmentQuery, queryParams);
+    const totalLiveClassesResult = await queryWithRetry(liveClassQuery, queryParams);
     
     const totalAssessments = parseInt(totalAssessmentsResult.rows[0].total) || 0;
     const totalAssignments = parseInt(totalAssignmentsResult.rows[0].total) || 0;
@@ -11779,7 +11779,7 @@ app.get('/api/progress/students', async (req, res) => {
     // Get progress for each student
     for (const student of students) {
       // Get student's assessment submissions
-      const submittedAssessmentsResult = await pool.query(`
+      const submittedAssessmentsResult = await queryWithRetry(`
         SELECT COUNT(*) as submitted, AVG(COALESCE(percentage, 0)) as avg_score
         FROM assessment_submissions 
         WHERE student_id = $1 AND student_program = $2
@@ -11789,7 +11789,7 @@ app.get('/api/progress/students', async (req, res) => {
       const avgAssessmentScore = parseFloat(submittedAssessmentsResult.rows[0].avg_score) || 0;
       
       // Get student's assignment submissions with percentage calculation
-      const submittedAssignmentsResult = await pool.query(`
+      const submittedAssignmentsResult = await queryWithRetry(`
         SELECT 
           COUNT(*) as submitted, 
           AVG(CASE 
@@ -11805,7 +11805,7 @@ app.get('/api/progress/students', async (req, res) => {
       const avgAssignmentGrade = parseFloat(submittedAssignmentsResult.rows[0].avg_grade) || 0;
       
       // Get student's live class attendance for this program
-      const attendedLiveClassesResult = await pool.query(`
+      const attendedLiveClassesResult = await queryWithRetry(`
         SELECT COUNT(DISTINCT lcp.class_id) as attended
         FROM live_class_participants lcp
         JOIN live_classes lc ON lcp.class_id = lc.id
@@ -11885,7 +11885,7 @@ app.get('/api/progress/lecturer/:lecturer_id', async (req, res) => {
     console.log('Lecturer ID:', lecturer_id);
     
     // Get lecturer info
-    const lecturerResult = await pool.query(
+    const lecturerResult = await queryWithRetry(
       'SELECT * FROM lecturers WHERE id = $1',
       [lecturer_id]
     );
@@ -11897,13 +11897,13 @@ app.get('/api/progress/lecturer/:lecturer_id', async (req, res) => {
     const lecturer = lecturerResult.rows[0];
     
     // Get programs assigned to this lecturer
-    const programsResult = await pool.query(`
+    const programsResult = await queryWithRetry(`
       SELECT COUNT(*) as total FROM programs WHERE lecturer_id = $1
     `, [lecturer_id]);
     const totalPrograms = parseInt(programsResult.rows[0].total) || 0;
     
     // Get assessment statistics
-    const assessmentStats = await pool.query(`
+    const assessmentStats = await queryWithRetry(`
       SELECT 
         COUNT(*) as total_created,
         COUNT(CASE WHEN status = 'active' OR status = 'published' THEN 1 END) as active,
@@ -11913,7 +11913,7 @@ app.get('/api/progress/lecturer/:lecturer_id', async (req, res) => {
     `, [lecturer_id]);
     
     // Get assignment statistics
-    const assignmentStats = await pool.query(`
+    const assignmentStats = await queryWithRetry(`
       SELECT 
         COUNT(*) as total_created,
         COUNT(CASE WHEN status = 'active' OR status = 'open' THEN 1 END) as active,
@@ -11923,7 +11923,7 @@ app.get('/api/progress/lecturer/:lecturer_id', async (req, res) => {
     `, [lecturer_id]);
     
     // Get live class statistics
-    const liveClassStats = await pool.query(`
+    const liveClassStats = await queryWithRetry(`
       SELECT 
         COUNT(*) as total_created,
         COUNT(CASE WHEN status = 'live' OR status = 'scheduled' THEN 1 END) as active,
@@ -11933,21 +11933,21 @@ app.get('/api/progress/lecturer/:lecturer_id', async (req, res) => {
     `, [lecturer_id]);
     
     // Get course content/materials statistics
-    const contentStats = await pool.query(`
+    const contentStats = await queryWithRetry(`
       SELECT COUNT(*) as total_created
       FROM course_content
       WHERE lecturer_id = $1
     `, [lecturer_id]);
     
     // Get announcement statistics
-    const announcementStats = await pool.query(`
+    const announcementStats = await queryWithRetry(`
       SELECT COUNT(*) as total_created
       FROM announcements
       WHERE created_by_id = $1 AND created_by_type = 'lecturer'
     `, [lecturer_id]);
     
     // Get total students across all programs
-    const studentsResult = await pool.query(`
+    const studentsResult = await queryWithRetry(`
       SELECT COUNT(DISTINCT e.student_id) as total_students
       FROM enrollments e
       JOIN programs p ON e.program_id = p.id
@@ -12027,7 +12027,7 @@ app.get('/api/progress/lecturers', async (req, res) => {
   try {
     console.log('=== FETCHING ALL LECTURERS PROGRESS ===');
     
-    const lecturersResult = await pool.query(`
+    const lecturersResult = await queryWithRetry(`
       SELECT id, name, email, specialization, employee_id, is_active
       FROM lecturers
       ORDER BY name
@@ -12038,22 +12038,22 @@ app.get('/api/progress/lecturers', async (req, res) => {
     
     for (const lecturer of lecturers) {
       // Get quick stats for each lecturer
-      const assessmentCount = await pool.query(
+      const assessmentCount = await queryWithRetry(
         'SELECT COUNT(*) as total FROM assessments WHERE lecturer_id = $1',
         [lecturer.id]
       );
       
-      const assignmentCount = await pool.query(
+      const assignmentCount = await queryWithRetry(
         'SELECT COUNT(*) as total FROM assignments WHERE lecturer_id = $1',
         [lecturer.id]
       );
       
-      const liveClassCount = await pool.query(
+      const liveClassCount = await queryWithRetry(
         'SELECT COUNT(*) as total FROM live_classes WHERE lecturer_id = $1',
         [lecturer.id]
       );
       
-      const programCount = await pool.query(
+      const programCount = await queryWithRetry(
         'SELECT COUNT(*) as total FROM programs WHERE lecturer_id = $1',
         [lecturer.id]
       );
