@@ -10,6 +10,8 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
+console.log('✅ Starting server with latest fixes!');
+
 // Trust proxy for express-rate-limit to work correctly behind reverse proxies (like Render)
 app.set('trust proxy', 1);
 
