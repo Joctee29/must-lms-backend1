@@ -671,11 +671,14 @@ const poolConfig = process.env.DATABASE_URL
   ? {
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000, 
+      idleTimeoutMillis: 30000, 
       max: 20,
+      min: 2, 
       keepAlive: true,
       keepAliveInitialDelayMillis: 10000,
+      allowExitOnIdle: false, 
+      maxUses: 7500 
     }
   : {
       user: process.env.DB_USER || 'postgres',
@@ -685,6 +688,9 @@ const poolConfig = process.env.DATABASE_URL
       port: process.env.DB_PORT || 5432,
       keepAlive: true,
       keepAliveInitialDelayMillis: 10000,
+      allowExitOnIdle: false,
+      maxUses: 7500,
+      min: 2
     };
 
 const pool = new Pool(poolConfig);
@@ -692,7 +698,6 @@ const pool = new Pool(poolConfig);
 // Handle pool errors
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
-  process.exit(-1);
 });
 
 // Test database connection
